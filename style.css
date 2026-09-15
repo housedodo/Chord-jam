@@ -898,6 +898,284 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Song Entry */
+.songentry-container {
+  margin: auto;
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.songentry-player {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Handoff */
+.handoff-container {
+  margin: auto;
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.handoff-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.handoff-player {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.handoff-instrument {
+  font-size: 1rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.handoff-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Piano roll blue grid + red notes */
+.pr-cell {
+  background: #1a2640;
+  border: 1px solid rgba(60, 90, 140, 0.35);
+}
+
+.pr-cell.pr-beat {
+  background: #1e2e4e;
+}
+
+.pr-cell.pr-alt {
+  background: #172238;
+}
+
+.pr-cell.pr-alt.pr-beat {
+  background: #1c2a48;
+}
+
+.pr-note-block {
+  background: #e05545 !important;
+  color: rgba(255,255,255,0.9) !important;
+  border: 1px solid #c43a2a;
+}
+
+.pr-note-block[data-inst="drums"] { background: var(--drums-color) !important; color: rgba(0,0,0,0.6) !important; border: none; }
+
+/* Piano roll resize handle */
+.pr-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+  background: rgba(255,255,255,0.15);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Chord timeline */
+.chord-timeline-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.chord-timeline {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #1a2640;
+}
+.chord-timeline::-webkit-scrollbar { width: 6px; height: 6px; }
+.chord-timeline::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.chord-timeline-canvas {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ct-cell {
+  position: absolute;
+  background: #1a2640;
+  border: 1px solid rgba(60, 90, 140, 0.35);
+  cursor: crosshair;
+}
+
+.ct-cell.ct-beat {
+  background: #1e2e4e;
+}
+
+.ct-beat-num {
+  position: absolute;
+  top: -16px;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  pointer-events: none;
+}
+
+.ct-notes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ct-note-block {
+  position: absolute;
+  background: var(--chords-color);
+  border-radius: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #151520;
+  overflow: hidden;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.ct-note-label {
+  pointer-events: none;
+}
+
+.ct-handle-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+  background: rgba(0,0,0,0.15);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Listen to existing layers button */
+.btn-listen-existing {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Guess section */
+.guess-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.guess-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Listen guesses */
+.listen-guesses {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.guesses-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+
+.guess-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.guess-player {
+  font-weight: 600;
+  font-size: 0.85rem;
+  min-width: 60px;
+}
+
+.guess-text {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.guess-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.guess-badge.correct {
+  background: var(--sage);
+  color: #151520;
+}
+
+.guess-badge.wrong {
+  background: rgba(194, 46, 46, 0.3);
+  color: #e88;
+}
+
+/* Listen counter (Song X of Y) */
+.listen-counter {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* Responsive */
 @media (min-width: 601px) {
   .chord-pick:hover {
