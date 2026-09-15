@@ -167,7 +167,11 @@
     speed: false,
     switcheroo: false,
     voting: false,
-    buildup: false
+    buildup: false,
+    genrelock: false,
+    remix: false,
+    arp: false,
+    vocal: false
   };
   let votes = {};
   let switcherooMap = null;
@@ -175,6 +179,7 @@
   function getActiveInstruments() {
     var insts = BASE_INSTRUMENTS.slice();
     if (gameSettings.sfx) insts.push('sfx');
+    if (gameSettings.vocal) insts.push('vocal');
     return insts;
   }
 
@@ -186,6 +191,10 @@
     gameSettings.switcheroo = !!(document.getElementById(p + 'opt-switcheroo') && document.getElementById(p + 'opt-switcheroo').checked);
     gameSettings.voting = !!(document.getElementById(p + 'opt-voting') && document.getElementById(p + 'opt-voting').checked);
     gameSettings.buildup = !!(document.getElementById(p + 'opt-buildup') && document.getElementById(p + 'opt-buildup').checked);
+    gameSettings.genrelock = !!(document.getElementById(p + 'opt-genrelock') && document.getElementById(p + 'opt-genrelock').checked);
+    gameSettings.remix = !!(document.getElementById(p + 'opt-remix') && document.getElementById(p + 'opt-remix').checked);
+    gameSettings.arp = !!(document.getElementById(p + 'opt-arp') && document.getElementById(p + 'opt-arp').checked);
+    gameSettings.vocal = !!(document.getElementById(p + 'opt-vocal') && document.getElementById(p + 'opt-vocal').checked);
     INSTRUMENTS = getActiveInstruments();
   }
 
@@ -476,6 +485,9 @@
     document.getElementById('btn-solo-start').onclick = function () {
       readGameOptions('solo-');
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
+      // Capture genre for genre lock
+      var genreEl = document.querySelector('#solo-genres .genre-result-genre');
+      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
       soloInstIdx = 0;
       games = [{ songName: sn, enteredBy: 0, submissions: {}, guesses: [] }];
       currentGameIdx = 0;
@@ -518,6 +530,8 @@
     startBtn.onclick = function () {
       if (players.length < 2) { toast('Need at least 2 players'); return; }
       readGameOptions('');
+      var genreEl = document.querySelector('#lobby-genres .genre-result-genre');
+      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
       if (gameSettings.switcheroo) buildSwitcherooMap(players.length, INSTRUMENTS.length);
       startSongEntry();
     };
@@ -674,8 +688,8 @@
     badge.textContent = instrument + (gameSettings.speed ? ' SPEED' : '');
     badge.setAttribute('data-inst', instrument);
 
-    // Show/hide sequencers - handle SFX being optional
-    var allInsts = BASE_INSTRUMENTS.concat(['sfx']);
+    // Show/hide sequencers
+    var allInsts = BASE_INSTRUMENTS.concat(['sfx', 'vocal']);
     allInsts.forEach(function (i) {
       var el = document.getElementById('seq-' + i);
       if (el) {
@@ -801,6 +815,12 @@
       });
       return sfxGrid;
     }
+    if (instrument === 'vocal') {
+      return { hasRecording: !!vocalBlob };
+    }
+    if (instrument === 'chords' && gameSettings.arp) {
+      return applyArpToChords(pianoRollNotes.slice());
+    }
     return pianoRollNotes.slice();
   }
 
@@ -812,6 +832,34 @@
     else if (instrument === 'bass') initPianoRoll('bass', NOTE_NAMES_BASS, false);
     else if (instrument === 'melody') initPianoRoll('melody', NOTE_NAMES_MELODY, true);
     else if (instrument === 'sfx') initSfxGrid();
+    else if (instrument === 'vocal') { initVocalRecorder(); return; }
+
+    // Show arp controls when building chords with arp enabled
+    var arpEl = document.getElementById('arp-controls');
+    if (arpEl) {
+      arpEl.style.display = (instrument === 'chords' && gameSettings.arp) ? 'flex' : 'none';
+      var arpPreviewBtn = document.getElementById('btn-arp-preview');
+      if (arpPreviewBtn) {
+        arpPreviewBtn.onclick = function () {
+          if (pianoRollNotes.length === 0) { toast('Place some chords first'); return; }
+          var arpData = applyArpToChords(pianoRollNotes);
+          ensureAudio().then(function () {
+            if (!synths.chords) synths.chords = createChordSynth();
+            var i = 0;
+            var speed = document.getElementById('arp-speed') ? document.getElementById('arp-speed').value : '16n';
+            var interval = Tone.Time(speed).toMilliseconds();
+            function playNext() {
+              if (i >= arpData.length) return;
+              var n = arpData[i];
+              if (n.isArp) synths.chords.play([n.note], 0.1);
+              i++;
+              setTimeout(playNext, interval);
+            }
+            playNext();
+          });
+        };
+      }
+    }
 
     var playBtn = document.getElementById(instrument + '-play');
     var playIcon = document.getElementById(instrument + '-play-icon');
@@ -1077,7 +1125,15 @@
     // Chord palette
     var palette = document.createElement('div');
     palette.className = 'chord-palette-bar';
-    CHORD_NAMES.forEach(function (ch) {
+    var lockedChords = getLockedChords();
+    var chordsToShow = lockedChords || CHORD_NAMES;
+    if (lockedChords) {
+      var lockLabel = document.createElement('span');
+      lockLabel.className = 'genre-lock-label';
+      lockLabel.textContent = 'Genre: ' + (currentGenreLock || 'Locked');
+      palette.appendChild(lockLabel);
+    }
+    chordsToShow.forEach(function (ch) {
       var btn = document.createElement('button');
       btn.className = 'chord-pick' + (ch === 'C' ? ' active' : '');
       btn.textContent = ch;
@@ -1300,7 +1356,12 @@
       var sub = game.submissions[inst];
       if (!sub) return;
 
-      addLayerSeq(inst, sub, seqs);
+      if (gameSettings.remix) {
+        var remixed = { data: remixLayerData(inst, sub.data), sound: sub.sound };
+        addLayerSeq(inst, remixed, seqs);
+      } else {
+        addLayerSeq(inst, sub, seqs);
+      }
     });
   }
 
@@ -1741,6 +1802,177 @@
     Tone.Transport.cancel();
     seqs.forEach(function (s) { s.dispose(); });
     seqs.length = 0;
+  }
+
+  // ── Genre Lock ──
+  var GENRE_CHORDS = {
+    'Pop': ['C','G','Am','F','Dm','Em'],
+    'Rock': ['E','A','D','G','B','Em','Am'],
+    'Jazz': ['Cmaj7','Dm7','Em7','Fmaj7','G7','Am7','Bm7','Cm7'],
+    'Blues': ['C7','F7','G7','A7','D7','E7'],
+    'EDM': ['Am','Cm','Fm','Gm','Em','Dm'],
+    'Country': ['G','C','D','Em','Am','A'],
+    'R&B': ['Dm7','Gm7','Am7','Cmaj7','Fmaj7','Em7'],
+    'Reggae': ['G','C','D','Em','Am','Bm'],
+    'Latin': ['Am','Dm','E7','G','C','F'],
+    'Classical': ['C','F','G','Am','Dm','G7','Cmaj7']
+  };
+  var currentGenreLock = null;
+
+  function getLockedChords() {
+    if (!gameSettings.genrelock || !currentGenreLock) return null;
+    return GENRE_CHORDS[currentGenreLock] || null;
+  }
+
+  // ── Remix Mode ──
+  function remixLayerData(instrument, data) {
+    if (instrument === 'drums' || instrument === 'sfx') {
+      var remixed = {};
+      var names = instrument === 'drums' ? DRUM_NAMES : SFX_NAMES;
+      names.forEach(function (name) {
+        remixed[name] = [];
+        for (var s = 0; s < STEPS; s++) {
+          var srcStep = (s + Math.floor(Math.random() * 4) - 2 + STEPS) % STEPS;
+          remixed[name].push(data[name] ? !!data[name][srcStep] : false);
+        }
+      });
+      return remixed;
+    }
+    if (Array.isArray(data)) {
+      return data.map(function (n) {
+        var shift = Math.floor(Math.random() * 5) - 2;
+        return { note: n.note, start: Math.max(0, Math.min(STEPS - 1, n.start + shift)), length: n.length };
+      });
+    }
+    return data;
+  }
+
+  // ── Arpeggiator ──
+  function arpeggiate(chordNotes, pattern, steps) {
+    if (!chordNotes || chordNotes.length === 0) return [];
+    var seq = [];
+    var notes = chordNotes.slice();
+    if (pattern === 'down') notes.reverse();
+    else if (pattern === 'updown') {
+      var up = notes.slice();
+      var down = notes.slice().reverse().slice(1, -1);
+      notes = up.concat(down);
+    }
+    for (var i = 0; i < steps; i++) {
+      var idx = pattern === 'random' ? Math.floor(Math.random() * chordNotes.length) : i % notes.length;
+      seq.push(notes[idx] || chordNotes[0]);
+    }
+    return seq;
+  }
+
+  function applyArpToChords(chordData) {
+    if (!gameSettings.arp) return chordData;
+    var pattern = document.getElementById('arp-pattern') ? document.getElementById('arp-pattern').value : 'up';
+    var result = [];
+    chordData.forEach(function (n) {
+      var cn = lookupChordNotes(n.note);
+      if (!cn) { result.push(n); return; }
+      var arpNotes = arpeggiate(cn, pattern, n.length);
+      for (var i = 0; i < arpNotes.length; i++) {
+        result.push({ note: arpNotes[i], start: n.start + i, length: 1, isArp: true });
+      }
+    });
+    return result;
+  }
+
+  // ── Vocal Recording ──
+  var vocalRecorder = null;
+  var vocalBlob = null;
+  var vocalPlayer = null;
+  var vocalAnalyser = null;
+
+  function initVocalRecorder() {
+    var recBtn = document.getElementById('vocal-rec');
+    var playBtn = document.getElementById('vocal-play');
+    var statusEl = document.getElementById('vocal-status');
+    var canvas = document.getElementById('vocal-waveform');
+    var ctx = canvas.getContext('2d');
+    var recording = false;
+    var mediaRecorder = null;
+    var chunks = [];
+    var recordTimeout = null;
+
+    function drawWaveform(analyser) {
+      if (!recording) return;
+      var bufLen = analyser.frequencyBinCount;
+      var data = new Uint8Array(bufLen);
+      analyser.getByteTimeDomainData(data);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#1a1528';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a78bfa';
+      ctx.beginPath();
+      var sliceW = canvas.width / bufLen;
+      var x = 0;
+      for (var i = 0; i < bufLen; i++) {
+        var v = data[i] / 128.0;
+        var y = v * canvas.height / 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceW;
+      }
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+      requestAnimationFrame(function () { drawWaveform(analyser); });
+    }
+
+    recBtn.onclick = function () {
+      if (recording) {
+        recording = false;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        clearTimeout(recordTimeout);
+        statusEl.textContent = 'Recording saved';
+        recBtn.classList.remove('recording');
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        recording = true;
+        chunks = [];
+        recBtn.classList.add('recording');
+        statusEl.textContent = 'Recording...';
+
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        var analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        drawWaveform(analyser);
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          vocalBlob = new Blob(chunks, { type: 'audio/webm' });
+          playBtn.style.display = 'inline-flex';
+          statusEl.textContent = 'Recorded! Tap play to preview';
+          audioCtx.close();
+        };
+        mediaRecorder.start();
+        recordTimeout = setTimeout(function () {
+          if (recording) {
+            recording = false;
+            mediaRecorder.stop();
+            recBtn.classList.remove('recording');
+          }
+        }, 8000);
+      }).catch(function () {
+        statusEl.textContent = 'Mic access denied';
+      });
+    };
+
+    playBtn.onclick = function () {
+      if (vocalBlob) {
+        var url = URL.createObjectURL(vocalBlob);
+        var audio = new Audio(url);
+        audio.play();
+        audio.onended = function () { URL.revokeObjectURL(url); };
+      }
+    };
   }
 
   initThemePicker();

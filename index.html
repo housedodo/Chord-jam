@@ -60,6 +60,10 @@
             <label class="option-toggle"><input type="checkbox" id="opt-switcheroo"> <span>Switcheroo</span></label>
             <label class="option-toggle"><input type="checkbox" id="opt-voting"> <span>Voting</span></label>
             <label class="option-toggle"><input type="checkbox" id="opt-buildup"> <span>Layered Reveal</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-genrelock"> <span>Genre Lock</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-remix"> <span>Remix Mode</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-arp"> <span>Arpeggiator</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-vocal"> <span>Vocal Layer</span></label>
           </div>
         </div>
         <button id="btn-start" class="btn-primary" disabled>Start Game</button>
@@ -94,6 +98,8 @@
           <div class="option-toggles" id="solo-options">
             <label class="option-toggle"><input type="checkbox" id="solo-opt-sfx"> <span>Sound FX Layer</span></label>
             <label class="option-toggle"><input type="checkbox" id="solo-opt-buildup"> <span>Layered Reveal</span></label>
+            <label class="option-toggle"><input type="checkbox" id="solo-opt-arp"> <span>Arpeggiator</span></label>
+            <label class="option-toggle"><input type="checkbox" id="solo-opt-vocal"> <span>Vocal Layer</span></label>
           </div>
         </div>
         <button id="btn-solo-start" class="btn-primary">Start Building</button>
@@ -210,6 +216,39 @@
           <span class="bpm-display" id="sfx-bpm-display"></span>
         </div>
         <div id="sfx-grid" class="drum-grid"></div>
+      </div>
+
+      <!-- Vocal recorder -->
+      <div id="seq-vocal" class="sequencer" style="display:none">
+        <div class="seq-controls">
+          <button id="vocal-rec" class="btn-seq-play btn-rec" title="Record">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+          </button>
+          <button id="vocal-play" class="btn-seq-play" title="Play" style="display:none">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+          </button>
+          <span class="vocal-status" id="vocal-status">Tap to record (max 8s)</span>
+        </div>
+        <canvas id="vocal-waveform" class="vocal-waveform" width="600" height="80"></canvas>
+      </div>
+
+      <!-- Arpeggiator controls (shown alongside chords when enabled) -->
+      <div id="arp-controls" class="arp-controls" style="display:none">
+        <label class="arp-label">Arpeggiator</label>
+        <div class="arp-options">
+          <select id="arp-pattern" class="arp-select">
+            <option value="up">Up</option>
+            <option value="down">Down</option>
+            <option value="updown">Up-Down</option>
+            <option value="random">Random</option>
+          </select>
+          <select id="arp-speed" class="arp-select">
+            <option value="8n">1/8</option>
+            <option value="16n" selected>1/16</option>
+            <option value="32n">1/32</option>
+          </select>
+          <button id="btn-arp-preview" class="btn-secondary btn-sm">Preview Arp</button>
+        </div>
       </div>
 
       <button id="btn-listen-existing" class="btn-secondary btn-listen-existing" style="display:none">
