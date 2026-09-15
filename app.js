@@ -1,713 +1,773 @@
-const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const NOTE_DISPLAY = ['C', 'C#/Db', 'D', 'D#/Eb', 'E', 'F', 'F#/Gb', 'G', 'G#/Ab', 'A', 'A#/Bb', 'B'];
+// ── Sound Telephone ──
+// A multiplayer music recreation game. Players share one device (pass-and-play).
+// One person names a song, others each get an instrument layer to recreate it.
+// All layers combine for a reveal playback.
 
-const CHORD_TYPES = {
-  major:  { intervals: [0, 4, 7],         suffix: '',     quality: 'major' },
-  minor:  { intervals: [0, 3, 7],         suffix: 'm',    quality: 'minor' },
-  '7':    { intervals: [0, 4, 7, 10],     suffix: '7',    quality: 'dom'   },
-  m7:     { intervals: [0, 3, 7, 10],     suffix: 'm7',   quality: 'minor' },
-  maj7:   { intervals: [0, 4, 7, 11],     suffix: 'maj7', quality: 'major' },
-  dim:    { intervals: [0, 3, 6],         suffix: 'dim',  quality: 'dim'   },
-  aug:    { intervals: [0, 4, 8],         suffix: 'aug',  quality: 'aug'   },
-  sus2:   { intervals: [0, 2, 7],         suffix: 'sus2', quality: 'sus'   },
-  sus4:   { intervals: [0, 5, 7],         suffix: 'sus4', quality: 'sus'   },
-  add9:   { intervals: [0, 4, 7, 14],     suffix: 'add9', quality: 'major' },
-  m9:     { intervals: [0, 3, 7, 10, 14], suffix: 'm9',   quality: 'minor' },
-  '9':    { intervals: [0, 4, 7, 10, 14], suffix: '9',    quality: 'dom'   },
-};
+(function () {
+  'use strict';
 
-const SCALES = {
-  major:      { steps: [0,2,4,5,7,9,11], chordTypes: ['major','minor','minor','major','major','minor','dim'], degrees: ['I','ii','iii','IV','V','vi','vii°'] },
-  minor:      { steps: [0,2,3,5,7,8,10], chordTypes: ['minor','dim','major','minor','minor','major','major'], degrees: ['i','ii°','III','iv','v','VI','VII'] },
-  dorian:     { steps: [0,2,3,5,7,9,10], chordTypes: ['minor','minor','major','major','minor','dim','major'], degrees: ['i','ii','III','IV','v','vi°','VII'] },
-  mixolydian: { steps: [0,2,4,5,7,9,10], chordTypes: ['major','minor','dim','major','minor','minor','major'], degrees: ['I','ii','iii°','IV','v','vi','VII'] },
-};
+  // ── Config ──
+  const INSTRUMENTS = ['drums', 'chords', 'bass', 'melody'];
+  const STEPS = 16;
+  const REVEAL_TIME = 6;
+  const BUILD_TIME = 120;
+  const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash'];
+  const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3'];
+  const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5'];
+  const CHORD_OPTIONS = [
+    'C', 'Cm', 'D', 'Dm', 'E', 'Em', 'F', 'Fm',
+    'G', 'Gm', 'A', 'Am', 'B', 'Bm',
+    'C7', 'D7', 'E7', 'G7', 'A7',
+    'Cmaj7', 'Fmaj7', 'Dm7', 'Em7', 'Am7'
+  ];
+  const CHORD_NOTES = {
+    'C': ['C4','E4','G4'], 'Cm': ['C4','Eb4','G4'],
+    'D': ['D4','F#4','A4'], 'Dm': ['D4','F4','A4'],
+    'E': ['E4','G#4','B4'], 'Em': ['E4','G4','B4'],
+    'F': ['F4','A4','C5'], 'Fm': ['F4','Ab4','C5'],
+    'G': ['G3','B3','D4'], 'Gm': ['G3','Bb3','D4'],
+    'A': ['A3','C#4','E4'], 'Am': ['A3','C4','E4'],
+    'B': ['B3','D#4','F#4'], 'Bm': ['B3','D4','F#4'],
+    'C7': ['C4','E4','G4','Bb4'], 'D7': ['D4','F#4','A4','C5'],
+    'E7': ['E4','G#4','B4','D5'], 'G7': ['G3','B3','D4','F4'],
+    'A7': ['A3','C#4','E4','G4'],
+    'Cmaj7': ['C4','E4','G4','B4'], 'Fmaj7': ['F4','A4','C5','E5'],
+    'Dm7': ['D4','F4','A4','C5'], 'Em7': ['E4','G4','B4','D5'],
+    'Am7': ['A3','C4','E4','G4']
+  };
+  const PLAYER_COLORS = ['#a78bfa', '#e8a0bf', '#7eb8d4', '#e8b07d', '#8cc5a2', '#c9a0d4'];
 
-const PRESETS = [
-  { name: 'Pop',         degrees: [0,4,5,3] },
-  { name: 'Sad',         degrees: [5,3,0,4] },
-  { name: 'Jazz ii-V-I', degrees: [1,4,0], types: ['m7','7','maj7'] },
-  { name: '50s',         degrees: [0,5,3,4] },
-  { name: 'Blues',       degrees: [0,0,0,0,3,3,0,0,4,3,0,4], types: ['7','7','7','7','7','7','7','7','7','7','7','7'] },
-  { name: 'Canon',       degrees: [0,4,5,2,3,0,3,4] },
-  { name: 'Andalusian',  degrees: [5,4,3,0], forScale: 'minor' },
-];
+  // ── State ──
+  let players = [];
+  let hostIndex = 0;
+  let songName = '';
+  let assignments = {};
+  let submissions = {};
+  let currentPlayerTurn = -1;
+  let buildTimer = null;
+  let buildSecondsLeft = BUILD_TIME;
+  let previewPlaying = false;
+  let previewSeq = null;
 
-const SOUND_PRESETS = {
-  'piano': {
-    create: () => {
-      const synth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 16,
-        voice: Tone.FMSynth,
-        options: {
-          harmonicity: 3,
-          modulationIndex: 0.8,
-          oscillator: { type: 'sine' },
-          envelope: { attack: 0.005, decay: 1.2, sustain: 0.3, release: 1.5 },
-          modulation: { type: 'square' },
-          modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.5 },
-        },
-      });
-      synth.volume.value = -8;
-      return synth;
-    },
-  },
-  'warm-pad': {
-    create: () => {
-      const synth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 12,
-        voice: Tone.FMSynth,
-        options: {
-          harmonicity: 1,
-          modulationIndex: 0.5,
-          oscillator: { type: 'sine' },
-          envelope: { attack: 0.3, decay: 0.5, sustain: 0.8, release: 2.0 },
-          modulation: { type: 'sine' },
-          modulationEnvelope: { attack: 0.5, decay: 0.5, sustain: 0.8, release: 1.0 },
-        },
-      });
-      synth.volume.value = -10;
-      return synth;
-    },
-  },
-  'electric-piano': {
-    create: () => {
-      const synth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 12,
-        voice: Tone.FMSynth,
-        options: {
-          harmonicity: 6,
-          modulationIndex: 1.2,
-          oscillator: { type: 'sine' },
-          envelope: { attack: 0.001, decay: 1.5, sustain: 0.1, release: 1.0 },
-          modulation: { type: 'sine' },
-          modulationEnvelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.3 },
-        },
-      });
-      synth.volume.value = -8;
-      return synth;
-    },
-  },
-  'soft-strings': {
-    create: () => {
-      const synth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 12,
-        voice: Tone.FMSynth,
-        options: {
-          harmonicity: 2,
-          modulationIndex: 0.3,
-          oscillator: { type: 'sawtooth8' },
-          envelope: { attack: 0.5, decay: 0.6, sustain: 0.8, release: 2.5 },
-          modulation: { type: 'sine' },
-          modulationEnvelope: { attack: 0.8, decay: 0.5, sustain: 0.7, release: 1.5 },
-        },
-      });
-      synth.volume.value = -12;
-      return synth;
-    },
-  },
-};
+  // ── Audio ──
+  let audioReady = false;
+  const synths = {};
 
-const ARP_PATTERNS = {
-  up:     (notes) => [...notes],
-  down:   (notes) => [...notes].reverse(),
-  updown: (notes) => {
-    if (notes.length <= 1) return notes;
-    return [...notes, ...notes.slice(1, -1).reverse()];
-  },
-  random: (notes) => {
-    const arr = [...notes];
-    for (let i = arr.length - 1; i > 0; i--) {
+  function ensureAudio() {
+    if (audioReady) return Promise.resolve();
+    return Tone.start().then(() => { audioReady = true; });
+  }
+
+  function createDrumSynth() {
+    const vol = new Tone.Volume(-4).toDestination();
+    const kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }).connect(vol);
+    const snare = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(vol);
+    const hihat = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.06, sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -12 }).connect(vol);
+    const openHH = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.3, sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -14 }).connect(vol);
+    const clap = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 } }).connect(vol);
+    const tom = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).connect(vol);
+    const rim = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }, volume: -6 }).connect(vol);
+    const crash = new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 }).connect(vol);
+
+    return {
+      trigger(name) {
+        switch (name) {
+          case 'Kick': kick.triggerAttackRelease('C1', '8n'); break;
+          case 'Snare': snare.triggerAttackRelease('8n'); break;
+          case 'HiHat': hihat.triggerAttackRelease('32n'); break;
+          case 'OpenHH': openHH.triggerAttackRelease('16n'); break;
+          case 'Clap': clap.triggerAttackRelease('16n'); break;
+          case 'Tom': tom.triggerAttackRelease('E2', '8n'); break;
+          case 'Rim': rim.triggerAttackRelease('G4', '32n'); break;
+          case 'Crash': crash.triggerAttackRelease('16n'); break;
+        }
+      },
+      dispose() {
+        [kick, snare, hihat, openHH, clap, tom, rim, crash, vol].forEach(n => n.dispose());
+      }
+    };
+  }
+
+  function createChordSynth() {
+    const reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).toDestination();
+    const poly = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3, modulationIndex: 0.8,
+      envelope: { attack: 0.02, decay: 0.4, sustain: 0.5, release: 0.8 },
+      modulation: { type: 'triangle' },
+      modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.4 },
+      volume: -8
+    }).connect(reverb);
+    return {
+      play(notes, dur) { poly.triggerAttackRelease(notes, dur); },
+      dispose() { poly.dispose(); reverb.dispose(); }
+    };
+  }
+
+  function createBassSynth() {
+    const syn = new Tone.FMSynth({
+      harmonicity: 1, modulationIndex: 2,
+      envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.3 },
+      modulation: { type: 'square' },
+      modulationEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.2 },
+      volume: -4
+    }).toDestination();
+    return {
+      play(note, dur) { syn.triggerAttackRelease(note, dur); },
+      dispose() { syn.dispose(); }
+    };
+  }
+
+  function createMelodySynth() {
+    const reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).toDestination();
+    const syn = new Tone.FMSynth({
+      harmonicity: 2, modulationIndex: 1.2,
+      envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.5 },
+      modulation: { type: 'sine' },
+      modulationEnvelope: { attack: 0.05, decay: 0.15, sustain: 0.4, release: 0.3 },
+      volume: -6
+    }).connect(reverb);
+    return {
+      play(note, dur) { syn.triggerAttackRelease(note, dur); },
+      dispose() { syn.dispose(); reverb.dispose(); }
+    };
+  }
+
+  // ── Screens ──
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2000);
+  }
+
+  // ── Home ──
+  function initHome() {
+    const savedName = localStorage.getItem('st-name') || '';
+    document.getElementById('input-name').value = savedName;
+
+    document.getElementById('btn-create').addEventListener('click', () => {
+      ensureAudio();
+      const name = getName();
+      if (!name) { toast('Enter your name first'); return; }
+      players = [{ name, color: PLAYER_COLORS[0] }];
+      hostIndex = 0;
+      showLobby();
+    });
+
+    document.getElementById('btn-join').addEventListener('click', () => {
+      ensureAudio();
+      const name = getName();
+      if (!name) { toast('Enter your name first'); return; }
+      if (players.length === 0) { toast('Create a room first'); return; }
+      if (players.length >= 6) { toast('Room is full'); return; }
+      if (players.some(p => p.name === name)) { toast('Name taken'); return; }
+      players.push({ name, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
+      showLobby();
+    });
+  }
+
+  function getName() {
+    const n = document.getElementById('input-name').value.trim();
+    if (n) localStorage.setItem('st-name', n);
+    return n;
+  }
+
+  // ── Lobby ──
+  function showLobby() {
+    showScreen('lobby');
+    const code = generateCode();
+    document.getElementById('room-code').textContent = code;
+    renderPlayerList();
+
+    document.getElementById('btn-copy-code').onclick = () => {
+      navigator.clipboard.writeText(code).then(() => toast('Code copied'));
+    };
+
+    document.getElementById('host-controls').style.display = 'flex';
+    document.getElementById('guest-waiting').style.display = 'none';
+
+    const songInput = document.getElementById('input-song');
+    const startBtn = document.getElementById('btn-start');
+    songInput.value = '';
+    startBtn.disabled = true;
+
+    songInput.oninput = () => {
+      startBtn.disabled = !songInput.value.trim() || players.length < 2;
+    };
+
+    startBtn.onclick = () => {
+      songName = songInput.value.trim();
+      if (!songName) return;
+      if (players.length < 2) { toast('Need at least 2 players'); return; }
+      assignInstruments();
+      startReveal(0);
+    };
+
+    document.getElementById('btn-leave').onclick = () => {
+      players = [];
+      submissions = {};
+      assignments = {};
+      showScreen('home');
+    };
+  }
+
+  function renderPlayerList() {
+    const list = document.getElementById('player-list');
+    list.innerHTML = '';
+
+    const addDiv = document.createElement('div');
+    addDiv.className = 'player-card';
+    addDiv.style.cursor = 'pointer';
+    addDiv.style.borderStyle = 'dashed';
+    addDiv.innerHTML = `
+      <div class="player-avatar" style="background:var(--surface-3);color:var(--text-dim)">+</div>
+      <input type="text" class="name-input" placeholder="Add player..." maxlength="20" style="flex:1;width:auto;text-align:left" autocomplete="off" spellcheck="false">
+    `;
+    const addInput = addDiv.querySelector('input');
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const n = addInput.value.trim();
+        if (!n) return;
+        if (players.length >= 6) { toast('Max 6 players'); return; }
+        if (players.some(p => p.name === n)) { toast('Name taken'); return; }
+        players.push({ name: n, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
+        renderPlayerList();
+        document.getElementById('input-song').dispatchEvent(new Event('input'));
+      }
+    });
+    list.appendChild(addDiv);
+
+    players.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'player-card';
+      card.innerHTML = `
+        <div class="player-avatar" style="background:${p.color}">${p.name[0].toUpperCase()}</div>
+        <span class="player-name">${esc(p.name)}</span>
+        ${i === hostIndex ? '<span class="player-badge">Host</span>' : `<button class="btn-icon remove-player" data-i="${i}" title="Remove">&times;</button>`}
+      `;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('.remove-player').forEach(btn => {
+      btn.onclick = () => {
+        players.splice(parseInt(btn.dataset.i), 1);
+        renderPlayerList();
+        document.getElementById('input-song').dispatchEvent(new Event('input'));
+      };
+    });
+  }
+
+  function generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c = '';
+    for (let i = 0; i < 5; i++) c += chars[Math.floor(Math.random() * chars.length)];
+    return c;
+  }
+
+  function assignInstruments() {
+    assignments = {};
+    submissions = {};
+    const shuffled = INSTRUMENTS.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    return arr;
-  },
-  pinky: (notes) => {
-    if (notes.length < 2) return notes;
-    const result = [];
-    for (let i = 0; i < notes.length - 1; i++) {
-      result.push(notes[i], notes[notes.length - 1]);
-    }
-    return result;
-  },
-  spread: (notes) => {
-    if (notes.length < 2) return notes;
-    const result = [];
-    let lo = 0, hi = notes.length - 1;
-    while (lo <= hi) {
-      result.push(notes[lo]);
-      if (lo !== hi) result.push(notes[hi]);
-      lo++;
-      hi--;
-    }
-    return result;
-  },
-};
-
-let state = {
-  key: 0,
-  scale: 'major',
-  tempo: 120,
-  beatsPerChord: 2,
-  sound: 'piano',
-  loop: true,
-  progression: [],
-  playing: false,
-  currentStep: -1,
-  paletteTab: 'diatonic',
-  arp: {
-    enabled: false,
-    pattern: 'up',
-    speed: '4n',
-    octaves: 1,
-    currentNote: -1,
-  },
-};
-
-let synth = null;
-let reverb = null;
-let chorus = null;
-let transportStarted = false;
-let holdArpInterval = null;
-let holdingChord = null;
-
-function initAudio() {
-  if (synth) return;
-  synth = SOUND_PRESETS[state.sound].create();
-  reverb = new Tone.Reverb({ decay: 2.5, wet: 0.2 });
-  chorus = new Tone.Chorus({ frequency: 0.5, delayTime: 3.5, depth: 0.3, wet: 0.15 }).start();
-  synth.chain(chorus, reverb, Tone.getDestination());
-}
-
-function rebuildSynth() {
-  if (synth) {
-    synth.releaseAll();
-    synth.disconnect();
-    synth.dispose();
-  }
-  synth = SOUND_PRESETS[state.sound].create();
-  if (chorus && reverb) {
-    synth.chain(chorus, reverb, Tone.getDestination());
-  }
-}
-
-function noteFromMidi(midi) {
-  return NOTES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
-}
-
-function getChordNotes(rootIndex, type) {
-  const chord = CHORD_TYPES[type];
-  if (!chord) return [];
-  const baseMidi = 48 + rootIndex;
-  return chord.intervals.map(i => noteFromMidi(baseMidi + i));
-}
-
-function getChordNotesExpanded(rootIndex, type, octaves) {
-  const chord = CHORD_TYPES[type];
-  if (!chord) return [];
-  const baseMidi = 48 + rootIndex;
-  const notes = [];
-  for (let oct = 0; oct < octaves; oct++) {
-    chord.intervals.forEach(i => {
-      notes.push(noteFromMidi(baseMidi + i + oct * 12));
+    const nonHost = players.map((_, i) => i).filter(i => i !== hostIndex);
+    nonHost.forEach((pi, idx) => {
+      assignments[pi] = shuffled[idx % shuffled.length];
     });
   }
-  return notes;
-}
 
-function getChordName(rootIndex, type) {
-  return NOTES[((rootIndex % 12) + 12) % 12] + CHORD_TYPES[type].suffix;
-}
+  // ── Reveal ──
+  function startReveal(turnIndex) {
+    const nonHost = Object.keys(assignments).map(Number);
+    if (turnIndex >= nonHost.length) {
+      showListen();
+      return;
+    }
+    currentPlayerTurn = nonHost[turnIndex];
+    const inst = assignments[currentPlayerTurn];
+    const p = players[currentPlayerTurn];
 
-function getDiatonicChords() {
-  const scale = SCALES[state.scale];
-  return scale.steps.map((step, i) => ({
-    root: (state.key + step) % 12,
-    type: scale.chordTypes[i],
-    degree: scale.degrees[i],
-  }));
-}
+    showScreen('reveal');
+    document.getElementById('reveal-song').textContent = songName;
+    document.getElementById('reveal-instrument').textContent = inst;
 
-function getExtendedChords() {
-  const scale = SCALES[state.scale];
-  const extended = [];
-  const extTypes = ['7', 'm7', 'maj7', 'sus2', 'sus4'];
-  scale.steps.forEach((step, i) => {
-    const root = (state.key + step) % 12;
-    const baseType = scale.chordTypes[i];
-    extTypes.forEach(t => {
-      if (t === baseType) return;
-      if (baseType === 'minor' && t === 'maj7') return;
-      if (baseType === 'major' && t === 'm7') return;
-      extended.push({ root, type: t, degree: '' });
+    const bar = document.getElementById('reveal-bar');
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        bar.style.transition = `width ${REVEAL_TIME}s linear`;
+        bar.style.width = '0%';
+      });
     });
-  });
-  return extended;
-}
 
-function getAllChords() {
-  const chords = [];
-  NOTES.forEach((_, rootIndex) => {
-    const root = (state.key + rootIndex) % 12;
-    Object.keys(CHORD_TYPES).forEach(type => {
-      chords.push({ root, type, degree: '' });
+    toast(`${p.name}, get ready!`);
+
+    setTimeout(() => {
+      showBuild(inst, turnIndex);
+    }, REVEAL_TIME * 1000);
+  }
+
+  // ── Build ──
+  function showBuild(instrument, turnIndex) {
+    showScreen('build');
+
+    document.getElementById('build-song').textContent = songName;
+    const badge = document.getElementById('build-instrument');
+    badge.textContent = instrument;
+    badge.setAttribute('data-inst', instrument);
+
+    INSTRUMENTS.forEach(inst => {
+      document.getElementById('seq-' + inst).style.display = inst === instrument ? 'flex' : 'none';
     });
-  });
-  return chords;
-}
 
-function startHoldChord(rootIndex, type) {
-  Tone.start();
-  initAudio();
-  stopHoldChord();
-  holdingChord = { root: rootIndex, type };
-
-  if (state.arp.enabled) {
-    const notes = getChordNotesExpanded(rootIndex, type, state.arp.octaves);
-    const pattern = ARP_PATTERNS[state.arp.pattern](notes);
-    let idx = 0;
-    const bpm = state.tempo;
-    const speedMs = Tone.Time(state.arp.speed).toMilliseconds() * (120 / bpm);
-
-    synth.triggerAttackRelease(pattern[0], state.arp.speed);
-    renderArpVisual(pattern, 0);
-    idx = 1;
-
-    holdArpInterval = setInterval(() => {
-      if (idx >= pattern.length) {
-        const fresh = ARP_PATTERNS[state.arp.pattern](
-          getChordNotesExpanded(rootIndex, type, state.arp.octaves)
-        );
-        pattern.length = 0;
-        pattern.push(...fresh);
-        idx = 0;
+    buildSecondsLeft = BUILD_TIME;
+    updateBuildTimer();
+    clearInterval(buildTimer);
+    buildTimer = setInterval(() => {
+      buildSecondsLeft--;
+      updateBuildTimer();
+      if (buildSecondsLeft <= 0) {
+        clearInterval(buildTimer);
+        submitLayer(instrument, turnIndex);
       }
-      synth.triggerAttackRelease(pattern[idx], state.arp.speed);
-      renderArpVisual(pattern, idx);
-      idx++;
-    }, speedMs);
-  } else {
-    const notes = getChordNotes(rootIndex, type);
-    synth.triggerAttack(notes);
+    }, 1000);
+
+    initSequencer(instrument);
+
+    document.getElementById('btn-submit').onclick = () => {
+      clearInterval(buildTimer);
+      submitLayer(instrument, turnIndex);
+    };
   }
-}
 
-function stopHoldChord() {
-  if (holdArpInterval) {
-    clearInterval(holdArpInterval);
-    holdArpInterval = null;
+  function updateBuildTimer() {
+    const m = Math.floor(buildSecondsLeft / 60);
+    const s = buildSecondsLeft % 60;
+    document.getElementById('build-time').textContent = `${m}:${s.toString().padStart(2, '0')}`;
   }
-  if (synth) synth.releaseAll();
-  holdingChord = null;
-}
 
-function addToProgression(rootIndex, type) {
-  state.progression.push({ root: rootIndex, type });
-  renderProgression();
-}
+  function submitLayer(instrument, turnIndex) {
+    stopPreview();
+    const bpmEl = document.getElementById(instrument === 'drums' ? 'drums-bpm' : instrument === 'chords' ? 'chords-bpm' : instrument === 'bass' ? 'bass-bpm' : 'melody-bpm');
+    const bpm = parseInt(bpmEl.value) || 120;
+    const data = collectData(instrument);
+    submissions[instrument] = { data, bpm, playerIndex: currentPlayerTurn };
+    toast('Layer submitted!');
 
-function removeFromProgression(index) {
-  state.progression.splice(index, 1);
-  renderProgression();
-  if (state.playing && state.progression.length === 0) stopPlayback();
-}
+    const nonHost = Object.keys(assignments).map(Number);
+    const nextTurn = turnIndex + 1;
+    if (nextTurn < nonHost.length) {
+      setTimeout(() => startReveal(nextTurn), 800);
+    } else {
+      setTimeout(() => showListen(), 800);
+    }
+  }
 
-function renderChordGrid() {
-  const grid = document.getElementById('chord-grid');
-  let chords;
-  if (state.paletteTab === 'diatonic') chords = getDiatonicChords();
-  else if (state.paletteTab === 'extended') chords = getExtendedChords();
-  else chords = getAllChords();
+  function collectData(instrument) {
+    if (instrument === 'drums') {
+      const grid = {};
+      DRUM_NAMES.forEach(name => {
+        grid[name] = [];
+        for (let s = 0; s < STEPS; s++) {
+          const cell = document.querySelector(`.drum-cell[data-name="${name}"][data-step="${s}"]`);
+          grid[name].push(cell && cell.classList.contains('on'));
+        }
+      });
+      return grid;
+    }
+    if (instrument === 'chords') {
+      const slots = document.querySelectorAll('.chord-slot');
+      return Array.from(slots).map(s => s.dataset.chord || null);
+    }
+    if (instrument === 'bass') {
+      return collectNoteGrid('bass', NOTE_NAMES_BASS);
+    }
+    if (instrument === 'melody') {
+      return collectNoteGrid('melody', NOTE_NAMES_MELODY);
+    }
+  }
 
-  grid.innerHTML = chords.map((c) => {
-    const name = getChordName(c.root, c.type);
-    const quality = CHORD_TYPES[c.type].quality;
-    const deg = c.degree ? `<span class="degree">${c.degree}</span>` : '';
-    return `<button class="chord-btn" data-quality="${quality}" data-root="${c.root}" data-type="${c.type}">${name}${deg}</button>`;
-  }).join('');
-
-  grid.querySelectorAll('.chord-btn').forEach(btn => {
-    const root = parseInt(btn.dataset.root);
-    const type = btn.dataset.type;
-
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      startHoldChord(root, type);
-    });
-    btn.addEventListener('mouseup', () => {
-      stopHoldChord();
-      addToProgression(root, type);
-    });
-    btn.addEventListener('mouseleave', () => {
-      if (holdingChord) {
-        stopHoldChord();
-        addToProgression(root, type);
+  function collectNoteGrid(inst, noteNames) {
+    const grid = {};
+    noteNames.forEach(note => {
+      grid[note] = [];
+      for (let s = 0; s < STEPS; s++) {
+        const cell = document.querySelector(`.note-cell[data-inst="${inst}"][data-note="${note}"][data-step="${s}"]`);
+        grid[note].push(cell && cell.classList.contains('on'));
       }
     });
-
-    btn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      startHoldChord(root, type);
-    }, { passive: false });
-    btn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      stopHoldChord();
-      addToProgression(root, type);
-    });
-    btn.addEventListener('touchcancel', () => {
-      stopHoldChord();
-    });
-  });
-}
-
-function renderProgression() {
-  const track = document.getElementById('progression-track');
-  if (state.progression.length === 0) {
-    track.innerHTML = '<div class="empty-state">Tap chords to build a progression</div>';
-    return;
+    return grid;
   }
 
-  track.innerHTML = state.progression.map((c, i) => {
-    const name = getChordName(c.root, c.type);
-    const playing = state.currentStep === i ? ' playing' : '';
-    return `<div class="prog-chord${playing}" draggable="true" data-index="${i}">
-      <span class="chord-name">${name}</span>
-      <button class="remove-btn" data-index="${i}">&times;</button>
-    </div>`;
-  }).join('');
+  // ── Sequencer init ──
+  function initSequencer(instrument) {
+    if (instrument === 'drums') initDrumGrid();
+    else if (instrument === 'chords') initChordSeq();
+    else if (instrument === 'bass') initNoteGrid('bass', NOTE_NAMES_BASS);
+    else if (instrument === 'melody') initNoteGrid('melody', NOTE_NAMES_MELODY);
 
-  track.querySelectorAll('.remove-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeFromProgression(parseInt(btn.dataset.index));
-    });
-  });
-
-  track.querySelectorAll('.prog-chord').forEach(el => {
-    el.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', el.dataset.index);
-      el.classList.add('dragging');
-    });
-    el.addEventListener('dragend', () => el.classList.remove('dragging'));
-  });
-
-  track.addEventListener('dragover', (e) => e.preventDefault());
-  track.addEventListener('drop', (e) => {
-    e.preventDefault();
-    const from = parseInt(e.dataTransfer.getData('text/plain'));
-    const target = e.target.closest('.prog-chord');
-    if (!target) return;
-    const to = parseInt(target.dataset.index);
-    if (from === to) return;
-    const [moved] = state.progression.splice(from, 1);
-    state.progression.splice(to, 0, moved);
-    renderProgression();
-  });
-
-  const last = track.lastElementChild;
-  if (last) last.scrollIntoView({ behavior: 'smooth', inline: 'end', block: 'nearest' });
-}
-
-function renderPresets() {
-  const list = document.getElementById('preset-list');
-  list.innerHTML = PRESETS.map((p, i) => {
-    const scale = SCALES[p.forScale || state.scale];
-    const names = p.degrees.map((d, j) => {
-      const root = (state.key + scale.steps[d]) % 12;
-      const type = p.types ? p.types[j] : scale.chordTypes[d];
-      return getChordName(root, type);
-    }).join(' - ');
-    return `<button class="preset-btn" data-index="${i}">
-      <span class="preset-name">${p.name}</span>
-      <span class="preset-chords">${names}</span>
-    </button>`;
-  }).join('');
-
-  list.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const p = PRESETS[parseInt(btn.dataset.index)];
-      const scale = SCALES[p.forScale || state.scale];
-      state.progression = p.degrees.map((d, j) => ({
-        root: (state.key + scale.steps[d]) % 12,
-        type: p.types ? p.types[j] : scale.chordTypes[d],
-      }));
-      renderProgression();
-      showToast(`Loaded "${p.name}"`);
-    });
-  });
-}
-
-function buildArpSequence(chord) {
-  const notes = getChordNotesExpanded(chord.root, chord.type, state.arp.octaves);
-  return ARP_PATTERNS[state.arp.pattern](notes);
-}
-
-function renderArpVisual(arpNotes, activeIndex) {
-  const visual = document.getElementById('arp-visual');
-  if (!visual) return;
-  if (!arpNotes || arpNotes.length === 0) {
-    visual.innerHTML = '<p class="arp-hint">Enable arpeggio and hold a chord button to hear the pattern</p>';
-    return;
-  }
-  const midiValues = arpNotes.map(n => {
-    const note = n.replace(/\d+/, '');
-    const oct = parseInt(n.match(/\d+/)[0]);
-    return NOTES.indexOf(note) + (oct + 1) * 12;
-  });
-  const minMidi = Math.min(...midiValues);
-  const maxMidi = Math.max(...midiValues);
-  const range = maxMidi - minMidi || 1;
-
-  visual.innerHTML = `<div class="arp-note-row">${midiValues.map((m, i) => {
-    const h = 15 + ((m - minMidi) / range) * 85;
-    const active = i === activeIndex ? ' active' : '';
-    return `<div class="arp-note-bar${active}" style="height:${h}%"></div>`;
-  }).join('')}</div>`;
-}
-
-async function startPlayback() {
-  if (state.progression.length === 0) return;
-  await Tone.start();
-  initAudio();
-
-  state.playing = true;
-  state.currentStep = -1;
-  updateTransportUI();
-
-  Tone.getTransport().bpm.value = state.tempo;
-  Tone.getTransport().cancel();
-
-  if (state.arp.enabled) {
-    startArpPlayback();
-  } else {
-    startChordPlayback();
+    const playBtn = document.getElementById(instrument + '-play');
+    const playIcon = document.getElementById(instrument + '-play-icon');
+    const stopIcon = document.getElementById(instrument + '-stop-icon');
+    playBtn.onclick = () => {
+      ensureAudio().then(() => {
+        if (previewPlaying) {
+          stopPreview();
+        } else {
+          startPreview(instrument);
+        }
+        playIcon.style.display = previewPlaying ? 'none' : 'block';
+        stopIcon.style.display = previewPlaying ? 'block' : 'none';
+      });
+    };
   }
 
-  Tone.getTransport().start();
-  transportStarted = true;
-}
-
-function startChordPlayback() {
-  const beatDur = `${state.beatsPerChord * 4}n`;
-  const steps = Array.from({ length: state.progression.length }, (_, i) => i);
-
-  const part = new Tone.Sequence((time, step) => {
-    state.currentStep = step;
-    const c = state.progression[step];
-    const notes = getChordNotes(c.root, c.type);
-    synth.triggerAttackRelease(notes, beatDur, time);
-    Tone.getDraw().schedule(() => renderProgression(), time);
-  }, steps, beatDur);
-
-  part.loop = state.loop;
-  part.start(0);
-
-  if (!state.loop) {
-    const total = Tone.Time(beatDur).toSeconds() * state.progression.length;
-    Tone.getTransport().schedule(() => stopPlayback(), total + 0.1);
+  function initDrumGrid() {
+    const grid = document.getElementById('drum-grid');
+    grid.innerHTML = '';
+    DRUM_NAMES.forEach(name => {
+      const row = document.createElement('div');
+      row.className = 'drum-row';
+      row.innerHTML = `<span class="drum-label">${name}</span>`;
+      for (let s = 0; s < STEPS; s++) {
+        const cell = document.createElement('div');
+        cell.className = 'drum-cell' + (s % 4 === 0 ? ' beat' : '');
+        cell.dataset.name = name;
+        cell.dataset.step = s;
+        cell.addEventListener('pointerdown', () => cell.classList.toggle('on'));
+        row.appendChild(cell);
+      }
+      grid.appendChild(row);
+    });
   }
-}
 
-function startArpPlayback() {
-  const beatsPerChord = state.beatsPerChord;
-  const arpSpeed = state.arp.speed;
-  const arpDurSec = Tone.Time(arpSpeed).toSeconds();
-  const beatDurSec = Tone.Time('4n').toSeconds();
-  const chordDurSec = beatDurSec * beatsPerChord;
-  const notesPerChord = Math.max(1, Math.floor(chordDurSec / arpDurSec));
+  function initChordSeq() {
+    const slotsEl = document.getElementById('chord-slots');
+    const paletteEl = document.getElementById('chord-palette');
+    slotsEl.innerHTML = '';
+    paletteEl.innerHTML = '';
 
-  const allSteps = [];
-  state.progression.forEach((chord, chordIdx) => {
-    const arpNotes = buildArpSequence(chord);
-    for (let n = 0; n < notesPerChord; n++) {
-      const noteIdx = n % arpNotes.length;
-      allSteps.push({ chordIdx, note: arpNotes[noteIdx], arpNotes, noteIdx });
+    let activeSlot = 0;
+    const NUM_SLOTS = 4;
+
+    for (let i = 0; i < NUM_SLOTS; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'chord-slot' + (i === 0 ? ' active' : '');
+      slot.textContent = '—';
+      slot.dataset.index = i;
+      slot.dataset.chord = '';
+      slot.addEventListener('click', () => {
+        slotsEl.querySelectorAll('.chord-slot').forEach(s => s.classList.remove('active'));
+        slot.classList.add('active');
+        activeSlot = i;
+      });
+      slotsEl.appendChild(slot);
     }
-  });
 
-  const seq = new Tone.Sequence((time, stepIdx) => {
-    const step = allSteps[stepIdx];
-    if (!step) return;
-    state.currentStep = step.chordIdx;
-    state.arp.currentNote = step.noteIdx;
-    synth.triggerAttackRelease(step.note, arpSpeed, time);
-    Tone.getDraw().schedule(() => {
-      renderProgression();
-      renderArpVisual(step.arpNotes, step.noteIdx);
-    }, time);
-  }, Array.from({ length: allSteps.length }, (_, i) => i), arpSpeed);
-
-  seq.loop = state.loop;
-  seq.start(0);
-
-  if (!state.loop) {
-    const total = arpDurSec * allSteps.length;
-    Tone.getTransport().schedule(() => stopPlayback(), total + 0.1);
+    CHORD_OPTIONS.forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = 'chord-pick';
+      btn.textContent = ch;
+      btn.addEventListener('click', () => {
+        ensureAudio().then(() => {
+          const slot = slotsEl.querySelector(`.chord-slot[data-index="${activeSlot}"]`);
+          slot.textContent = ch;
+          slot.dataset.chord = ch;
+          slot.classList.add('filled');
+          if (!synths.chords) synths.chords = createChordSynth();
+          const notes = CHORD_NOTES[ch];
+          if (notes) synths.chords.play(notes, '4n');
+          if (activeSlot < NUM_SLOTS - 1) {
+            activeSlot++;
+            slotsEl.querySelectorAll('.chord-slot').forEach(s => s.classList.remove('active'));
+            slotsEl.querySelector(`.chord-slot[data-index="${activeSlot}"]`).classList.add('active');
+          }
+        });
+      });
+      paletteEl.appendChild(btn);
+    });
   }
-}
 
-function stopPlayback() {
-  state.playing = false;
-  state.currentStep = -1;
-  state.arp.currentNote = -1;
-  if (transportStarted) {
-    Tone.getTransport().stop();
-    Tone.getTransport().cancel();
-    transportStarted = false;
+  function initNoteGrid(inst, noteNames) {
+    const grid = document.getElementById(inst + '-grid');
+    grid.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'note-grid-inner';
+    inner.style.gridTemplateColumns = `44px repeat(${STEPS}, 1fr)`;
+    inner.style.gridTemplateRows = `repeat(${noteNames.length}, 28px)`;
+
+    const reversed = [...noteNames].reverse();
+    reversed.forEach((note) => {
+      const label = document.createElement('div');
+      label.className = 'note-label';
+      label.textContent = note;
+      inner.appendChild(label);
+
+      for (let s = 0; s < STEPS; s++) {
+        const cell = document.createElement('div');
+        cell.className = 'note-cell' + (s % 4 === 0 ? ' beat' : '');
+        cell.dataset.inst = inst;
+        cell.dataset.note = note;
+        cell.dataset.step = s;
+        cell.addEventListener('pointerdown', () => {
+          if (!cell.classList.contains('on')) {
+            inner.querySelectorAll(`.note-cell[data-step="${s}"].on`).forEach(c => c.classList.remove('on'));
+          }
+          cell.classList.toggle('on');
+          if (cell.classList.contains('on')) {
+            ensureAudio().then(() => {
+              if (inst === 'bass') {
+                if (!synths.bass) synths.bass = createBassSynth();
+                synths.bass.play(note, '16n');
+              } else {
+                if (!synths.melody) synths.melody = createMelodySynth();
+                synths.melody.play(note, '16n');
+              }
+            });
+          }
+        });
+        inner.appendChild(cell);
+      }
+    });
+
+    grid.appendChild(inner);
   }
-  if (synth) synth.releaseAll();
-  updateTransportUI();
-  renderProgression();
-  if (state.arp.enabled) renderArpVisual(null);
-}
 
-function togglePlayback() {
-  if (state.playing) stopPlayback();
-  else startPlayback();
-}
+  // ── Preview playback ──
+  function startPreview(instrument) {
+    const bpmEl = document.getElementById(instrument === 'drums' ? 'drums-bpm' : instrument === 'chords' ? 'chords-bpm' : instrument === 'bass' ? 'bass-bpm' : 'melody-bpm');
+    const bpm = parseInt(bpmEl.value) || 120;
+    Tone.Transport.bpm.value = bpm;
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
 
-function updateTransportUI() {
-  document.getElementById('play-icon').style.display = state.playing ? 'none' : 'block';
-  document.getElementById('pause-icon').style.display = state.playing ? 'block' : 'none';
-}
+    previewPlaying = true;
 
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 1800);
-}
-
-function setupTabs() {
-  document.querySelectorAll('.tab-bar-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-bar-item').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.target).classList.add('active');
-    });
-  });
-}
-
-function setupOptionButtons(containerId, callback) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.querySelectorAll('.arp-btn, .opt-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      container.querySelectorAll('.arp-btn, .opt-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      callback(btn);
-    });
-  });
-}
-
-function init() {
-  const keySelect = document.getElementById('key-select');
-  NOTE_DISPLAY.forEach((name, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = name;
-    keySelect.appendChild(opt);
-  });
-
-  keySelect.addEventListener('change', () => {
-    state.key = parseInt(keySelect.value);
-    renderChordGrid();
-    renderPresets();
-  });
-
-  document.getElementById('scale-select').addEventListener('change', (e) => {
-    state.scale = e.target.value;
-    renderChordGrid();
-    renderPresets();
-  });
-
-  const tempoSlider = document.getElementById('tempo-slider');
-  const tempoValue = document.getElementById('tempo-value');
-  tempoSlider.addEventListener('input', () => {
-    state.tempo = parseInt(tempoSlider.value);
-    tempoValue.textContent = state.tempo;
-    if (transportStarted) Tone.getTransport().bpm.value = state.tempo;
-  });
-
-  document.getElementById('play-btn').addEventListener('click', togglePlayback);
-  document.getElementById('stop-btn').addEventListener('click', stopPlayback);
-
-  const loopBtn = document.getElementById('loop-btn');
-  loopBtn.addEventListener('click', () => {
-    state.loop = !state.loop;
-    loopBtn.classList.toggle('active', state.loop);
-    if (state.playing) { stopPlayback(); startPlayback(); }
-  });
-
-  document.getElementById('clear-btn').addEventListener('click', () => {
-    if (state.progression.length === 0) return;
-    stopPlayback();
-    state.progression = [];
-    renderProgression();
-    showToast('Cleared');
-  });
-
-  document.getElementById('export-btn').addEventListener('click', () => {
-    if (state.progression.length === 0) return;
-    const text = state.progression.map(c => getChordName(c.root, c.type)).join(' | ');
-    const full = `Key: ${NOTES[state.key]} ${state.scale} | ${text} | ${state.tempo} BPM`;
-    navigator.clipboard.writeText(full).then(() => showToast('Copied!')).catch(() => showToast(full));
-  });
-
-  document.querySelectorAll('.palette-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.palette-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      state.paletteTab = tab.dataset.tab;
-      renderChordGrid();
-    });
-  });
-
-  setupTabs();
-
-  setupOptionButtons('arp-patterns', (btn) => {
-    state.arp.pattern = btn.dataset.pattern;
-    if (state.playing && state.arp.enabled) { stopPlayback(); startPlayback(); }
-  });
-
-  setupOptionButtons('arp-speeds', (btn) => {
-    state.arp.speed = btn.dataset.speed;
-    if (state.playing && state.arp.enabled) { stopPlayback(); startPlayback(); }
-  });
-
-  setupOptionButtons('arp-octaves', (btn) => {
-    state.arp.octaves = parseInt(btn.dataset.octaves);
-    if (state.playing && state.arp.enabled) { stopPlayback(); startPlayback(); }
-  });
-
-  document.getElementById('arp-toggle').addEventListener('change', (e) => {
-    state.arp.enabled = e.target.checked;
-    if (state.playing) { stopPlayback(); startPlayback(); }
-    if (!state.arp.enabled) renderArpVisual(null);
-  });
-
-  setupOptionButtons('beats-options', (btn) => {
-    state.beatsPerChord = parseInt(btn.dataset.val);
-    if (state.playing) { stopPlayback(); startPlayback(); }
-  });
-
-  setupOptionButtons('sound-options', (btn) => {
-    state.sound = btn.dataset.val;
-    rebuildSynth();
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
-      e.preventDefault();
-      togglePlayback();
+    if (instrument === 'drums') {
+      if (!synths.drums) synths.drums = createDrumSynth();
+      previewSeq = new Tone.Sequence((time, s) => {
+        Tone.Draw.schedule(() => highlightDrumStep(s), time);
+        DRUM_NAMES.forEach(name => {
+          const cell = document.querySelector(`.drum-cell[data-name="${name}"][data-step="${s}"]`);
+          if (cell && cell.classList.contains('on')) {
+            synths.drums.trigger(name);
+          }
+        });
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+    } else if (instrument === 'chords') {
+      if (!synths.chords) synths.chords = createChordSynth();
+      const slots = document.querySelectorAll('.chord-slot');
+      const chords = Array.from(slots).map(s => s.dataset.chord).filter(Boolean);
+      if (chords.length === 0) { previewPlaying = false; return; }
+      let ci = 0;
+      previewSeq = new Tone.Sequence((time, s) => {
+        if (s % 4 === 0) {
+          const ch = chords[ci % chords.length];
+          const notes = CHORD_NOTES[ch];
+          if (notes) synths.chords.play(notes, '2n');
+          Tone.Draw.schedule(() => highlightChordSlot(ci % chords.length), time);
+          ci++;
+        }
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+    } else if (instrument === 'bass' || instrument === 'melody') {
+      const noteNames = instrument === 'bass' ? NOTE_NAMES_BASS : NOTE_NAMES_MELODY;
+      if (!synths[instrument]) {
+        synths[instrument] = instrument === 'bass' ? createBassSynth() : createMelodySynth();
+      }
+      previewSeq = new Tone.Sequence((time, s) => {
+        Tone.Draw.schedule(() => highlightNoteStep(instrument, s), time);
+        noteNames.forEach(note => {
+          const cell = document.querySelector(`.note-cell[data-inst="${instrument}"][data-note="${note}"][data-step="${s}"]`);
+          if (cell && cell.classList.contains('on')) {
+            synths[instrument].play(note, '16n');
+          }
+        });
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
     }
-  });
 
-  renderChordGrid();
-  renderPresets();
-  renderProgression();
-}
+    Tone.Transport.start();
+  }
 
-document.addEventListener('DOMContentLoaded', init);
+  function stopPreview() {
+    previewPlaying = false;
+    if (previewSeq) { previewSeq.dispose(); previewSeq = null; }
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    document.querySelectorAll('.drum-cell.playing, .note-cell.playing, .chord-slot.playing').forEach(el => el.classList.remove('playing'));
+    INSTRUMENTS.forEach(inst => {
+      const pi = document.getElementById(inst + '-play-icon');
+      const si = document.getElementById(inst + '-stop-icon');
+      if (pi) pi.style.display = 'block';
+      if (si) si.style.display = 'none';
+    });
+  }
+
+  function highlightDrumStep(step) {
+    document.querySelectorAll('.drum-cell.playing').forEach(el => el.classList.remove('playing'));
+    document.querySelectorAll(`.drum-cell[data-step="${step}"]`).forEach(el => el.classList.add('playing'));
+  }
+
+  function highlightChordSlot(index) {
+    document.querySelectorAll('.chord-slot.playing').forEach(el => el.classList.remove('playing'));
+    const slot = document.querySelector(`.chord-slot[data-index="${index}"]`);
+    if (slot) slot.classList.add('playing');
+  }
+
+  function highlightNoteStep(inst, step) {
+    document.querySelectorAll(`.note-cell[data-inst="${inst}"].playing`).forEach(el => el.classList.remove('playing'));
+    document.querySelectorAll(`.note-cell[data-inst="${inst}"][data-step="${step}"]`).forEach(el => el.classList.add('playing'));
+  }
+
+  // ── Listen (combined playback) ──
+  function showListen() {
+    showScreen('listen');
+    document.getElementById('listen-song').textContent = songName;
+
+    const layersEl = document.getElementById('listen-layers');
+    layersEl.innerHTML = '';
+
+    INSTRUMENTS.forEach(inst => {
+      const sub = submissions[inst];
+      const card = document.createElement('div');
+      card.className = 'layer-card';
+      const pName = sub ? players[sub.playerIndex].name : '—';
+      const status = sub ? 'Ready' : 'Empty';
+      card.innerHTML = `
+        <span class="layer-badge" data-inst="${inst}">${inst}</span>
+        <span class="layer-player">${esc(pName)}</span>
+        <span class="layer-status">${status}</span>
+      `;
+      layersEl.appendChild(card);
+    });
+
+    let allPlaying = false;
+    let allSeqs = [];
+
+    const playAllBtn = document.getElementById('btn-play-all');
+    const stopAllBtn = document.getElementById('btn-stop-all');
+    playAllBtn.style.display = 'flex';
+    stopAllBtn.style.display = 'none';
+
+    playAllBtn.onclick = () => {
+      ensureAudio().then(() => {
+        if (allPlaying) return;
+        allPlaying = true;
+        playAllBtn.style.display = 'none';
+        stopAllBtn.style.display = 'flex';
+        playAllLayers(allSeqs);
+      });
+    };
+
+    stopAllBtn.onclick = () => {
+      allPlaying = false;
+      playAllBtn.style.display = 'flex';
+      stopAllBtn.style.display = 'none';
+      stopAllLayers(allSeqs);
+      allSeqs = [];
+    };
+
+    document.getElementById('btn-play-again').onclick = () => {
+      stopAllLayers(allSeqs);
+      allSeqs = [];
+      showLobby();
+    };
+
+    document.getElementById('btn-back-lobby').onclick = () => {
+      stopAllLayers(allSeqs);
+      allSeqs = [];
+      showLobby();
+    };
+  }
+
+  function playAllLayers(seqs) {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+
+    const firstSub = Object.values(submissions)[0];
+    const bpm = firstSub ? firstSub.bpm : 120;
+    Tone.Transport.bpm.value = bpm;
+
+    if (submissions.drums) {
+      if (!synths.drums) synths.drums = createDrumSynth();
+      const data = submissions.drums.data;
+      const seq = new Tone.Sequence((time, s) => {
+        DRUM_NAMES.forEach(name => {
+          if (data[name] && data[name][s]) {
+            synths.drums.trigger(name);
+          }
+        });
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+      seqs.push(seq);
+    }
+
+    if (submissions.chords) {
+      if (!synths.chords) synths.chords = createChordSynth();
+      const chords = submissions.chords.data.filter(Boolean);
+      if (chords.length > 0) {
+        let ci = 0;
+        const seq = new Tone.Sequence((time, s) => {
+          if (s % 4 === 0) {
+            const ch = chords[ci % chords.length];
+            const notes = CHORD_NOTES[ch];
+            if (notes) synths.chords.play(notes, '2n');
+            ci++;
+          }
+        }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+        seqs.push(seq);
+      }
+    }
+
+    if (submissions.bass) {
+      if (!synths.bass) synths.bass = createBassSynth();
+      const data = submissions.bass.data;
+      const seq = new Tone.Sequence((time, s) => {
+        NOTE_NAMES_BASS.forEach(note => {
+          if (data[note] && data[note][s]) {
+            synths.bass.play(note, '16n');
+          }
+        });
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+      seqs.push(seq);
+    }
+
+    if (submissions.melody) {
+      if (!synths.melody) synths.melody = createMelodySynth();
+      const data = submissions.melody.data;
+      const seq = new Tone.Sequence((time, s) => {
+        NOTE_NAMES_MELODY.forEach(note => {
+          if (data[note] && data[note][s]) {
+            synths.melody.play(note, '16n');
+          }
+        });
+      }, Array.from({ length: STEPS }, (_, i) => i), '16n').start(0);
+      seqs.push(seq);
+    }
+
+    Tone.Transport.start();
+  }
+
+  function stopAllLayers(seqs) {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    seqs.forEach(s => s.dispose());
+  }
+
+  // ── Utils ──
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── Init ──
+  initHome();
+
+})();

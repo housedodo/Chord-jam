@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>CHORD JAM</title>
+  <title>SOUND TELEPHONE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,163 +11,159 @@
 </head>
 <body>
 
-  <div class="app">
-    <!-- Header -->
-    <header>
-      <div class="header-row">
-        <h1>CHORD JAM</h1>
-        <div class="header-controls">
-          <select id="key-select" class="pill-select" aria-label="Key"></select>
-          <select id="scale-select" class="pill-select" aria-label="Scale">
-            <option value="major">Major</option>
-            <option value="minor">Minor</option>
-            <option value="dorian">Dorian</option>
-            <option value="mixolydian">Mixolydian</option>
-          </select>
+  <!-- HOME screen -->
+  <div id="screen-home" class="screen active">
+    <div class="home-container">
+      <h1 class="logo">SOUND<br>TELEPHONE</h1>
+      <p class="tagline">Recreate songs together, one layer at a time</p>
+      <div class="home-actions">
+        <button id="btn-create" class="btn-primary">Create Room</button>
+        <div class="join-row">
+          <input id="input-code" type="text" class="code-input" placeholder="Room code" maxlength="6" autocomplete="off" spellcheck="false">
+          <button id="btn-join" class="btn-secondary">Join</button>
         </div>
       </div>
-    </header>
-
-    <!-- Progression strip (always visible) -->
-    <div class="progression-strip">
-      <div id="progression-track" class="progression-track">
-        <div class="empty-state">Tap chords to build a progression</div>
+      <div class="home-footer">
+        <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false">
       </div>
-      <div class="transport-row">
-        <button id="clear-btn" class="transport-btn" title="Clear">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <button id="stop-btn" class="transport-btn" title="Stop">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-        </button>
-        <button id="play-btn" class="transport-btn play-btn" title="Play / Pause">
-          <svg id="play-icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
-          <svg id="pause-icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>
-        </button>
-        <button id="loop-btn" class="transport-btn active" title="Loop">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/>
-            <path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
-          </svg>
-        </button>
-        <button id="export-btn" class="transport-btn" title="Copy">
+    </div>
+  </div>
+
+  <!-- LOBBY screen -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-container">
+      <div class="lobby-header">
+        <h2>Room <span id="room-code" class="room-code"></span></h2>
+        <button id="btn-copy-code" class="btn-icon" title="Copy code">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
         </button>
       </div>
+      <div id="player-list" class="player-list"></div>
+      <div id="host-controls" class="host-controls" style="display:none">
+        <div class="song-input-row">
+          <input id="input-song" type="text" class="song-input" placeholder="Enter song name..." maxlength="80" autocomplete="off" spellcheck="false">
+        </div>
+        <button id="btn-start" class="btn-primary" disabled>Start Game</button>
+      </div>
+      <div id="guest-waiting" class="guest-waiting">
+        <p>Waiting for host to start...</p>
+      </div>
+      <button id="btn-leave" class="btn-text">Leave Room</button>
     </div>
+  </div>
 
-    <!-- Tab content area -->
-    <div class="tab-content">
-
-      <!-- Play tab -->
-      <div id="tab-play" class="tab-pane active">
-        <div class="play-grid-header">
-          <div class="palette-tabs">
-            <button class="palette-tab active" data-tab="diatonic">Diatonic</button>
-            <button class="palette-tab" data-tab="extended">Extended</button>
-            <button class="palette-tab" data-tab="all">All</button>
-          </div>
-        </div>
-        <div id="chord-grid" class="chord-grid"></div>
-        <div class="presets-section">
-          <p class="section-label">Presets</p>
-          <div id="preset-list" class="preset-list"></div>
-        </div>
+  <!-- REVEAL screen (shows the song name briefly) -->
+  <div id="screen-reveal" class="screen">
+    <div class="reveal-container">
+      <p class="reveal-label">Recreate this song:</p>
+      <h2 id="reveal-song" class="reveal-song"></h2>
+      <p class="reveal-instrument">Your instrument: <strong id="reveal-instrument"></strong></p>
+      <div class="reveal-timer">
+        <div id="reveal-bar" class="reveal-bar"></div>
       </div>
-
-      <!-- Arpeggio tab -->
-      <div id="tab-arp" class="tab-pane">
-        <div class="arp-controls">
-          <div class="arp-row">
-            <p class="section-label">Pattern</p>
-            <div class="arp-patterns" id="arp-patterns">
-              <button class="arp-btn active" data-pattern="up">Up</button>
-              <button class="arp-btn" data-pattern="down">Down</button>
-              <button class="arp-btn" data-pattern="updown">Up/Down</button>
-              <button class="arp-btn" data-pattern="random">Random</button>
-              <button class="arp-btn" data-pattern="pinky">Pinky</button>
-              <button class="arp-btn" data-pattern="spread">Spread</button>
-            </div>
-          </div>
-          <div class="arp-row">
-            <p class="section-label">Speed</p>
-            <div class="arp-speeds" id="arp-speeds">
-              <button class="arp-btn" data-speed="2n">Half</button>
-              <button class="arp-btn active" data-speed="4n">Quarter</button>
-              <button class="arp-btn" data-speed="8n">Eighth</button>
-              <button class="arp-btn" data-speed="16n">16th</button>
-            </div>
-          </div>
-          <div class="arp-row">
-            <p class="section-label">Octaves</p>
-            <div class="arp-octaves" id="arp-octaves">
-              <button class="arp-btn active" data-octaves="1">1</button>
-              <button class="arp-btn" data-octaves="2">2</button>
-              <button class="arp-btn" data-octaves="3">3</button>
-            </div>
-          </div>
-          <div class="arp-toggle-row">
-            <label class="toggle-label">
-              <span>Arpeggio on</span>
-              <div class="toggle-switch">
-                <input type="checkbox" id="arp-toggle">
-                <span class="toggle-slider"></span>
-              </div>
-            </label>
-          </div>
-        </div>
-        <div class="arp-visual" id="arp-visual">
-          <p class="arp-hint">Enable arpeggio and play a progression to see the pattern</p>
-        </div>
-      </div>
-
-      <!-- Settings tab -->
-      <div id="tab-settings" class="tab-pane">
-        <div class="settings-list">
-          <div class="setting-item">
-            <label>Tempo</label>
-            <div class="tempo-control">
-              <input type="range" id="tempo-slider" min="40" max="220" value="120">
-              <span id="tempo-value" class="tempo-display">120</span>
-            </div>
-          </div>
-          <div class="setting-item">
-            <label>Beats per chord</label>
-            <div class="setting-options" id="beats-options">
-              <button class="opt-btn" data-val="1">1</button>
-              <button class="opt-btn active" data-val="2">2</button>
-              <button class="opt-btn" data-val="4">4</button>
-            </div>
-          </div>
-          <div class="setting-item">
-            <label>Sound</label>
-            <div class="setting-options" id="sound-options">
-              <button class="opt-btn active" data-val="piano">Piano</button>
-              <button class="opt-btn" data-val="electric-piano">E. Piano</button>
-              <button class="opt-btn" data-val="warm-pad">Pad</button>
-              <button class="opt-btn" data-val="soft-strings">Strings</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
+  </div>
 
-    <!-- Bottom tab bar -->
-    <nav class="tab-bar">
-      <button class="tab-bar-item active" data-target="tab-play">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        <span>Play</span>
-      </button>
-      <button class="tab-bar-item" data-target="tab-arp">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 20l4-8 4 4 4-12 4 8 4-4"/></svg>
-        <span>Arpeggio</span>
-      </button>
-      <button class="tab-bar-item" data-target="tab-settings">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        <span>Settings</span>
-      </button>
-    </nav>
+  <!-- BUILD screen (instrument sequencer) -->
+  <div id="screen-build" class="screen">
+    <div class="build-container">
+      <div class="build-header">
+        <div class="build-info">
+          <span id="build-song" class="build-song"></span>
+          <span id="build-instrument" class="build-badge"></span>
+        </div>
+        <div class="build-timer">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="build-time"></span>
+        </div>
+      </div>
+
+      <!-- Drums sequencer -->
+      <div id="seq-drums" class="sequencer" style="display:none">
+        <div class="seq-controls">
+          <button id="drums-play" class="btn-seq-play" title="Play/Stop">
+            <svg id="drums-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+            <svg id="drums-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <div class="tempo-mini">
+            <label>BPM</label>
+            <input type="number" id="drums-bpm" class="bpm-input" value="120" min="60" max="200">
+          </div>
+        </div>
+        <div id="drum-grid" class="drum-grid"></div>
+      </div>
+
+      <!-- Chords sequencer -->
+      <div id="seq-chords" class="sequencer" style="display:none">
+        <div class="seq-controls">
+          <button id="chords-play" class="btn-seq-play" title="Play/Stop">
+            <svg id="chords-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+            <svg id="chords-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <div class="tempo-mini">
+            <label>BPM</label>
+            <input type="number" id="chords-bpm" class="bpm-input" value="120" min="60" max="200">
+          </div>
+        </div>
+        <div class="chord-slots" id="chord-slots"></div>
+        <div class="chord-palette" id="chord-palette"></div>
+      </div>
+
+      <!-- Bass sequencer -->
+      <div id="seq-bass" class="sequencer" style="display:none">
+        <div class="seq-controls">
+          <button id="bass-play" class="btn-seq-play" title="Play/Stop">
+            <svg id="bass-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+            <svg id="bass-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <div class="tempo-mini">
+            <label>BPM</label>
+            <input type="number" id="bass-bpm" class="bpm-input" value="120" min="60" max="200">
+          </div>
+        </div>
+        <div id="bass-grid" class="note-grid"></div>
+      </div>
+
+      <!-- Melody sequencer -->
+      <div id="seq-melody" class="sequencer" style="display:none">
+        <div class="seq-controls">
+          <button id="melody-play" class="btn-seq-play" title="Play/Stop">
+            <svg id="melody-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+            <svg id="melody-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <div class="tempo-mini">
+            <label>BPM</label>
+            <input type="number" id="melody-bpm" class="bpm-input" value="120" min="60" max="200">
+          </div>
+        </div>
+        <div id="melody-grid" class="note-grid"></div>
+      </div>
+
+      <button id="btn-submit" class="btn-primary btn-submit">Submit Layer</button>
+    </div>
+  </div>
+
+  <!-- LISTEN screen (combined playback) -->
+  <div id="screen-listen" class="screen">
+    <div class="listen-container">
+      <h2 class="listen-title">The Song Was:</h2>
+      <h3 id="listen-song" class="listen-song"></h3>
+      <div id="listen-layers" class="listen-layers"></div>
+      <div class="listen-controls">
+        <button id="btn-play-all" class="btn-primary">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
+          Play All Layers
+        </button>
+        <button id="btn-stop-all" class="btn-secondary" style="display:none">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          Stop
+        </button>
+      </div>
+      <div class="listen-actions">
+        <button id="btn-play-again" class="btn-secondary">Play Again</button>
+        <button id="btn-back-lobby" class="btn-text">Back to Lobby</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast"></div>
