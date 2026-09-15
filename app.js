@@ -34,10 +34,78 @@ const PRESETS = [
 ];
 
 const SOUND_PRESETS = {
-  'warm-pad':      { oscillator: { type: 'sine' },     envelope: { attack: 0.15, decay: 0.3, sustain: 0.6, release: 0.8 }, volume: -10 },
-  'electric-piano': { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.3, release: 0.5 }, volume: -8  },
-  'bright-keys':   { oscillator: { type: 'square' },   envelope: { attack: 0.005,decay: 0.2, sustain: 0.15,release: 0.3 }, volume: -14 },
-  'soft-strings':  { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.4, decay: 0.5, sustain: 0.7, release: 1.2 }, volume: -14 },
+  'piano': {
+    create: () => {
+      const synth = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 16,
+        voice: Tone.FMSynth,
+        options: {
+          harmonicity: 3,
+          modulationIndex: 0.8,
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.005, decay: 1.2, sustain: 0.3, release: 1.5 },
+          modulation: { type: 'square' },
+          modulationEnvelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.5 },
+        },
+      });
+      synth.volume.value = -8;
+      return synth;
+    },
+  },
+  'warm-pad': {
+    create: () => {
+      const synth = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 12,
+        voice: Tone.FMSynth,
+        options: {
+          harmonicity: 1,
+          modulationIndex: 0.5,
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.3, decay: 0.5, sustain: 0.8, release: 2.0 },
+          modulation: { type: 'sine' },
+          modulationEnvelope: { attack: 0.5, decay: 0.5, sustain: 0.8, release: 1.0 },
+        },
+      });
+      synth.volume.value = -10;
+      return synth;
+    },
+  },
+  'electric-piano': {
+    create: () => {
+      const synth = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 12,
+        voice: Tone.FMSynth,
+        options: {
+          harmonicity: 6,
+          modulationIndex: 1.2,
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.001, decay: 1.5, sustain: 0.1, release: 1.0 },
+          modulation: { type: 'sine' },
+          modulationEnvelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.3 },
+        },
+      });
+      synth.volume.value = -8;
+      return synth;
+    },
+  },
+  'soft-strings': {
+    create: () => {
+      const synth = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 12,
+        voice: Tone.FMSynth,
+        options: {
+          harmonicity: 2,
+          modulationIndex: 0.3,
+          oscillator: { type: 'sawtooth8' },
+          envelope: { attack: 0.5, decay: 0.6, sustain: 0.8, release: 2.5 },
+          modulation: { type: 'sine' },
+          modulationEnvelope: { attack: 0.8, decay: 0.5, sustain: 0.7, release: 1.5 },
+        },
+      });
+      synth.volume.value = -12;
+      return synth;
+    },
+  },
 };
 
 const ARP_PATTERNS = {
@@ -82,7 +150,7 @@ let state = {
   scale: 'major',
   tempo: 120,
   beatsPerChord: 2,
-  sound: 'warm-pad',
+  sound: 'piano',
   loop: true,
   progression: [],
   playing: false,
@@ -99,27 +167,29 @@ let state = {
 
 let synth = null;
 let reverb = null;
+let chorus = null;
 let transportStarted = false;
+let holdArpInterval = null;
+let holdingChord = null;
 
 function initAudio() {
   if (synth) return;
-  const preset = SOUND_PRESETS[state.sound];
-  synth = new Tone.PolySynth(Tone.Synth, {
-    maxPolyphony: 12,
-    voice: Tone.Synth,
-    options: { oscillator: preset.oscillator, envelope: preset.envelope },
-  });
-  synth.volume.value = preset.volume;
-  reverb = new Tone.Reverb({ decay: 2, wet: 0.25 });
-  synth.connect(reverb);
-  reverb.toDestination();
+  synth = SOUND_PRESETS[state.sound].create();
+  reverb = new Tone.Reverb({ decay: 2.5, wet: 0.2 });
+  chorus = new Tone.Chorus({ frequency: 0.5, delayTime: 3.5, depth: 0.3, wet: 0.15 }).start();
+  synth.chain(chorus, reverb, Tone.getDestination());
 }
 
-function updateSynthSound() {
-  if (!synth) return;
-  const preset = SOUND_PRESETS[state.sound];
-  synth.set({ oscillator: preset.oscillator, envelope: preset.envelope });
-  synth.volume.value = preset.volume;
+function rebuildSynth() {
+  if (synth) {
+    synth.releaseAll();
+    synth.disconnect();
+    synth.dispose();
+  }
+  synth = SOUND_PRESETS[state.sound].create();
+  if (chorus && reverb) {
+    synth.chain(chorus, reverb, Tone.getDestination());
+  }
 }
 
 function noteFromMidi(midi) {
@@ -187,20 +257,49 @@ function getAllChords() {
   return chords;
 }
 
-function previewChord(rootIndex, type) {
+function startHoldChord(rootIndex, type) {
   Tone.start();
   initAudio();
-  synth.releaseAll();
+  stopHoldChord();
+  holdingChord = { root: rootIndex, type };
+
   if (state.arp.enabled) {
     const notes = getChordNotesExpanded(rootIndex, type, state.arp.octaves);
     const pattern = ARP_PATTERNS[state.arp.pattern](notes);
-    const dur = Tone.Time(state.arp.speed).toSeconds();
-    pattern.forEach((note, i) => {
-      synth.triggerAttackRelease(note, state.arp.speed, Tone.now() + i * dur);
-    });
+    let idx = 0;
+    const bpm = state.tempo;
+    const speedMs = Tone.Time(state.arp.speed).toMilliseconds() * (120 / bpm);
+
+    synth.triggerAttackRelease(pattern[0], state.arp.speed);
+    renderArpVisual(pattern, 0);
+    idx = 1;
+
+    holdArpInterval = setInterval(() => {
+      if (idx >= pattern.length) {
+        const fresh = ARP_PATTERNS[state.arp.pattern](
+          getChordNotesExpanded(rootIndex, type, state.arp.octaves)
+        );
+        pattern.length = 0;
+        pattern.push(...fresh);
+        idx = 0;
+      }
+      synth.triggerAttackRelease(pattern[idx], state.arp.speed);
+      renderArpVisual(pattern, idx);
+      idx++;
+    }, speedMs);
   } else {
-    synth.triggerAttackRelease(getChordNotes(rootIndex, type), '4n');
+    const notes = getChordNotes(rootIndex, type);
+    synth.triggerAttack(notes);
   }
+}
+
+function stopHoldChord() {
+  if (holdArpInterval) {
+    clearInterval(holdArpInterval);
+    holdArpInterval = null;
+  }
+  if (synth) synth.releaseAll();
+  holdingChord = null;
 }
 
 function addToProgression(rootIndex, type) {
@@ -229,11 +328,35 @@ function renderChordGrid() {
   }).join('');
 
   grid.querySelectorAll('.chord-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const root = parseInt(btn.dataset.root);
-      const type = btn.dataset.type;
-      previewChord(root, type);
+    const root = parseInt(btn.dataset.root);
+    const type = btn.dataset.type;
+
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startHoldChord(root, type);
+    });
+    btn.addEventListener('mouseup', () => {
+      stopHoldChord();
       addToProgression(root, type);
+    });
+    btn.addEventListener('mouseleave', () => {
+      if (holdingChord) {
+        stopHoldChord();
+        addToProgression(root, type);
+      }
+    });
+
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      startHoldChord(root, type);
+    }, { passive: false });
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      stopHoldChord();
+      addToProgression(root, type);
+    });
+    btn.addEventListener('touchcancel', () => {
+      stopHoldChord();
     });
   });
 }
@@ -262,10 +385,6 @@ function renderProgression() {
   });
 
   track.querySelectorAll('.prog-chord').forEach(el => {
-    el.addEventListener('click', () => {
-      const c = state.progression[parseInt(el.dataset.index)];
-      previewChord(c.root, c.type);
-    });
     el.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', el.dataset.index);
       el.classList.add('dragging');
@@ -326,8 +445,9 @@ function buildArpSequence(chord) {
 
 function renderArpVisual(arpNotes, activeIndex) {
   const visual = document.getElementById('arp-visual');
+  if (!visual) return;
   if (!arpNotes || arpNotes.length === 0) {
-    visual.innerHTML = '<p class="arp-hint">Enable arpeggio and play a progression to see the pattern</p>';
+    visual.innerHTML = '<p class="arp-hint">Enable arpeggio and hold a chord button to hear the pattern</p>';
     return;
   }
   const midiValues = arpNotes.map(n => {
@@ -396,9 +516,6 @@ function startArpPlayback() {
   const beatDurSec = Tone.Time('4n').toSeconds();
   const chordDurSec = beatDurSec * beatsPerChord;
   const notesPerChord = Math.max(1, Math.floor(chordDurSec / arpDurSec));
-
-  let globalStep = 0;
-  const totalArpNotes = state.progression.length * notesPerChord;
 
   const allSteps = [];
   state.progression.forEach((chord, chordIdx) => {
@@ -578,7 +695,7 @@ function init() {
 
   setupOptionButtons('sound-options', (btn) => {
     state.sound = btn.dataset.val;
-    updateSynthSound();
+    rebuildSynth();
   });
 
   document.addEventListener('keydown', (e) => {
