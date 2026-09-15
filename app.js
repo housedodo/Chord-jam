@@ -177,7 +177,7 @@
   let roomCode = '';
 
   function netSend(conn, msg) {
-    try { conn.send(JSON.stringify(msg)); } catch (e) { console.warn('net send error', e); }
+    try { conn.send(msg); } catch (e) { console.warn('net send error', e); }
   }
   function netBroadcast(msg) {
     guestConns.forEach(function (c) { netSend(c, msg); });
@@ -198,11 +198,13 @@
     myPlayerIndex = 0;
     players = [{ name: myName, color: PLAYER_COLORS[0] }];
 
-    peer = new Peer('st-' + code, { debug: 0 });
-    peer.on('open', function () {
+    peer = new Peer('st-' + code, { debug: 2, serialization: 'json' });
+    peer.on('open', function (id) {
+      console.log('Host peer open:', id);
       showOnlineLobby();
     });
     peer.on('error', function (err) {
+      console.error('Host peer error:', err);
       if (err.type === 'unavailable-id') {
         toast('Room code taken, try again');
         destroyPeer();
@@ -212,9 +214,12 @@
       }
     });
     peer.on('connection', function (conn) {
+      console.log('Host got connection from:', conn.peer);
       conn.on('open', function () {
-        conn.on('data', function (raw) {
-          handleHostMessage(conn, typeof raw === 'string' ? JSON.parse(raw) : raw);
+        console.log('Host connection open:', conn.peer);
+        conn.on('data', function (data) {
+          console.log('Host received:', data);
+          handleHostMessage(conn, data);
         });
         conn.on('close', function () {
           handleGuestDisconnect(conn);
@@ -228,14 +233,17 @@
     netMode = 'guest';
     toast('Connecting...');
 
-    peer = new Peer(undefined, { debug: 0 });
-    peer.on('open', function () {
-      hostConn = peer.connect('st-' + code, { reliable: true });
+    peer = new Peer(undefined, { debug: 2, serialization: 'json' });
+    peer.on('open', function (id) {
+      console.log('Guest peer open:', id);
+      hostConn = peer.connect('st-' + code, { reliable: true, serialization: 'json' });
       hostConn.on('open', function () {
+        console.log('Guest connected to host');
         netSend(hostConn, { type: 'join', name: myName });
       });
-      hostConn.on('data', function (raw) {
-        handleGuestReceive(typeof raw === 'string' ? JSON.parse(raw) : raw);
+      hostConn.on('data', function (data) {
+        console.log('Guest received:', data);
+        handleGuestReceive(data);
       });
       hostConn.on('close', function () {
         toast('Disconnected from host');
@@ -243,7 +251,8 @@
         netMode = 'local';
         showScreen('home');
       });
-      hostConn.on('error', function () {
+      hostConn.on('error', function (err) {
+        console.error('Guest conn error:', err);
         toast('Connection failed');
         destroyPeer();
         netMode = 'local';
@@ -251,7 +260,12 @@
       });
     });
     peer.on('error', function (err) {
-      toast('Could not join: ' + err.type);
+      console.error('Guest peer error:', err);
+      if (err.type === 'peer-unavailable') {
+        toast('Room not found — check the code');
+      } else {
+        toast('Could not join: ' + err.type);
+      }
       destroyPeer();
       netMode = 'local';
       showScreen('home');
