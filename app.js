@@ -1380,7 +1380,7 @@
       return sfxGrid;
     }
     if (instrument === 'vocal') {
-      return { hasRecording: !!vocalBlob };
+      return { dataUrl: vocalDataUrl || null };
     }
     if (instrument === 'chords' && gameSettings.arp) {
       return applyArpToChords(pianoRollNotes.slice());
@@ -1996,6 +1996,11 @@
       seqs.push(new Tone.Sequence(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
+      var vAudio = new Audio(sub.data.dataUrl);
+      vAudio.currentTime = 0;
+      vAudio.play();
+      seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
     }
   }
 
@@ -2402,6 +2407,11 @@
       seqs.push(new Tone.Sequence(function (time, s) {
         SFX_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.sfx.trigger(name); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
+      var vAudio = new Audio(sub.data.dataUrl);
+      vAudio.currentTime = 0;
+      vAudio.play();
+      seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
     }
   }
 
@@ -2489,10 +2499,7 @@
   }
 
   // ── Vocal Recording ──
-  var vocalRecorder = null;
-  var vocalBlob = null;
-  var vocalPlayer = null;
-  var vocalAnalyser = null;
+  var vocalDataUrl = null;
 
   function initVocalRecorder() {
     var recBtn = document.getElementById('vocal-rec');
@@ -2504,6 +2511,10 @@
     var mediaRecorder = null;
     var chunks = [];
     var recordTimeout = null;
+
+    vocalDataUrl = null;
+    playBtn.style.display = 'none';
+    statusEl.textContent = 'Tap to record (max 8s)';
 
     function drawWaveform(analyser) {
       if (!recording) return;
@@ -2555,9 +2566,14 @@
         mediaRecorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function () {
           stream.getTracks().forEach(function (t) { t.stop(); });
-          vocalBlob = new Blob(chunks, { type: 'audio/webm' });
-          playBtn.style.display = 'inline-flex';
-          statusEl.textContent = 'Recorded! Tap play to preview';
+          var blob = new Blob(chunks, { type: 'audio/webm' });
+          var reader = new FileReader();
+          reader.onloadend = function () {
+            vocalDataUrl = reader.result;
+            playBtn.style.display = 'inline-flex';
+            statusEl.textContent = 'Recorded! Tap play to preview';
+          };
+          reader.readAsDataURL(blob);
           audioCtx.close();
         };
         mediaRecorder.start();
@@ -2574,11 +2590,9 @@
     };
 
     playBtn.onclick = function () {
-      if (vocalBlob) {
-        var url = URL.createObjectURL(vocalBlob);
-        var audio = new Audio(url);
+      if (vocalDataUrl) {
+        var audio = new Audio(vocalDataUrl);
         audio.play();
-        audio.onended = function () { URL.revokeObjectURL(url); };
       }
     };
   }
