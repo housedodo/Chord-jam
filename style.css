@@ -149,11 +149,10 @@ body {
 .name-input::placeholder { color: var(--text-dim); }
 .name-input:focus { border-color: var(--accent-soft); }
 
-.home-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+.home-hint {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-top: -16px;
 }
 
 /* Buttons */
@@ -309,6 +308,20 @@ body {
 }
 .song-input::placeholder { color: var(--text-dim); }
 .song-input:focus { border-color: var(--accent-soft); }
+
+.lobby-tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lobby-tempo label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
 
 .guest-waiting {
   text-align: center;
@@ -472,23 +485,45 @@ body {
   text-transform: uppercase;
 }
 
-.bpm-input {
-  width: 60px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--text);
-  padding: 6px 8px;
-  font-size: 0.85rem;
+.bpm-display {
+  font-size: 0.75rem;
   font-weight: 600;
-  text-align: center;
-  outline: none;
-  font-family: inherit;
-  -moz-appearance: textfield;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
 }
-.bpm-input::-webkit-inner-spin-button,
-.bpm-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-.bpm-input:focus { border-color: var(--accent-soft); }
+
+.tempo-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tempo-control input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+
+.tempo-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.tempo-display {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+}
 
 /* Drum grid */
 .drum-grid {
@@ -580,23 +615,23 @@ body {
 
 /* Chord slots */
 .chord-slots {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .chord-slot {
-  flex: 1;
   background: var(--surface);
   border: 2px dashed var(--border);
   border-radius: var(--radius-sm);
-  padding: 16px 8px;
+  padding: 12px 4px;
   text-align: center;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
-  min-height: 60px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;

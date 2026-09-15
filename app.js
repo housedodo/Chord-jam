@@ -17,8 +17,16 @@
   const CHORD_OPTIONS = [
     'C', 'Cm', 'D', 'Dm', 'E', 'Em', 'F', 'Fm',
     'G', 'Gm', 'A', 'Am', 'B', 'Bm',
-    'C7', 'D7', 'E7', 'G7', 'A7',
-    'Cmaj7', 'Fmaj7', 'Dm7', 'Em7', 'Am7'
+    'C7', 'D7', 'E7', 'F7', 'G7', 'A7', 'B7',
+    'Cmaj7', 'Dmaj7', 'Fmaj7', 'Gmaj7',
+    'Cm7', 'Dm7', 'Em7', 'Fm7', 'Gm7', 'Am7', 'Bm7',
+    'Csus4', 'Dsus4', 'Gsus4', 'Asus4',
+    'Csus2', 'Dsus2', 'Gsus2', 'Asus2',
+    'Cdim', 'Ddim', 'Edim', 'Bdim',
+    'Caug', 'Eaug',
+    'C6', 'D6', 'F6', 'G6', 'A6',
+    'Cm6', 'Dm6', 'Em6', 'Am6',
+    'C9', 'D9', 'G9', 'A9'
   ];
   const CHORD_NOTES = {
     'C': ['C4','E4','G4'], 'Cm': ['C4','Eb4','G4'],
@@ -29,11 +37,29 @@
     'A': ['A3','C#4','E4'], 'Am': ['A3','C4','E4'],
     'B': ['B3','D#4','F#4'], 'Bm': ['B3','D4','F#4'],
     'C7': ['C4','E4','G4','Bb4'], 'D7': ['D4','F#4','A4','C5'],
-    'E7': ['E4','G#4','B4','D5'], 'G7': ['G3','B3','D4','F4'],
-    'A7': ['A3','C#4','E4','G4'],
-    'Cmaj7': ['C4','E4','G4','B4'], 'Fmaj7': ['F4','A4','C5','E5'],
-    'Dm7': ['D4','F4','A4','C5'], 'Em7': ['E4','G4','B4','D5'],
-    'Am7': ['A3','C4','E4','G4']
+    'E7': ['E4','G#4','B4','D5'], 'F7': ['F4','A4','C5','Eb5'],
+    'G7': ['G3','B3','D4','F4'], 'A7': ['A3','C#4','E4','G4'],
+    'B7': ['B3','D#4','F#4','A4'],
+    'Cmaj7': ['C4','E4','G4','B4'], 'Dmaj7': ['D4','F#4','A4','C#5'],
+    'Fmaj7': ['F4','A4','C5','E5'], 'Gmaj7': ['G3','B3','D4','F#4'],
+    'Cm7': ['C4','Eb4','G4','Bb4'], 'Dm7': ['D4','F4','A4','C5'],
+    'Em7': ['E4','G4','B4','D5'], 'Fm7': ['F4','Ab4','C5','Eb5'],
+    'Gm7': ['G3','Bb3','D4','F4'], 'Am7': ['A3','C4','E4','G4'],
+    'Bm7': ['B3','D4','F#4','A4'],
+    'Csus4': ['C4','F4','G4'], 'Dsus4': ['D4','G4','A4'],
+    'Gsus4': ['G3','C4','D4'], 'Asus4': ['A3','D4','E4'],
+    'Csus2': ['C4','D4','G4'], 'Dsus2': ['D4','E4','A4'],
+    'Gsus2': ['G3','A3','D4'], 'Asus2': ['A3','B3','E4'],
+    'Cdim': ['C4','Eb4','Gb4'], 'Ddim': ['D4','F4','Ab4'],
+    'Edim': ['E4','G4','Bb4'], 'Bdim': ['B3','D4','F4'],
+    'Caug': ['C4','E4','G#4'], 'Eaug': ['E4','G#4','C5'],
+    'C6': ['C4','E4','G4','A4'], 'D6': ['D4','F#4','A4','B4'],
+    'F6': ['F4','A4','C5','D5'], 'G6': ['G3','B3','D4','E4'],
+    'A6': ['A3','C#4','E4','F#4'],
+    'Cm6': ['C4','Eb4','G4','A4'], 'Dm6': ['D4','F4','A4','B4'],
+    'Em6': ['E4','G4','B4','C#5'], 'Am6': ['A3','C4','E4','F#4'],
+    'C9': ['C4','E4','G4','Bb4','D5'], 'D9': ['D4','F#4','A4','C5','E5'],
+    'G9': ['G3','B3','D4','F4','A4'], 'A9': ['A3','C#4','E4','G4','B4']
   };
   const PLAYER_COLORS = ['#a78bfa', '#e8a0bf', '#7eb8d4', '#e8b07d', '#8cc5a2', '#c9a0d4'];
 
@@ -41,6 +67,7 @@
   let players = [];
   let hostIndex = 0;
   let songName = '';
+  let gameBpm = 120;
   let assignments = {};
   let submissions = {};
   let currentPlayerTurn = -1;
@@ -158,17 +185,6 @@
       hostIndex = 0;
       showLobby();
     });
-
-    document.getElementById('btn-join').addEventListener('click', () => {
-      ensureAudio();
-      const name = getName();
-      if (!name) { toast('Enter your name first'); return; }
-      if (players.length === 0) { toast('Create a room first'); return; }
-      if (players.length >= 6) { toast('Room is full'); return; }
-      if (players.some(p => p.name === name)) { toast('Name taken'); return; }
-      players.push({ name, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
-      showLobby();
-    });
   }
 
   function getName() {
@@ -198,6 +214,15 @@
 
     songInput.oninput = () => updateStartBtn();
     updateStartBtn();
+
+    const tempoSlider = document.getElementById('lobby-tempo');
+    const tempoVal = document.getElementById('lobby-tempo-val');
+    tempoSlider.value = gameBpm;
+    tempoVal.textContent = gameBpm;
+    tempoSlider.oninput = () => {
+      gameBpm = parseInt(tempoSlider.value);
+      tempoVal.textContent = gameBpm;
+    };
 
     startBtn.onclick = () => {
       songName = songInput.value.trim();
@@ -343,6 +368,8 @@
 
     INSTRUMENTS.forEach(inst => {
       document.getElementById('seq-' + inst).style.display = inst === instrument ? 'flex' : 'none';
+      const bpmDisp = document.getElementById(inst + '-bpm-display');
+      if (bpmDisp) bpmDisp.textContent = gameBpm + ' BPM';
     });
 
     buildSecondsLeft = BUILD_TIME;
@@ -373,10 +400,8 @@
 
   function submitLayer(instrument, turnIndex) {
     stopPreview();
-    const bpmEl = document.getElementById(instrument === 'drums' ? 'drums-bpm' : instrument === 'chords' ? 'chords-bpm' : instrument === 'bass' ? 'bass-bpm' : 'melody-bpm');
-    const bpm = parseInt(bpmEl.value) || 120;
     const data = collectData(instrument);
-    submissions[instrument] = { data, bpm, playerIndex: currentPlayerTurn };
+    submissions[instrument] = { data, bpm: gameBpm, playerIndex: currentPlayerTurn };
     toast('Layer submitted!');
 
     const nonHost = Object.keys(assignments).map(Number);
@@ -473,7 +498,7 @@
     paletteEl.innerHTML = '';
 
     let activeSlot = 0;
-    const NUM_SLOTS = 4;
+    const NUM_SLOTS = 8;
 
     for (let i = 0; i < NUM_SLOTS; i++) {
       const slot = document.createElement('div');
@@ -560,9 +585,7 @@
 
   // ── Preview playback ──
   function startPreview(instrument) {
-    const bpmEl = document.getElementById(instrument === 'drums' ? 'drums-bpm' : instrument === 'chords' ? 'chords-bpm' : instrument === 'bass' ? 'bass-bpm' : 'melody-bpm');
-    const bpm = parseInt(bpmEl.value) || 120;
-    Tone.Transport.bpm.value = bpm;
+    Tone.Transport.bpm.value = gameBpm;
     Tone.Transport.stop();
     Tone.Transport.cancel();
 

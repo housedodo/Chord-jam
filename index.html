@@ -17,15 +17,10 @@
       <h1 class="logo">SOUND<br>TELEPHONE</h1>
       <p class="tagline">Recreate songs together, one layer at a time</p>
       <div class="home-actions">
-        <button id="btn-create" class="btn-primary">Create Room</button>
-        <div class="join-row">
-          <input id="input-code" type="text" class="code-input" placeholder="Room code" maxlength="6" autocomplete="off" spellcheck="false">
-          <button id="btn-join" class="btn-secondary">Join</button>
-        </div>
+        <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;text-align:center;font-size:1rem;padding:14px 16px">
+        <button id="btn-create" class="btn-primary">Start a Game</button>
       </div>
-      <div class="home-footer">
-        <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false">
-      </div>
+      <p class="home-hint">Add friends in the lobby. Pass the phone around!</p>
     </div>
   </div>
 
@@ -42,6 +37,13 @@
       <div id="host-controls" class="host-controls" style="display:none">
         <div class="song-input-row">
           <input id="input-song" type="text" class="song-input" placeholder="Enter song name..." maxlength="80" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="lobby-tempo">
+          <label>Tempo</label>
+          <div class="tempo-control">
+            <input type="range" id="lobby-tempo" min="60" max="200" value="120">
+            <span id="lobby-tempo-val" class="tempo-display">120</span>
+          </div>
         </div>
         <button id="btn-start" class="btn-primary" disabled>Start Game</button>
       </div>
@@ -85,10 +87,7 @@
             <svg id="drums-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
             <svg id="drums-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
-          <div class="tempo-mini">
-            <label>BPM</label>
-            <input type="number" id="drums-bpm" class="bpm-input" value="120" min="60" max="200">
-          </div>
+          <span class="bpm-display" id="drums-bpm-display"></span>
         </div>
         <div id="drum-grid" class="drum-grid"></div>
       </div>
@@ -100,10 +99,7 @@
             <svg id="chords-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
             <svg id="chords-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
-          <div class="tempo-mini">
-            <label>BPM</label>
-            <input type="number" id="chords-bpm" class="bpm-input" value="120" min="60" max="200">
-          </div>
+          <span class="bpm-display" id="chords-bpm-display"></span>
         </div>
         <div class="chord-slots" id="chord-slots"></div>
         <div class="chord-palette" id="chord-palette"></div>
@@ -116,10 +112,7 @@
             <svg id="bass-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
             <svg id="bass-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
-          <div class="tempo-mini">
-            <label>BPM</label>
-            <input type="number" id="bass-bpm" class="bpm-input" value="120" min="60" max="200">
-          </div>
+          <span class="bpm-display" id="bass-bpm-display"></span>
         </div>
         <div id="bass-grid" class="note-grid"></div>
       </div>
@@ -131,10 +124,7 @@
             <svg id="melody-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>
             <svg id="melody-stop-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
-          <div class="tempo-mini">
-            <label>BPM</label>
-            <input type="number" id="melody-bpm" class="bpm-input" value="120" min="60" max="200">
-          </div>
+          <span class="bpm-display" id="melody-bpm-display"></span>
         </div>
         <div id="melody-grid" class="note-grid"></div>
       </div>
