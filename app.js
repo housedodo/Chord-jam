@@ -55,6 +55,24 @@
     'Bell': { harmonicity: 5.07, modulationIndex: 2, envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.3 }, volume: -8 },
     'Organ': { harmonicity: 2, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.1 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.1 }, volume: -8 }
   };
+  const GENRE_SUGGESTIONS = [
+    { genre: 'Pop', bpm: '100-130', icon: '🎤' },
+    { genre: 'Rock', bpm: '110-140', icon: '🎸' },
+    { genre: 'Hip Hop', bpm: '80-100', icon: '🎧' },
+    { genre: 'EDM / House', bpm: '120-130', icon: '🎛️' },
+    { genre: 'Drum & Bass', bpm: '160-180', icon: '🥁' },
+    { genre: 'R&B / Soul', bpm: '60-80', icon: '🎷' },
+    { genre: 'Reggaeton', bpm: '90-100', icon: '🌴' },
+    { genre: 'Jazz', bpm: '100-160', icon: '🎺' },
+    { genre: 'Country', bpm: '100-120', icon: '🤠' },
+    { genre: 'Funk', bpm: '100-120', icon: '🕺' },
+    { genre: 'Metal', bpm: '120-180', icon: '🤘' },
+    { genre: 'Ballad', bpm: '60-80', icon: '💜' },
+    { genre: 'Disco', bpm: '110-130', icon: '🪩' },
+    { genre: 'Lo-Fi', bpm: '70-90', icon: '☕' },
+    { genre: 'Punk', bpm: '140-180', icon: '⚡' },
+    { genre: 'Latin', bpm: '90-110', icon: '💃' }
+  ];
   const CELL_W = 28;
   const LABEL_W = 44;
 
@@ -168,6 +186,24 @@
 
   function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+  function renderGenreChips(container, tempoSlider, tempoDisplay) {
+    container.innerHTML = '';
+    GENRE_SUGGESTIONS.forEach(function (g) {
+      var chip = document.createElement('button');
+      chip.className = 'genre-chip';
+      chip.textContent = g.icon + ' ' + g.genre;
+      chip.title = g.bpm + ' BPM';
+      chip.onclick = function () {
+        container.querySelectorAll('.genre-chip').forEach(function (c) { c.classList.remove('active'); });
+        chip.classList.add('active');
+        var parts = g.bpm.split('-');
+        var mid = Math.round((+parts[0] + +parts[1]) / 2);
+        if (tempoSlider) { tempoSlider.value = mid; tempoDisplay.textContent = mid; gameBpm = mid; }
+      };
+      container.appendChild(chip);
+    });
+  }
+
   function generateCode() {
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = '';
     for (var i = 0; i < 5; i++) c += chars[Math.floor(Math.random() * chars.length)];
@@ -211,6 +247,8 @@
     var tv = document.getElementById('solo-tempo-val');
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
+    var gc = document.getElementById('solo-genres');
+    if (gc) renderGenreChips(gc, ts, tv);
     document.getElementById('btn-solo-start').onclick = function () {
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
       soloInstIdx = 0;
@@ -244,6 +282,8 @@
     var tv = document.getElementById('lobby-tempo-val');
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
+    var lgc = document.getElementById('lobby-genres');
+    if (lgc) renderGenreChips(lgc, ts, tv);
 
     var startBtn = document.getElementById('btn-start');
     startBtn.onclick = function () {
@@ -324,6 +364,8 @@
     document.getElementById('songentry-player').textContent = players[songEntryIdx].name + ', enter your song:';
     var input = document.getElementById('songentry-input');
     input.value = '';
+    var gc = document.getElementById('songentry-genres');
+    if (gc) renderGenreChips(gc, null, null);
     setTimeout(function () { input.focus(); }, 100);
     document.getElementById('btn-songentry-done').onclick = function () {
       var song = input.value.trim();
@@ -400,22 +442,22 @@
       if (bpm) bpm.textContent = gameBpm + ' BPM';
     });
 
-    // Listen to existing layers
+    // Listen: plays existing layers + current instrument together
     var listenBtn = document.getElementById('btn-listen-existing');
     var hasExisting = Object.keys(game.submissions).length > 0;
     var listeningExisting = false;
     listenBtn.style.display = hasExisting ? 'flex' : 'none';
-    listenBtn.textContent = 'Listen to Existing Layers';
+    listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with Existing Layers';
     listenBtn.onclick = function () {
       ensureAudio().then(function () {
         if (listeningExisting) {
           stopPreview();
-          listenBtn.textContent = 'Listen to Existing Layers';
+          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with Existing Layers';
           listeningExisting = false;
         } else {
           stopPreview();
-          playExistingOnly(currentGameIdx);
-          listenBtn.textContent = 'Stop Listening';
+          startPreview(instrument);
+          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
           listeningExisting = true;
         }
       });

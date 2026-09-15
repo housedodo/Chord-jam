@@ -39,6 +39,10 @@
         <div class="song-input-row">
           <input id="input-song" type="text" class="song-input" placeholder="Enter song name..." maxlength="80" autocomplete="off" spellcheck="false">
         </div>
+        <div class="genre-section">
+          <label class="genre-section-label">Genre & BPM suggestion</label>
+          <div id="lobby-genres" class="genre-chips"></div>
+        </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
           <div class="tempo-control">
@@ -62,6 +66,10 @@
       <p style="color:var(--text-muted);font-size:0.85rem">Build all 4 layers yourself: drums, chords, bass, and melody.</p>
       <div class="host-controls" style="display:flex">
         <input id="solo-song" type="text" class="song-input" placeholder="Song name (optional)" maxlength="80" autocomplete="off" spellcheck="false">
+        <div class="genre-section">
+          <label class="genre-section-label">Genre & BPM suggestion</label>
+          <div id="solo-genres" class="genre-chips"></div>
+        </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
           <div class="tempo-control">
@@ -80,6 +88,10 @@
     <div class="songentry-container">
       <p id="songentry-player" class="songentry-player"></p>
       <input id="songentry-input" type="text" class="song-input" placeholder="Enter your song..." maxlength="80" autocomplete="off" spellcheck="false">
+      <div class="genre-section">
+        <label class="genre-section-label">Pick a genre for inspiration</label>
+        <div id="songentry-genres" class="genre-chips"></div>
+      </div>
       <button id="btn-songentry-done" class="btn-primary">Done</button>
     </div>
   </div>
