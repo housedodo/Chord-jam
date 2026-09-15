@@ -177,9 +177,13 @@
   let roomCode = '';
 
   function netSend(conn, msg) {
-    try { conn.send(msg); } catch (e) { console.warn('net send error', e); }
+    try {
+      if (!conn || !conn.open) { console.warn('netSend: connection not open', msg.type); return; }
+      conn.send(msg);
+    } catch (e) { console.warn('net send error', e); }
   }
   function netBroadcast(msg) {
+    console.log('Broadcasting', msg.type, 'to', guestConns.length, 'guests');
     guestConns.forEach(function (c) { netSend(c, msg); });
   }
   function netBroadcastExcept(excludeConn, msg) {
@@ -366,11 +370,14 @@
         break;
 
       case 'your_turn':
+        clearInterval(buildTimer);
+        stopPreview();
         games = msg.games;
         currentRound = msg.round;
         currentTurnPlayer = msg.turnPlayer;
         currentGameIdx = msg.gameIdx;
         gameBpm = msg.bpm;
+        console.log('Got your_turn: round=' + msg.round + ' gameIdx=' + msg.gameIdx);
         var inst = INSTRUMENTS[currentRound];
         if (currentRound === 0) {
           showBuildOnline(inst);
@@ -537,6 +544,7 @@
     currentRound = round;
     roundSubmissionsCount = 0;
     var inst = INSTRUMENTS[round];
+    console.log('Starting round ' + round + ' (' + inst + ') for ' + players.length + ' players');
 
     var gamesToSend = games.map(function (g) {
       return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
@@ -545,6 +553,7 @@
     guestConns.forEach(function (c, ci) {
       var guestIdx = ci + 1;
       var gIdx = getGameIdx(guestIdx, round);
+      console.log('Sending your_turn to player ' + guestIdx + ' for game ' + gIdx);
       netSend(c, {
         type: 'your_turn', round: round, turnPlayer: guestIdx,
         gameIdx: gIdx, games: gamesToSend, bpm: gameBpm
@@ -568,8 +577,10 @@
 
   function onLayerSubmittedHost() {
     roundSubmissionsCount++;
+    console.log('Submissions for round ' + currentRound + ': ' + roundSubmissionsCount + '/' + players.length);
     if (roundSubmissionsCount >= players.length) {
-      setTimeout(function () { startRoundOnline(currentRound + 1); }, 600);
+      var nextRound = currentRound + 1;
+      setTimeout(function () { startRoundOnline(nextRound); }, 600);
     }
   }
 
