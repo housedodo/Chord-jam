@@ -200,7 +200,7 @@
     gameSettings.blind = !!(document.getElementById(p + 'opt-blind') && document.getElementById(p + 'opt-blind').checked);
     gameSettings.speed = !!(document.getElementById(p + 'opt-speed') && document.getElementById(p + 'opt-speed').checked);
     gameSettings.switcheroo = !!(document.getElementById(p + 'opt-switcheroo') && document.getElementById(p + 'opt-switcheroo').checked);
-    gameSettings.voting = !!(document.getElementById(p + 'opt-voting') && document.getElementById(p + 'opt-voting').checked);
+    gameSettings.voting = !soloMode;
     gameSettings.buildup = !!(document.getElementById(p + 'opt-buildup') && document.getElementById(p + 'opt-buildup').checked);
     gameSettings.genrelock = !!(document.getElementById(p + 'opt-genrelock') && document.getElementById(p + 'opt-genrelock').checked);
     gameSettings.remix = !!(document.getElementById(p + 'opt-remix') && document.getElementById(p + 'opt-remix').checked);
