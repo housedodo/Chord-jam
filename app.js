@@ -3,9 +3,12 @@
   'use strict';
 
   // ── Config ──
-  const INSTRUMENTS = ['drums', 'chords', 'bass', 'melody'];
+  const BASE_INSTRUMENTS = ['drums', 'chords', 'bass', 'melody'];
+  let INSTRUMENTS = BASE_INSTRUMENTS.slice();
   const STEPS = 32;
   const BUILD_TIME = 120;
+  const SPEED_TIME = 60;
+  const SFX_NAMES = ['Siren', 'Laser', 'Boom', 'Sweep', 'Zap', 'Whoosh', 'Glitch', 'Drop'];
   const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash', 'Cowbell', 'Shaker', 'Conga'];
   const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3'];
   const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6'];
@@ -167,6 +170,69 @@
   let currentMelodySound = 'Piano';
   let currentChordSound = 'Piano Chords';
   let pianoRollNotes = [];
+
+  // ── Game settings ──
+  let gameSettings = {
+    sfx: false,
+    blind: false,
+    speed: false,
+    switcheroo: false,
+    voting: false,
+    buildup: false,
+    genrelock: false,
+    remix: false,
+    arp: false,
+    vocal: false
+  };
+  let votes = {};
+  let switcherooMap = null;
+
+  function getActiveInstruments() {
+    var insts = BASE_INSTRUMENTS.slice();
+    if (gameSettings.sfx) insts.push('sfx');
+    if (gameSettings.vocal) insts.push('vocal');
+    return insts;
+  }
+
+  function readGameOptions(prefix) {
+    var p = prefix || '';
+    gameSettings.sfx = !!(document.getElementById(p + 'opt-sfx') && document.getElementById(p + 'opt-sfx').checked);
+    gameSettings.blind = !!(document.getElementById(p + 'opt-blind') && document.getElementById(p + 'opt-blind').checked);
+    gameSettings.speed = !!(document.getElementById(p + 'opt-speed') && document.getElementById(p + 'opt-speed').checked);
+    gameSettings.switcheroo = !!(document.getElementById(p + 'opt-switcheroo') && document.getElementById(p + 'opt-switcheroo').checked);
+    gameSettings.voting = !!(document.getElementById(p + 'opt-voting') && document.getElementById(p + 'opt-voting').checked);
+    gameSettings.buildup = !!(document.getElementById(p + 'opt-buildup') && document.getElementById(p + 'opt-buildup').checked);
+    gameSettings.genrelock = !!(document.getElementById(p + 'opt-genrelock') && document.getElementById(p + 'opt-genrelock').checked);
+    gameSettings.remix = !!(document.getElementById(p + 'opt-remix') && document.getElementById(p + 'opt-remix').checked);
+    gameSettings.arp = !!(document.getElementById(p + 'opt-arp') && document.getElementById(p + 'opt-arp').checked);
+    gameSettings.vocal = !!(document.getElementById(p + 'opt-vocal') && document.getElementById(p + 'opt-vocal').checked);
+    INSTRUMENTS = getActiveInstruments();
+  }
+
+  function getBuildTime() {
+    return gameSettings.speed ? SPEED_TIME : BUILD_TIME;
+  }
+
+  function buildSwitcherooMap(numPlayers, numRounds) {
+    switcherooMap = {};
+    for (var r = 0; r < numRounds; r++) {
+      switcherooMap[r] = {};
+      var shuffled = [];
+      for (var p = 0; p < numPlayers; p++) shuffled.push(p);
+      for (var i = shuffled.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+      }
+      for (var p2 = 0; p2 < numPlayers; p2++) {
+        switcherooMap[r][p2] = shuffled[p2];
+      }
+    }
+  }
+
+  function getGameIdxWithSwitcheroo(playerIdx, round) {
+    if (!gameSettings.switcheroo || !switcherooMap || !switcherooMap[round]) return playerIdx;
+    return switcherooMap[round][playerIdx] !== undefined ? switcherooMap[round][playerIdx] : playerIdx;
+  }
 
   // ── Network state ──
   let netMode = 'local'; // 'local' | 'host' | 'guest'
@@ -736,6 +802,33 @@
     };
   }
 
+  function createSfxSynth() {
+    var vol = new Tone.Volume(-4).toDestination();
+    var siren = new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.2 } }).connect(vol);
+    var laser = new Tone.FMSynth({ harmonicity: 5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }).connect(vol);
+    var boom = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 8, envelope: { attack: 0.001, decay: 0.6, sustain: 0 } }).connect(vol);
+    var sweep = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.3, decay: 0.5, sustain: 0.2, release: 0.3 }, volume: -8 }).connect(vol);
+    var zap = new Tone.FMSynth({ harmonicity: 8, modulationIndex: 30, envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.05 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 } }).connect(vol);
+    var whoosh = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.1, decay: 0.3, sustain: 0, release: 0.2 }, volume: -6 }).connect(vol);
+    var glitch = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }, volume: -8 }).connect(vol);
+    var drop = new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, volume: 2 }).connect(vol);
+    return {
+      trigger: function (name) {
+        switch (name) {
+          case 'Siren': siren.triggerAttackRelease('C5', '8n'); break;
+          case 'Laser': laser.triggerAttackRelease('G6', '16n'); break;
+          case 'Boom': boom.triggerAttackRelease('C1', '4n'); break;
+          case 'Sweep': sweep.triggerAttackRelease('8n'); break;
+          case 'Zap': zap.triggerAttackRelease('A5', '32n'); break;
+          case 'Whoosh': whoosh.triggerAttackRelease('8n'); break;
+          case 'Glitch': glitch.triggerAttackRelease('32n'); break;
+          case 'Drop': drop.triggerAttackRelease('C1', '4n'); break;
+        }
+      },
+      dispose: function () { [siren, laser, boom, sweep, zap, whoosh, glitch, drop, vol].forEach(function (n) { n.dispose(); }); }
+    };
+  }
+
   function createChordSynth(presetName) {
     var preset = CHORD_SOUNDS[presetName || currentChordSound] || CHORD_SOUNDS['Piano Chords'];
     var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).toDestination();
@@ -950,7 +1043,11 @@
     var gc = document.getElementById('solo-genres');
     if (gc) renderGenreRoller(gc, ts, tv);
     document.getElementById('btn-solo-start').onclick = function () {
+      readGameOptions('solo-');
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
+      // Capture genre for genre lock
+      var genreEl = document.querySelector('#solo-genres .genre-result-genre');
+      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
       soloInstIdx = 0;
       games = [{ songName: sn, enteredBy: 0, submissions: {}, guesses: [] }];
       currentGameIdx = 0;
@@ -960,7 +1057,11 @@
   }
 
   function startSoloBuild() {
-    if (soloInstIdx >= INSTRUMENTS.length) { showReveal(); return; }
+    if (soloInstIdx >= INSTRUMENTS.length) {
+      if (gameSettings.buildup) { showBuildupReveal(0); return; }
+      showReveal();
+      return;
+    }
     currentTurnPlayer = 0;
     currentGameIdx = 0;
     showBuild(INSTRUMENTS[soloInstIdx]);
@@ -988,6 +1089,10 @@
     var startBtn = document.getElementById('btn-start');
     startBtn.onclick = function () {
       if (players.length < 2) { toast('Need at least 2 players'); return; }
+      readGameOptions('');
+      var genreEl = document.querySelector('#lobby-genres .genre-result-genre');
+      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
+      if (gameSettings.switcheroo) buildSwitcherooMap(players.length, INSTRUMENTS.length);
       startSongEntry();
     };
 
@@ -1089,7 +1194,12 @@
   }
 
   function nextTurn() {
-    if (currentRound >= 4) { showReveal(); return; }
+    if (currentRound >= INSTRUMENTS.length) {
+      if (gameSettings.voting) { showVoting(0); return; }
+      if (gameSettings.buildup) { showBuildupReveal(0); return; }
+      showReveal();
+      return;
+    }
     if (currentTurnPlayer >= players.length) {
       currentRound++;
       currentTurnPlayer = 0;
@@ -1103,7 +1213,7 @@
     showScreen('handoff');
     var p = players[currentTurnPlayer];
     var inst = INSTRUMENTS[currentRound];
-    var gIdx = getGameIdx(currentTurnPlayer, currentRound);
+    var gIdx = getGameIdxWithSwitcheroo(currentTurnPlayer, currentRound);
     var game = games[gIdx];
     var existingCount = Object.keys(game.submissions).length;
 
@@ -1131,19 +1241,25 @@
     var playerIdx = (netMode !== 'local') ? myPlayerIndex : currentTurnPlayer;
     var isOwn = game.enteredBy === playerIdx;
 
-    document.getElementById('build-song').textContent = isOwn ? game.songName : (currentRound === 0 ? game.songName : '???');
+    var showSong = gameSettings.blind ? false : (isOwn || currentRound === 0);
+    document.getElementById('build-song').textContent = showSong ? game.songName : '???';
 
     var badge = document.getElementById('build-instrument');
-    badge.textContent = instrument;
+    badge.textContent = instrument + (gameSettings.speed ? ' SPEED' : '');
     badge.setAttribute('data-inst', instrument);
 
-    INSTRUMENTS.forEach(function (i) {
-      document.getElementById('seq-' + i).style.display = i === instrument ? 'flex' : 'none';
+    // Show/hide sequencers
+    var allInsts = BASE_INSTRUMENTS.concat(['sfx', 'vocal']);
+    allInsts.forEach(function (i) {
+      var el = document.getElementById('seq-' + i);
+      if (el) {
+        el.style.display = i === instrument ? 'flex' : 'none';
+      }
       var bpm = document.getElementById(i + '-bpm-display');
       if (bpm) bpm.textContent = gameBpm + ' BPM';
     });
 
-    // Listen: plays previous layer + current instrument together
+    // Listen: plays previous layer + current instrument
     var listenBtn = document.getElementById('btn-listen-existing');
     var instIdx = INSTRUMENTS.indexOf(instrument);
     var prevInst = instIdx > 0 ? INSTRUMENTS[instIdx - 1] : null;
@@ -1182,7 +1298,7 @@
     if (soloMode) {
       document.getElementById('build-time').textContent = 'No limit';
     } else {
-      buildSecondsLeft = BUILD_TIME;
+      buildSecondsLeft = getBuildTime();
       updateBuildTimer();
       buildTimer = setInterval(function () {
         buildSecondsLeft--;
@@ -1229,7 +1345,8 @@
         setTimeout(startSoloBuild, 600);
       } else {
         toast('All layers done!');
-        setTimeout(showReveal, 600);
+        if (gameSettings.buildup) { setTimeout(function () { showBuildupReveal(0); }, 600); }
+        else { setTimeout(showReveal, 600); }
       }
       return;
     }
@@ -1245,11 +1362,28 @@
       DRUM_NAMES.forEach(function (name) {
         grid[name] = [];
         for (var s = 0; s < STEPS; s++) {
-          var cell = document.querySelector('.drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+          var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
           grid[name].push(cell && cell.classList.contains('on'));
         }
       });
       return grid;
+    }
+    if (instrument === 'sfx') {
+      var sfxGrid = {};
+      SFX_NAMES.forEach(function (name) {
+        sfxGrid[name] = [];
+        for (var s = 0; s < STEPS; s++) {
+          var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+          sfxGrid[name].push(cell && cell.classList.contains('on'));
+        }
+      });
+      return sfxGrid;
+    }
+    if (instrument === 'vocal') {
+      return { hasRecording: !!vocalBlob };
+    }
+    if (instrument === 'chords' && gameSettings.arp) {
+      return applyArpToChords(pianoRollNotes.slice());
     }
     return pianoRollNotes.slice();
   }
@@ -1261,6 +1395,35 @@
     else if (instrument === 'chords') initChordTimeline();
     else if (instrument === 'bass') initPianoRoll('bass', NOTE_NAMES_BASS, false);
     else if (instrument === 'melody') initPianoRoll('melody', NOTE_NAMES_MELODY, true);
+    else if (instrument === 'sfx') initSfxGrid();
+    else if (instrument === 'vocal') { initVocalRecorder(); return; }
+
+    // Show arp controls when building chords with arp enabled
+    var arpEl = document.getElementById('arp-controls');
+    if (arpEl) {
+      arpEl.style.display = (instrument === 'chords' && gameSettings.arp) ? 'flex' : 'none';
+      var arpPreviewBtn = document.getElementById('btn-arp-preview');
+      if (arpPreviewBtn) {
+        arpPreviewBtn.onclick = function () {
+          if (pianoRollNotes.length === 0) { toast('Place some chords first'); return; }
+          var arpData = applyArpToChords(pianoRollNotes);
+          ensureAudio().then(function () {
+            if (!synths.chords) synths.chords = createChordSynth();
+            var i = 0;
+            var speed = document.getElementById('arp-speed') ? document.getElementById('arp-speed').value : '16n';
+            var interval = Tone.Time(speed).toMilliseconds();
+            function playNext() {
+              if (i >= arpData.length) return;
+              var n = arpData[i];
+              if (n.isArp) synths.chords.play([n.note], 0.1);
+              i++;
+              setTimeout(playNext, interval);
+            }
+            playNext();
+          });
+        };
+      }
+    }
 
     var playBtn = document.getElementById(instrument + '-play');
     var playIcon = document.getElementById(instrument + '-play-icon');
@@ -1279,6 +1442,25 @@
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
     DRUM_NAMES.forEach(function (name) {
+      var row = document.createElement('div');
+      row.className = 'drum-row';
+      row.innerHTML = '<span class="drum-label">' + name + '</span>';
+      for (var s = 0; s < STEPS; s++) {
+        var cell = document.createElement('div');
+        cell.className = 'drum-cell' + (s % 4 === 0 ? ' beat' : '');
+        cell.dataset.name = name;
+        cell.dataset.step = s;
+        cell.addEventListener('pointerdown', (function (c) { return function () { c.classList.toggle('on'); }; })(cell));
+        row.appendChild(cell);
+      }
+      grid.appendChild(row);
+    });
+  }
+
+  function initSfxGrid() {
+    var grid = document.getElementById('sfx-grid');
+    grid.innerHTML = '';
+    SFX_NAMES.forEach(function (name) {
       var row = document.createElement('div');
       row.className = 'drum-row';
       row.innerHTML = '<span class="drum-label">' + name + '</span>';
@@ -1516,13 +1698,25 @@
       });
     }
 
+    // Genre lock label
+    var lockedChords = getLockedChords();
+    if (lockedChords) {
+      var lockLabel = document.createElement('div');
+      lockLabel.className = 'genre-lock-label';
+      lockLabel.textContent = 'Genre: ' + (currentGenreLock || 'Locked');
+      wrapper.appendChild(lockLabel);
+    }
+
     // Chord selector row with dropdowns
     var selectorRow = document.createElement('div');
     selectorRow.className = 'chord-selector-row';
 
     var rootSelect = document.createElement('select');
     rootSelect.className = 'chord-select';
-    CHORD_ROOTS.forEach(function (r) {
+    var allowedRoots = lockedChords ? CHORD_ROOTS.filter(function (r) {
+      return lockedChords.some(function (ch) { return ch.startsWith(r); });
+    }) : CHORD_ROOTS;
+    allowedRoots.forEach(function (r) {
       var opt = document.createElement('option');
       opt.value = r;
       opt.textContent = r;
@@ -1711,11 +1905,21 @@
       var seq = new Tone.Sequence(function (time, s) {
         Tone.Draw.schedule(function () { highlightDrumStep(s); }, time);
         DRUM_NAMES.forEach(function (name) {
-          var cell = document.querySelector('.drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+          var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
           if (cell && cell.classList.contains('on')) synths.drums.trigger(name);
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq);
+    } else if (instrument === 'sfx') {
+      if (!synths.sfx) synths.sfx = createSfxSynth();
+      var sfxSeq = new Tone.Sequence(function (time, s) {
+        Tone.Draw.schedule(function () { highlightSfxStep(s); }, time);
+        SFX_NAMES.forEach(function (name) {
+          var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+          if (cell && cell.classList.contains('on')) synths.sfx.trigger(name);
+        });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
+      previewSeqs.push(sfxSeq);
     } else {
       if (instrument === 'chords') { if (!synths.chords) synths.chords = createChordSynth(); }
       else if (instrument === 'bass') { if (!synths.bass) getOrCreateBassSynth(); }
@@ -1750,34 +1954,49 @@
       var sub = game.submissions[inst];
       if (!sub) return;
 
-      if (inst === 'drums') {
-        if (!synths.bgDrums) synths.bgDrums = createDrumSynth();
-        var data = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
-          DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
-      } else if (inst === 'chords') {
-        if (!synths.bgChords) synths.bgChords = createChordSynth();
-        var notes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
-          notes.forEach(function (n) {
-            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
-          });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
-      } else if (inst === 'bass') {
-        if (!synths.bgBass) synths.bgBass = createSynthFromPreset(BASS_SOUNDS[sub.sound || 'Analog Bass'], false);
-        var bnotes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
-          bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
-      } else if (inst === 'melody') {
-        if (!synths.bgMelody) synths.bgMelody = createSynthFromPreset(MELODY_SOUNDS[sub.sound || 'Piano'], true);
-        var mnotes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
-          mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      if (gameSettings.remix) {
+        var remixed = { data: remixLayerData(inst, sub.data), sound: sub.sound };
+        addLayerSeq(inst, remixed, seqs);
+      } else {
+        addLayerSeq(inst, sub, seqs);
       }
     });
+  }
+
+  function addLayerSeq(inst, sub, seqs) {
+    if (inst === 'drums') {
+      if (!synths.bgDrums) synths.bgDrums = createDrumSynth();
+      var data = sub.data;
+      seqs.push(new Tone.Sequence(function (time, s) {
+        DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'sfx') {
+      if (!synths.bgSfx) synths.bgSfx = createSfxSynth();
+      var sfxData = sub.data;
+      seqs.push(new Tone.Sequence(function (time, s) {
+        SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'chords') {
+      if (!synths.bgChords) synths.bgChords = createChordSynth();
+      var notes = sub.data;
+      seqs.push(new Tone.Sequence(function (time, s) {
+        notes.forEach(function (n) {
+          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+        });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'bass') {
+      if (!synths.bgBass) synths.bgBass = createSynthFromPreset(BASS_SOUNDS[sub.sound || 'Analog Bass'], false);
+      var bnotes = sub.data;
+      seqs.push(new Tone.Sequence(function (time, s) {
+        bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'melody') {
+      if (!synths.bgMelody) synths.bgMelody = createSynthFromPreset(MELODY_SOUNDS[sub.sound || 'Piano'], true);
+      var mnotes = sub.data;
+      seqs.push(new Tone.Sequence(function (time, s) {
+        mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    }
   }
 
   function playExistingOnly(gameIdx) {
@@ -1796,7 +2015,7 @@
     previewSeqs = [];
     Tone.Transport.stop();
     Tone.Transport.cancel();
-    ['bgDrums', 'bgChords', 'bgBass', 'bgMelody'].forEach(function (k) {
+    ['bgDrums', 'bgChords', 'bgBass', 'bgMelody', 'bgSfx'].forEach(function (k) {
       if (synths[k]) { synths[k].dispose(); synths[k] = null; }
     });
     document.querySelectorAll('.drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
@@ -1810,8 +2029,13 @@
   }
 
   function highlightDrumStep(step) {
-    document.querySelectorAll('.drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
-    document.querySelectorAll('.drum-cell[data-step="' + step + '"]').forEach(function (el) { el.classList.add('playing'); });
+    document.querySelectorAll('#drum-grid .drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
+    document.querySelectorAll('#drum-grid .drum-cell[data-step="' + step + '"]').forEach(function (el) { el.classList.add('playing'); });
+  }
+
+  function highlightSfxStep(step) {
+    document.querySelectorAll('#sfx-grid .drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
+    document.querySelectorAll('#sfx-grid .drum-cell[data-step="' + step + '"]').forEach(function (el) { el.classList.add('playing'); });
   }
 
   function showPlayhead(inst, step) {
@@ -1956,10 +2180,229 @@
         seqs.push(new Tone.Sequence(function (time, s) {
           mnotes.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      } else if (inst === 'sfx') {
+        if (!synths.sfx) synths.sfx = createSfxSynth();
+        var sfxData = sub.data;
+        seqs.push(new Tone.Sequence(function (time, s) {
+          SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.sfx.trigger(name); });
+        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       }
     });
 
     Tone.Transport.start();
+  }
+
+  // ── Voting ──
+  function showVoting(gameIdx) {
+    showScreen('voting');
+    var game = games[gameIdx];
+    document.getElementById('voting-song').textContent = 'Song: ' + game.songName;
+    var optionsEl = document.getElementById('voting-options');
+    var resultsEl = document.getElementById('voting-results');
+    var submitBtn = document.getElementById('btn-vote-submit');
+    var nextBtn = document.getElementById('btn-vote-next');
+    optionsEl.innerHTML = '';
+    resultsEl.innerHTML = '';
+    resultsEl.style.display = 'none';
+    submitBtn.style.display = 'inline-flex';
+    nextBtn.style.display = 'none';
+
+    var selected = null;
+    var candidates = [];
+    INSTRUMENTS.forEach(function (inst) {
+      var sub = game.submissions[inst];
+      if (!sub) return;
+      candidates.push({ inst: inst, playerIndex: sub.playerIndex });
+    });
+
+    candidates.forEach(function (c) {
+      var card = document.createElement('div');
+      card.className = 'vote-option';
+      card.setAttribute('data-inst', c.inst);
+      card.innerHTML = '<span class="vote-layer" data-inst="' + c.inst + '">' + c.inst.charAt(0).toUpperCase() + c.inst.slice(1) + '</span>' +
+        '<span class="vote-player">' + esc(players[c.playerIndex].name) + '</span>' +
+        '<span class="vote-check"></span>';
+      card.onclick = function () {
+        optionsEl.querySelectorAll('.vote-option').forEach(function (el) { el.classList.remove('selected'); });
+        card.classList.add('selected');
+        selected = c.inst;
+      };
+      optionsEl.appendChild(card);
+    });
+
+    submitBtn.onclick = function () {
+      if (!selected) { toast('Pick a layer!'); return; }
+      if (!votes[gameIdx]) votes[gameIdx] = {};
+      votes[gameIdx][selected] = (votes[gameIdx][selected] || 0) + 1;
+      submitBtn.style.display = 'none';
+      resultsEl.style.display = 'flex';
+      nextBtn.style.display = 'inline-flex';
+
+      var maxVotes = 0;
+      Object.keys(votes[gameIdx]).forEach(function (k) { if (votes[gameIdx][k] > maxVotes) maxVotes = votes[gameIdx][k]; });
+
+      resultsEl.innerHTML = '<h4 class="results-title">Results</h4>';
+      candidates.forEach(function (c) {
+        var count = (votes[gameIdx] && votes[gameIdx][c.inst]) || 0;
+        var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
+        var row = document.createElement('div');
+        row.className = 'vote-result';
+        row.innerHTML = '<span class="vote-result-label">' + c.inst.charAt(0).toUpperCase() + c.inst.slice(1) +
+          ' (' + esc(players[c.playerIndex].name) + ')</span>' +
+          '<div class="vote-bar-track"><div class="vote-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '<span class="vote-count">' + count + '</span>';
+        resultsEl.appendChild(row);
+      });
+    };
+
+    nextBtn.onclick = function () {
+      if (gameIdx < games.length - 1) {
+        showVoting(gameIdx + 1);
+      } else {
+        if (gameSettings.buildup) showBuildupReveal(0);
+        else showReveal();
+      }
+    };
+  }
+
+  // ── Buildup Reveal ──
+  function showBuildupReveal(gameIdx) {
+    showScreen('listen');
+    var game = games[gameIdx];
+    document.getElementById('listen-song').textContent = game.songName;
+    var songCounter = document.getElementById('listen-counter');
+    if (songCounter) songCounter.textContent = games.length > 1 ? 'Song ' + (gameIdx + 1) + ' of ' + games.length : '';
+
+    var layersEl = document.getElementById('listen-layers');
+    layersEl.innerHTML = '';
+    INSTRUMENTS.forEach(function (inst) {
+      var sub = game.submissions[inst];
+      var card = document.createElement('div');
+      card.className = 'layer-card';
+      var pName = sub ? players[sub.playerIndex].name : '-';
+      var status = sub ? (sub.sound || 'Recorded') : 'Empty';
+      card.innerHTML = '<span class="layer-badge" data-inst="' + inst + '">' + inst + '</span>' +
+        '<span class="layer-player">' + esc(pName) + '</span>' +
+        '<span class="layer-status">' + status + '</span>';
+      layersEl.appendChild(card);
+    });
+
+    var guessesEl = document.getElementById('listen-guesses');
+    guessesEl.innerHTML = '';
+    guessesEl.style.display = 'none';
+
+    var allSeqs = [];
+    var playBtn = document.getElementById('btn-play-all');
+    var stopBtn = document.getElementById('btn-stop-all');
+    playBtn.style.display = 'none';
+    stopBtn.style.display = 'none';
+
+    var layerIdx = 0;
+    var submittedInsts = INSTRUMENTS.filter(function (inst) { return !!game.submissions[inst]; });
+
+    var controlsArea = document.createElement('div');
+    controlsArea.className = 'buildup-controls';
+    var statusText = document.createElement('p');
+    statusText.className = 'buildup-status';
+    controlsArea.appendChild(statusText);
+
+    var buildupPlayBtn = document.createElement('button');
+    buildupPlayBtn.className = 'btn-primary';
+    buildupPlayBtn.textContent = 'Play Layer 1';
+    controlsArea.appendChild(buildupPlayBtn);
+
+    var buildupNextBtn = document.createElement('button');
+    buildupNextBtn.className = 'btn-secondary';
+    buildupNextBtn.textContent = 'Add Next Layer';
+    buildupNextBtn.style.display = 'none';
+    controlsArea.appendChild(buildupNextBtn);
+
+    layersEl.parentNode.insertBefore(controlsArea, layersEl.nextSibling);
+
+    function updateStatus() {
+      var playing = submittedInsts.slice(0, layerIdx + 1).map(function (i) { return i.charAt(0).toUpperCase() + i.slice(1); });
+      statusText.textContent = 'Playing: ' + playing.join(' + ');
+    }
+
+    function playUpToLayer() {
+      stopAllLayers(allSeqs);
+      allSeqs = [];
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      Tone.Transport.bpm.value = gameBpm;
+
+      for (var i = 0; i <= layerIdx; i++) {
+        var inst = submittedInsts[i];
+        addLayerSeqForPlayAll(inst, game, allSeqs);
+      }
+      Tone.Transport.start();
+      updateStatus();
+    }
+
+    buildupPlayBtn.onclick = function () {
+      ensureAudio().then(function () {
+        playUpToLayer();
+        buildupPlayBtn.textContent = 'Restart';
+        if (layerIdx < submittedInsts.length - 1) buildupNextBtn.style.display = 'inline-flex';
+      });
+    };
+
+    buildupNextBtn.onclick = function () {
+      layerIdx++;
+      ensureAudio().then(function () {
+        playUpToLayer();
+        if (layerIdx >= submittedInsts.length - 1) {
+          buildupNextBtn.style.display = 'none';
+        }
+      });
+    };
+
+    var nextBtn = document.getElementById('btn-play-again');
+    var backBtn = document.getElementById('btn-back-lobby');
+
+    if (games.length > 1 && gameIdx < games.length - 1) {
+      nextBtn.textContent = 'Next Song';
+      nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; controlsArea.remove(); showBuildupReveal(gameIdx + 1); };
+    } else {
+      nextBtn.textContent = 'Play Again';
+      nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; controlsArea.remove(); soloMode ? showSoloSetup() : showLobby(); };
+    }
+    backBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; controlsArea.remove(); showScreen('home'); };
+  }
+
+  function addLayerSeqForPlayAll(inst, game, seqs) {
+    var sub = game.submissions[inst];
+    if (!sub) return;
+    if (inst === 'drums') {
+      if (!synths.drums) synths.drums = createDrumSynth();
+      seqs.push(new Tone.Sequence(function (time, s) {
+        DRUM_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.drums.trigger(name); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'chords') {
+      if (!synths.chords) synths.chords = createChordSynth();
+      seqs.push(new Tone.Sequence(function (time, s) {
+        sub.data.forEach(function (n) {
+          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+        });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'bass') {
+      currentBassSound = sub.sound || 'Analog Bass';
+      getOrCreateBassSynth();
+      seqs.push(new Tone.Sequence(function (time, s) {
+        sub.data.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'melody') {
+      currentMelodySound = sub.sound || 'Piano';
+      getOrCreateMelodySynth();
+      seqs.push(new Tone.Sequence(function (time, s) {
+        sub.data.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    } else if (inst === 'sfx') {
+      if (!synths.sfx) synths.sfx = createSfxSynth();
+      seqs.push(new Tone.Sequence(function (time, s) {
+        SFX_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.sfx.trigger(name); });
+      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+    }
   }
 
   function stopAllLayers(seqs) {
@@ -1967,6 +2410,177 @@
     Tone.Transport.cancel();
     seqs.forEach(function (s) { s.dispose(); });
     seqs.length = 0;
+  }
+
+  // ── Genre Lock ──
+  var GENRE_CHORDS = {
+    'Pop': ['C','G','Am','F','Dm','Em'],
+    'Rock': ['E','A','D','G','B','Em','Am'],
+    'Jazz': ['Cmaj7','Dm7','Em7','Fmaj7','G7','Am7','Bm7','Cm7'],
+    'Blues': ['C7','F7','G7','A7','D7','E7'],
+    'EDM': ['Am','Cm','Fm','Gm','Em','Dm'],
+    'Country': ['G','C','D','Em','Am','A'],
+    'R&B': ['Dm7','Gm7','Am7','Cmaj7','Fmaj7','Em7'],
+    'Reggae': ['G','C','D','Em','Am','Bm'],
+    'Latin': ['Am','Dm','E7','G','C','F'],
+    'Classical': ['C','F','G','Am','Dm','G7','Cmaj7']
+  };
+  var currentGenreLock = null;
+
+  function getLockedChords() {
+    if (!gameSettings.genrelock || !currentGenreLock) return null;
+    return GENRE_CHORDS[currentGenreLock] || null;
+  }
+
+  // ── Remix Mode ──
+  function remixLayerData(instrument, data) {
+    if (instrument === 'drums' || instrument === 'sfx') {
+      var remixed = {};
+      var names = instrument === 'drums' ? DRUM_NAMES : SFX_NAMES;
+      names.forEach(function (name) {
+        remixed[name] = [];
+        for (var s = 0; s < STEPS; s++) {
+          var srcStep = (s + Math.floor(Math.random() * 4) - 2 + STEPS) % STEPS;
+          remixed[name].push(data[name] ? !!data[name][srcStep] : false);
+        }
+      });
+      return remixed;
+    }
+    if (Array.isArray(data)) {
+      return data.map(function (n) {
+        var shift = Math.floor(Math.random() * 5) - 2;
+        return { note: n.note, start: Math.max(0, Math.min(STEPS - 1, n.start + shift)), length: n.length };
+      });
+    }
+    return data;
+  }
+
+  // ── Arpeggiator ──
+  function arpeggiate(chordNotes, pattern, steps) {
+    if (!chordNotes || chordNotes.length === 0) return [];
+    var seq = [];
+    var notes = chordNotes.slice();
+    if (pattern === 'down') notes.reverse();
+    else if (pattern === 'updown') {
+      var up = notes.slice();
+      var down = notes.slice().reverse().slice(1, -1);
+      notes = up.concat(down);
+    }
+    for (var i = 0; i < steps; i++) {
+      var idx = pattern === 'random' ? Math.floor(Math.random() * chordNotes.length) : i % notes.length;
+      seq.push(notes[idx] || chordNotes[0]);
+    }
+    return seq;
+  }
+
+  function applyArpToChords(chordData) {
+    if (!gameSettings.arp) return chordData;
+    var pattern = document.getElementById('arp-pattern') ? document.getElementById('arp-pattern').value : 'up';
+    var result = [];
+    chordData.forEach(function (n) {
+      var cn = lookupChordNotes(n.note);
+      if (!cn) { result.push(n); return; }
+      var arpNotes = arpeggiate(cn, pattern, n.length);
+      for (var i = 0; i < arpNotes.length; i++) {
+        result.push({ note: arpNotes[i], start: n.start + i, length: 1, isArp: true });
+      }
+    });
+    return result;
+  }
+
+  // ── Vocal Recording ──
+  var vocalRecorder = null;
+  var vocalBlob = null;
+  var vocalPlayer = null;
+  var vocalAnalyser = null;
+
+  function initVocalRecorder() {
+    var recBtn = document.getElementById('vocal-rec');
+    var playBtn = document.getElementById('vocal-play');
+    var statusEl = document.getElementById('vocal-status');
+    var canvas = document.getElementById('vocal-waveform');
+    var ctx = canvas.getContext('2d');
+    var recording = false;
+    var mediaRecorder = null;
+    var chunks = [];
+    var recordTimeout = null;
+
+    function drawWaveform(analyser) {
+      if (!recording) return;
+      var bufLen = analyser.frequencyBinCount;
+      var data = new Uint8Array(bufLen);
+      analyser.getByteTimeDomainData(data);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#1a1528';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a78bfa';
+      ctx.beginPath();
+      var sliceW = canvas.width / bufLen;
+      var x = 0;
+      for (var i = 0; i < bufLen; i++) {
+        var v = data[i] / 128.0;
+        var y = v * canvas.height / 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceW;
+      }
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+      requestAnimationFrame(function () { drawWaveform(analyser); });
+    }
+
+    recBtn.onclick = function () {
+      if (recording) {
+        recording = false;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        clearTimeout(recordTimeout);
+        statusEl.textContent = 'Recording saved';
+        recBtn.classList.remove('recording');
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        recording = true;
+        chunks = [];
+        recBtn.classList.add('recording');
+        statusEl.textContent = 'Recording...';
+
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        var analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        drawWaveform(analyser);
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          vocalBlob = new Blob(chunks, { type: 'audio/webm' });
+          playBtn.style.display = 'inline-flex';
+          statusEl.textContent = 'Recorded! Tap play to preview';
+          audioCtx.close();
+        };
+        mediaRecorder.start();
+        recordTimeout = setTimeout(function () {
+          if (recording) {
+            recording = false;
+            mediaRecorder.stop();
+            recBtn.classList.remove('recording');
+          }
+        }, 8000);
+      }).catch(function () {
+        statusEl.textContent = 'Mic access denied';
+      });
+    };
+
+    playBtn.onclick = function () {
+      if (vocalBlob) {
+        var url = URL.createObjectURL(vocalBlob);
+        var audio = new Audio(url);
+        audio.play();
+        audio.onended = function () { URL.revokeObjectURL(url); };
+      }
+    };
   }
 
   initThemePicker();
