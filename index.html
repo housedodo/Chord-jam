@@ -18,9 +18,10 @@
       <p class="tagline">Recreate songs together, one layer at a time</p>
       <div class="home-actions">
         <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;text-align:center;font-size:1rem;padding:14px 16px">
-        <button id="btn-create" class="btn-primary">Start a Game</button>
+        <button id="btn-create" class="btn-primary">Multiplayer</button>
+        <button id="btn-solo" class="btn-secondary" style="width:100%">Solo Mode</button>
       </div>
-      <p class="home-hint">Add friends in the lobby. Pass the phone around!</p>
+      <p class="home-hint">Solo: build all 4 layers yourself. Multiplayer: pass the phone!</p>
     </div>
   </div>
 
@@ -51,6 +52,26 @@
         <p>Waiting for host to start...</p>
       </div>
       <button id="btn-leave" class="btn-text">Leave Room</button>
+    </div>
+  </div>
+
+  <!-- SOLO setup screen -->
+  <div id="screen-solo" class="screen">
+    <div class="lobby-container">
+      <h2 style="font-size:1.2rem;font-weight:700;color:var(--accent)">Solo Mode</h2>
+      <p style="color:var(--text-muted);font-size:0.85rem">Build all 4 layers yourself: drums, chords, bass, and melody.</p>
+      <div class="host-controls" style="display:flex">
+        <input id="solo-song" type="text" class="song-input" placeholder="Song name (optional)" maxlength="80" autocomplete="off" spellcheck="false">
+        <div class="lobby-tempo">
+          <label>Tempo</label>
+          <div class="tempo-control">
+            <input type="range" id="solo-tempo" min="60" max="200" value="120">
+            <span id="solo-tempo-val" class="tempo-display">120</span>
+          </div>
+        </div>
+        <button id="btn-solo-start" class="btn-primary">Start Building</button>
+      </div>
+      <button id="btn-solo-back" class="btn-text">Back</button>
     </div>
   </div>
 

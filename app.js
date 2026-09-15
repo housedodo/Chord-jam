@@ -68,6 +68,8 @@
   let hostIndex = 0;
   let songName = '';
   let gameBpm = 120;
+  let soloMode = false;
+  let soloInstrumentIndex = 0;
   let assignments = {};
   let submissions = {};
   let currentPlayerTurn = -1;
@@ -183,8 +185,49 @@
       if (!name) { toast('Enter your name first'); return; }
       players = [{ name, color: PLAYER_COLORS[0] }];
       hostIndex = 0;
+      soloMode = false;
       showLobby();
     });
+
+    document.getElementById('btn-solo').addEventListener('click', () => {
+      ensureAudio();
+      const name = getName();
+      if (!name) { toast('Enter your name first'); return; }
+      players = [{ name, color: PLAYER_COLORS[0] }];
+      soloMode = true;
+      showSoloSetup();
+    });
+  }
+
+  function showSoloSetup() {
+    showScreen('solo');
+    const tempoSlider = document.getElementById('solo-tempo');
+    const tempoVal = document.getElementById('solo-tempo-val');
+    tempoSlider.value = gameBpm;
+    tempoVal.textContent = gameBpm;
+    tempoSlider.oninput = () => {
+      gameBpm = parseInt(tempoSlider.value);
+      tempoVal.textContent = gameBpm;
+    };
+
+    document.getElementById('btn-solo-start').onclick = () => {
+      songName = document.getElementById('solo-song').value.trim() || 'Free Jam';
+      soloInstrumentIndex = 0;
+      submissions = {};
+      startSoloBuild();
+    };
+
+    document.getElementById('btn-solo-back').onclick = () => showScreen('home');
+  }
+
+  function startSoloBuild() {
+    if (soloInstrumentIndex >= INSTRUMENTS.length) {
+      showListen();
+      return;
+    }
+    const instrument = INSTRUMENTS[soloInstrumentIndex];
+    currentPlayerTurn = 0;
+    showBuild(instrument, soloInstrumentIndex);
   }
 
   function getName() {
@@ -372,17 +415,21 @@
       if (bpmDisp) bpmDisp.textContent = gameBpm + ' BPM';
     });
 
-    buildSecondsLeft = BUILD_TIME;
-    updateBuildTimer();
     clearInterval(buildTimer);
-    buildTimer = setInterval(() => {
-      buildSecondsLeft--;
+    if (soloMode) {
+      document.getElementById('build-time').textContent = 'No limit';
+    } else {
+      buildSecondsLeft = BUILD_TIME;
       updateBuildTimer();
-      if (buildSecondsLeft <= 0) {
-        clearInterval(buildTimer);
-        submitLayer(instrument, turnIndex);
-      }
-    }, 1000);
+      buildTimer = setInterval(() => {
+        buildSecondsLeft--;
+        updateBuildTimer();
+        if (buildSecondsLeft <= 0) {
+          clearInterval(buildTimer);
+          submitLayer(instrument, turnIndex);
+        }
+      }, 1000);
+    }
 
     initSequencer(instrument);
 
@@ -402,8 +449,20 @@
     stopPreview();
     const data = collectData(instrument);
     submissions[instrument] = { data, bpm: gameBpm, playerIndex: currentPlayerTurn };
-    toast('Layer submitted!');
 
+    if (soloMode) {
+      soloInstrumentIndex++;
+      if (soloInstrumentIndex < INSTRUMENTS.length) {
+        toast(`${instrument} done! Next: ${INSTRUMENTS[soloInstrumentIndex]}`);
+        setTimeout(() => startSoloBuild(), 600);
+      } else {
+        toast('All layers done!');
+        setTimeout(() => showListen(), 600);
+      }
+      return;
+    }
+
+    toast('Layer submitted!');
     const nonHost = Object.keys(assignments).map(Number);
     const nextTurn = turnIndex + 1;
     if (nextTurn < nonHost.length) {
@@ -717,13 +776,17 @@
     document.getElementById('btn-play-again').onclick = () => {
       stopAllLayers(allSeqs);
       allSeqs = [];
-      showLobby();
+      if (soloMode) {
+        showSoloSetup();
+      } else {
+        showLobby();
+      }
     };
 
     document.getElementById('btn-back-lobby').onclick = () => {
       stopAllLayers(allSeqs);
       allSeqs = [];
-      showLobby();
+      showScreen('home');
     };
   }
 
