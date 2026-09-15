@@ -168,6 +168,447 @@
   let currentChordSound = 'Piano Chords';
   let pianoRollNotes = [];
 
+  // ── Network state ──
+  let netMode = 'local'; // 'local' | 'host' | 'guest'
+  let peer = null;
+  let hostConn = null; // guest's connection to host
+  let guestConns = []; // host's connections to guests
+  let myPlayerIndex = -1;
+  let roomCode = '';
+
+  function netSend(conn, msg) {
+    try { conn.send(JSON.stringify(msg)); } catch (e) { console.warn('net send error', e); }
+  }
+  function netBroadcast(msg) {
+    guestConns.forEach(function (c) { netSend(c, msg); });
+  }
+  function netBroadcastExcept(excludeConn, msg) {
+    guestConns.forEach(function (c) { if (c !== excludeConn) netSend(c, msg); });
+  }
+
+  function destroyPeer() {
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    hostConn = null;
+    guestConns = [];
+  }
+
+  function createHost(code, myName) {
+    roomCode = code;
+    netMode = 'host';
+    myPlayerIndex = 0;
+    players = [{ name: myName, color: PLAYER_COLORS[0] }];
+
+    peer = new Peer('st-' + code, { debug: 0 });
+    peer.on('open', function () {
+      showOnlineLobby();
+    });
+    peer.on('error', function (err) {
+      if (err.type === 'unavailable-id') {
+        toast('Room code taken, try again');
+        destroyPeer();
+        showScreen('home');
+      } else {
+        toast('Connection error: ' + err.type);
+      }
+    });
+    peer.on('connection', function (conn) {
+      conn.on('open', function () {
+        conn.on('data', function (raw) {
+          handleHostMessage(conn, typeof raw === 'string' ? JSON.parse(raw) : raw);
+        });
+        conn.on('close', function () {
+          handleGuestDisconnect(conn);
+        });
+      });
+    });
+  }
+
+  function joinRoom(code, myName) {
+    roomCode = code;
+    netMode = 'guest';
+    toast('Connecting...');
+
+    peer = new Peer(undefined, { debug: 0 });
+    peer.on('open', function () {
+      hostConn = peer.connect('st-' + code, { reliable: true });
+      hostConn.on('open', function () {
+        netSend(hostConn, { type: 'join', name: myName });
+      });
+      hostConn.on('data', function (raw) {
+        handleGuestReceive(typeof raw === 'string' ? JSON.parse(raw) : raw);
+      });
+      hostConn.on('close', function () {
+        toast('Disconnected from host');
+        destroyPeer();
+        netMode = 'local';
+        showScreen('home');
+      });
+      hostConn.on('error', function () {
+        toast('Connection failed');
+        destroyPeer();
+        netMode = 'local';
+        showScreen('home');
+      });
+    });
+    peer.on('error', function (err) {
+      toast('Could not join: ' + err.type);
+      destroyPeer();
+      netMode = 'local';
+      showScreen('home');
+    });
+  }
+
+  // ── Host message handling ──
+  function findConnPlayerIndex(conn) {
+    for (var i = 0; i < guestConns.length; i++) {
+      if (guestConns[i] === conn) return i + 1;
+    }
+    return -1;
+  }
+
+  function handleGuestDisconnect(conn) {
+    var idx = findConnPlayerIndex(conn);
+    if (idx > 0 && idx < players.length) {
+      var name = players[idx].name;
+      players.splice(idx, 1);
+      guestConns.splice(idx - 1, 1);
+      netBroadcast({ type: 'players', players: players });
+      toast(name + ' disconnected');
+      if (document.getElementById('screen-lobby').classList.contains('active')) {
+        renderOnlinePlayerList();
+        updateStartBtn();
+      }
+    }
+  }
+
+  function handleHostMessage(conn, msg) {
+    switch (msg.type) {
+      case 'join':
+        if (players.length >= 6) { netSend(conn, { type: 'error', text: 'Room is full' }); return; }
+        if (players.some(function (p) { return p.name === msg.name; })) { netSend(conn, { type: 'error', text: 'Name taken' }); return; }
+        guestConns.push(conn);
+        players.push({ name: msg.name, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
+        var pIdx = players.length - 1;
+        netSend(conn, { type: 'joined', playerIndex: pIdx, players: players, roomCode: roomCode });
+        netBroadcastExcept(conn, { type: 'players', players: players });
+        toast(msg.name + ' joined');
+        if (document.getElementById('screen-lobby').classList.contains('active')) {
+          renderOnlinePlayerList();
+          updateStartBtn();
+        }
+        break;
+
+      case 'song_entered':
+        games.push({ songName: msg.songName, enteredBy: msg.playerIndex, submissions: {}, guesses: [] });
+        songEntryIdx++;
+        if (songEntryIdx < players.length) {
+          netBroadcast({ type: 'enter_song', playerIndex: songEntryIdx });
+        } else {
+          startGameRoundsOnline();
+        }
+        break;
+
+      case 'layer_submitted':
+        var gIdx = getGameIdx(msg.playerIndex, currentRound);
+        var game = games[gIdx];
+        var inst = INSTRUMENTS[currentRound];
+        game.submissions[inst] = { data: msg.data, bpm: gameBpm, playerIndex: msg.playerIndex };
+        if (msg.sound) game.submissions[inst].sound = msg.sound;
+        if (msg.guess) game.guesses.push({ playerIndex: msg.playerIndex, guess: msg.guess, round: currentRound, instrument: inst });
+        currentTurnPlayer++;
+        nextTurnOnline();
+        break;
+    }
+  }
+
+  // ── Guest message handling ──
+  function handleGuestReceive(msg) {
+    switch (msg.type) {
+      case 'joined':
+        myPlayerIndex = msg.playerIndex;
+        players = msg.players;
+        showOnlineLobby();
+        break;
+
+      case 'players':
+        players = msg.players;
+        if (document.getElementById('screen-lobby').classList.contains('active')) {
+          renderOnlinePlayerList();
+        }
+        break;
+
+      case 'error':
+        toast(msg.text);
+        destroyPeer();
+        netMode = 'local';
+        showScreen('home');
+        break;
+
+      case 'enter_song':
+        if (msg.playerIndex === myPlayerIndex) {
+          showSongEntryOnline();
+        } else {
+          showWaiting(players[msg.playerIndex].name, 'is entering their song...');
+        }
+        break;
+
+      case 'your_turn':
+        games = msg.games;
+        currentRound = msg.round;
+        currentTurnPlayer = msg.turnPlayer;
+        currentGameIdx = msg.gameIdx;
+        gameBpm = msg.bpm;
+        var inst = INSTRUMENTS[currentRound];
+        if (currentRound === 0) {
+          showBuildOnline(inst);
+        } else {
+          showScreen('reveal');
+          var game = games[currentGameIdx];
+          document.getElementById('reveal-song').textContent = game.enteredBy === myPlayerIndex ? game.songName : '???';
+          document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
+          document.getElementById('reveal-bar').style.width = '100%';
+          setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
+          setTimeout(function () { showBuildOnline(inst); }, 3000);
+        }
+        break;
+
+      case 'wait_turn':
+        showWaiting(players[msg.turnPlayer].name, 'is building ' + msg.instrument + '...');
+        break;
+
+      case 'reveal':
+        games = msg.games;
+        players = msg.players;
+        gameBpm = msg.bpm;
+        showReveal();
+        break;
+
+      case 'kicked':
+        toast('You were removed from the room');
+        destroyPeer();
+        netMode = 'local';
+        showScreen('home');
+        break;
+
+      case 'game_start':
+        games = [];
+        gameBpm = msg.bpm;
+        songEntryIdx = 0;
+        if (msg.firstEntry === myPlayerIndex) {
+          showSongEntryOnline();
+        } else {
+          showWaiting(players[msg.firstEntry].name, 'is entering their song...');
+        }
+        break;
+    }
+  }
+
+  // ── Online lobby ──
+  function showOnlineLobby() {
+    showScreen('lobby');
+    document.getElementById('room-code').textContent = roomCode;
+    document.getElementById('btn-copy-code').onclick = function () {
+      navigator.clipboard.writeText(roomCode).then(function () { toast('Code copied!'); });
+    };
+    renderOnlinePlayerList();
+
+    var isHost = netMode === 'host';
+    document.getElementById('host-controls').style.display = isHost ? 'flex' : 'none';
+    document.getElementById('guest-waiting').style.display = isHost ? 'none' : 'block';
+
+    var songRow = document.querySelector('.song-input-row');
+    if (songRow) songRow.style.display = 'none';
+
+    if (isHost) {
+      var ts = document.getElementById('lobby-tempo');
+      var tv = document.getElementById('lobby-tempo-val');
+      ts.value = gameBpm; tv.textContent = gameBpm;
+      ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
+      var lgc = document.getElementById('lobby-genres');
+      if (lgc) renderGenreRoller(lgc, ts, tv);
+
+      document.getElementById('btn-start').onclick = function () {
+        if (players.length < 2) { toast('Need at least 2 players'); return; }
+        games = [];
+        songEntryIdx = 0;
+        netBroadcast({ type: 'game_start', bpm: gameBpm, firstEntry: 0 });
+        showSongEntryOnline();
+      };
+    }
+
+    document.getElementById('btn-leave').onclick = function () {
+      destroyPeer();
+      players = [];
+      games = [];
+      netMode = 'local';
+      showScreen('home');
+    };
+
+    updateStartBtn();
+  }
+
+  function renderOnlinePlayerList() {
+    var list = document.getElementById('player-list');
+    list.innerHTML = '';
+    players.forEach(function (p, i) {
+      var card = document.createElement('div');
+      card.className = 'player-card';
+      var badge = '';
+      if (i === 0) badge = '<span class="player-badge">Host</span>';
+      else if (netMode === 'host') badge = '<button class="btn-icon kick-player" data-i="' + i + '" title="Kick">&times;</button>';
+      if (i === myPlayerIndex) badge = '<span class="player-badge" style="color:var(--accent)">You</span>' + (i === 0 ? ' <span class="player-badge">Host</span>' : '');
+      card.innerHTML = '<div class="player-avatar" style="background:' + p.color + '">' + p.name[0].toUpperCase() + '</div>' +
+        '<span class="player-name">' + esc(p.name) + '</span>' + badge;
+      list.appendChild(card);
+    });
+    if (netMode === 'host') {
+      list.querySelectorAll('.kick-player').forEach(function (btn) {
+        btn.onclick = function () {
+          var idx = +btn.dataset.i;
+          if (idx > 0 && idx <= guestConns.length) {
+            netSend(guestConns[idx - 1], { type: 'kicked' });
+            guestConns[idx - 1].close();
+            players.splice(idx, 1);
+            guestConns.splice(idx - 1, 1);
+            netBroadcast({ type: 'players', players: players });
+            renderOnlinePlayerList();
+            updateStartBtn();
+          }
+        };
+      });
+    }
+  }
+
+  // ── Online song entry ──
+  function showSongEntryOnline() {
+    showScreen('songentry');
+    document.getElementById('songentry-player').textContent = 'Enter your song:';
+    var input = document.getElementById('songentry-input');
+    input.value = '';
+    var gc = document.getElementById('songentry-genres');
+    if (gc) renderGenreRoller(gc, null, null);
+    setTimeout(function () { input.focus(); }, 100);
+    document.getElementById('btn-songentry-done').onclick = function () {
+      var song = input.value.trim();
+      if (!song) { toast('Enter a song name'); return; }
+      if (netMode === 'host') {
+        games.push({ songName: song, enteredBy: myPlayerIndex, submissions: {}, guesses: [] });
+        songEntryIdx++;
+        if (songEntryIdx < players.length) {
+          netBroadcast({ type: 'enter_song', playerIndex: songEntryIdx });
+          showWaiting(players[songEntryIdx].name, 'is entering their song...');
+        } else {
+          startGameRoundsOnline();
+        }
+      } else {
+        netSend(hostConn, { type: 'song_entered', songName: song, playerIndex: myPlayerIndex });
+        showWaiting('Others', 'are entering their songs...');
+      }
+    };
+  }
+
+  // ── Online game rounds ──
+  function startGameRoundsOnline() {
+    currentRound = 0;
+    currentTurnPlayer = 0;
+    nextTurnOnline();
+  }
+
+  function nextTurnOnline() {
+    if (currentRound >= 4) {
+      netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
+      showReveal();
+      return;
+    }
+    if (currentTurnPlayer >= players.length) {
+      currentRound++;
+      currentTurnPlayer = 0;
+      nextTurnOnline();
+      return;
+    }
+
+    var inst = INSTRUMENTS[currentRound];
+    var gIdx = getGameIdx(currentTurnPlayer, currentRound);
+    currentGameIdx = gIdx;
+
+    if (currentTurnPlayer === 0) {
+      // Host's turn
+      var gamesToSend = games.map(function (g) {
+        return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
+      });
+      netBroadcast({ type: 'wait_turn', turnPlayer: 0, instrument: inst });
+
+      if (currentRound === 0) {
+        showBuildOnline(inst);
+      } else {
+        showScreen('reveal');
+        var game = games[gIdx];
+        document.getElementById('reveal-song').textContent = game.enteredBy === 0 ? game.songName : '???';
+        document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
+        document.getElementById('reveal-bar').style.width = '100%';
+        setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
+        setTimeout(function () { showBuildOnline(inst); }, 3000);
+      }
+    } else {
+      // Guest's turn
+      var connIdx = currentTurnPlayer - 1;
+      if (connIdx < guestConns.length) {
+        var gamesToSend = games.map(function (g) {
+          return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
+        });
+        netSend(guestConns[connIdx], {
+          type: 'your_turn', round: currentRound, turnPlayer: currentTurnPlayer,
+          gameIdx: gIdx, games: gamesToSend, bpm: gameBpm
+        });
+        guestConns.forEach(function (c, ci) {
+          if (ci !== connIdx) netSend(c, { type: 'wait_turn', turnPlayer: currentTurnPlayer, instrument: inst });
+        });
+        showWaiting(players[currentTurnPlayer].name, 'is building ' + inst + '...');
+      }
+    }
+  }
+
+  function showBuildOnline(instrument) {
+    showBuild(instrument);
+    document.getElementById('btn-submit').onclick = function () {
+      clearInterval(buildTimer);
+      stopPreview();
+      var data = collectData(instrument);
+      var game = games[currentGameIdx];
+      var guess = '';
+      if (currentRound > 0 && game.enteredBy !== myPlayerIndex) {
+        guess = document.getElementById('guess-input').value.trim();
+      }
+
+      if (netMode === 'host') {
+        game.submissions[instrument] = { data: data, bpm: gameBpm, playerIndex: myPlayerIndex };
+        if (instrument === 'bass') game.submissions[instrument].sound = currentBassSound;
+        if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
+        if (instrument === 'chords') game.submissions[instrument].sound = currentChordSound;
+        if (guess) game.guesses.push({ playerIndex: myPlayerIndex, guess: guess, round: currentRound, instrument: instrument });
+        currentTurnPlayer++;
+        toast('Layer submitted!');
+        setTimeout(function () { nextTurnOnline(); }, 600);
+      } else {
+        netSend(hostConn, {
+          type: 'layer_submitted',
+          playerIndex: myPlayerIndex,
+          data: data,
+          sound: instrument === 'bass' ? currentBassSound : (instrument === 'melody' ? currentMelodySound : (instrument === 'chords' ? currentChordSound : null)),
+          guess: guess
+        });
+        toast('Layer submitted!');
+        showWaiting('Others', 'are building...');
+      }
+    };
+  }
+
+  function showWaiting(name, info) {
+    showScreen('waiting');
+    document.getElementById('waiting-player').textContent = name;
+    document.getElementById('waiting-info').textContent = info;
+  }
+
   // ── Audio ──
   let audioReady = false;
   const synths = {};
@@ -363,21 +804,47 @@
     var savedName = localStorage.getItem('st-name') || '';
     document.getElementById('input-name').value = savedName;
 
+    // Create Room (online host)
     document.getElementById('btn-create').addEventListener('click', function () {
+      ensureAudio();
+      var name = getName();
+      if (!name) { toast('Enter your name first'); return; }
+      soloMode = false;
+      var code = generateCode();
+      toast('Creating room ' + code + '...');
+      createHost(code, name);
+    });
+
+    // Join Room (online guest)
+    document.getElementById('btn-join').addEventListener('click', function () {
+      ensureAudio();
+      var name = getName();
+      if (!name) { toast('Enter your name first'); return; }
+      var code = document.getElementById('input-room-code').value.trim().toUpperCase();
+      if (!code) { toast('Enter a room code'); return; }
+      soloMode = false;
+      joinRoom(code, name);
+    });
+
+    // Local Multiplayer (pass-and-play)
+    document.getElementById('btn-local').addEventListener('click', function () {
       ensureAudio();
       var name = getName();
       if (!name) { toast('Enter your name first'); return; }
       players = [{ name: name, color: PLAYER_COLORS[0] }];
       soloMode = false;
+      netMode = 'local';
       showLobby();
     });
 
+    // Solo
     document.getElementById('btn-solo').addEventListener('click', function () {
       ensureAudio();
       var name = getName();
       if (!name) { toast('Enter your name first'); return; }
       players = [{ name: name, color: PLAYER_COLORS[0] }];
       soloMode = true;
+      netMode = 'local';
       showSoloSetup();
     });
   }
@@ -576,9 +1043,10 @@
   function showBuild(instrument) {
     showScreen('build');
     var game = games[currentGameIdx];
-    var isOwn = game.enteredBy === currentTurnPlayer;
+    var playerIdx = (netMode !== 'local') ? myPlayerIndex : currentTurnPlayer;
+    var isOwn = game.enteredBy === playerIdx;
 
-    document.getElementById('build-song').textContent = currentRound === 0 ? game.songName : '???';
+    document.getElementById('build-song').textContent = isOwn ? game.songName : (currentRound === 0 ? game.songName : '???');
 
     var badge = document.getElementById('build-instrument');
     badge.textContent = instrument;
@@ -1339,9 +1807,19 @@
       nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; showRevealForSong(idx + 1); };
     } else {
       nextBtn.textContent = 'Play Again';
-      nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; soloMode ? showSoloSetup() : showLobby(); };
+      nextBtn.onclick = function () {
+        stopAllLayers(allSeqs); allSeqs = [];
+        if (soloMode) showSoloSetup();
+        else if (netMode === 'host' || netMode === 'guest') showOnlineLobby();
+        else showLobby();
+      };
     }
-    backBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; showScreen('home'); };
+    backBtn.onclick = function () {
+      stopAllLayers(allSeqs); allSeqs = [];
+      destroyPeer();
+      netMode = 'local';
+      showScreen('home');
+    };
   }
 
   function playAllLayersForGame(gameIdx, seqs) {

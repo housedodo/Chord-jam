@@ -19,10 +19,15 @@
       <div id="theme-picker" class="theme-picker"></div>
       <div class="home-actions">
         <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;text-align:center;font-size:1rem;padding:14px 16px">
-        <button id="btn-create" class="btn-primary">Multiplayer</button>
+        <button id="btn-create" class="btn-primary">Create Room</button>
+        <div class="join-row">
+          <input id="input-room-code" type="text" class="code-input" placeholder="Room code" maxlength="5" autocomplete="off" spellcheck="false">
+          <button id="btn-join" class="btn-secondary" style="padding:12px 20px">Join</button>
+        </div>
+        <button id="btn-local" class="btn-secondary" style="width:100%">Local Multiplayer</button>
         <button id="btn-solo" class="btn-secondary" style="width:100%">Solo Mode</button>
       </div>
-      <p class="home-hint">Solo: build all 4 layers yourself. Multiplayer: take turns on Discord!</p>
+      <p class="home-hint">Create a room and share the code, or join a friend's room!</p>
     </div>
   </div>
 
@@ -94,6 +99,16 @@
         <div id="songentry-genres" class="genre-roller"></div>
       </div>
       <button id="btn-songentry-done" class="btn-primary">Done</button>
+    </div>
+  </div>
+
+  <!-- WAITING screen (online: waiting for another player's turn) -->
+  <div id="screen-waiting" class="screen">
+    <div class="handoff-container">
+      <p class="handoff-label">WAITING</p>
+      <h2 id="waiting-player" class="handoff-player"></h2>
+      <p id="waiting-info" class="handoff-instrument"></p>
+      <div class="waiting-dots"><span>.</span><span>.</span><span>.</span></div>
     </div>
   </div>
 
@@ -222,6 +237,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
