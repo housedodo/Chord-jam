@@ -9,38 +9,51 @@
   const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash', 'Cowbell', 'Shaker', 'Conga'];
   const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3'];
   const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6'];
-  const CHORD_NAMES = ['C','Cm','D','Dm','E','Em','F','Fm','G','Gm','A','Am','B','Bm',
-    'C7','D7','E7','F7','G7','A7','B7',
-    'Cmaj7','Dmaj7','Fmaj7','Gmaj7',
-    'Cm7','Dm7','Em7','Fm7','Gm7','Am7','Bm7',
-    'Csus4','Dsus4','Gsus4','Asus4','Csus2','Dsus2','Gsus2','Asus2',
-    'Cdim','Ddim','Edim','Bdim','Caug','Eaug',
-    'C6','D6','F6','G6','A6','Cm6','Dm6','Em6','Am6',
-    'C9','D9','G9','A9'];
-  const CHORD_NOTES = {
-    'C':['C4','E4','G4'],'Cm':['C4','Eb4','G4'],'D':['D4','F#4','A4'],'Dm':['D4','F4','A4'],
-    'E':['E4','G#4','B4'],'Em':['E4','G4','B4'],'F':['F4','A4','C5'],'Fm':['F4','Ab4','C5'],
-    'G':['G3','B3','D4'],'Gm':['G3','Bb3','D4'],'A':['A3','C#4','E4'],'Am':['A3','C4','E4'],
-    'B':['B3','D#4','F#4'],'Bm':['B3','D4','F#4'],
-    'C7':['C4','E4','G4','Bb4'],'D7':['D4','F#4','A4','C5'],'E7':['E4','G#4','B4','D5'],
-    'F7':['F4','A4','C5','Eb5'],'G7':['G3','B3','D4','F4'],'A7':['A3','C#4','E4','G4'],
-    'B7':['B3','D#4','F#4','A4'],
-    'Cmaj7':['C4','E4','G4','B4'],'Dmaj7':['D4','F#4','A4','C#5'],
-    'Fmaj7':['F4','A4','C5','E5'],'Gmaj7':['G3','B3','D4','F#4'],
-    'Cm7':['C4','Eb4','G4','Bb4'],'Dm7':['D4','F4','A4','C5'],'Em7':['E4','G4','B4','D5'],
-    'Fm7':['F4','Ab4','C5','Eb5'],'Gm7':['G3','Bb3','D4','F4'],'Am7':['A3','C4','E4','G4'],
-    'Bm7':['B3','D4','F#4','A4'],
-    'Csus4':['C4','F4','G4'],'Dsus4':['D4','G4','A4'],'Gsus4':['G3','C4','D4'],'Asus4':['A3','D4','E4'],
-    'Csus2':['C4','D4','G4'],'Dsus2':['D4','E4','A4'],'Gsus2':['G3','A3','D4'],'Asus2':['A3','B3','E4'],
-    'Cdim':['C4','Eb4','Gb4'],'Ddim':['D4','F4','Ab4'],'Edim':['E4','G4','Bb4'],'Bdim':['B3','D4','F4'],
-    'Caug':['C4','E4','G#4'],'Eaug':['E4','G#4','C5'],
-    'C6':['C4','E4','G4','A4'],'D6':['D4','F#4','A4','B4'],'F6':['F4','A4','C5','D5'],
-    'G6':['G3','B3','D4','E4'],'A6':['A3','C#4','E4','F#4'],
-    'Cm6':['C4','Eb4','G4','A4'],'Dm6':['D4','F4','A4','B4'],
-    'Em6':['E4','G4','B4','C#5'],'Am6':['A3','C4','E4','F#4'],
-    'C9':['C4','E4','G4','Bb4','D5'],'D9':['D4','F#4','A4','C5','E5'],
-    'G9':['G3','B3','D4','F4','A4'],'A9':['A3','C#4','E4','G4','B4']
-  };
+  const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const CHORD_QUALITIES = [
+    { label: 'Major', suffix: '', intervals: [0, 4, 7] },
+    { label: 'Minor', suffix: 'm', intervals: [0, 3, 7] },
+    { label: '7th', suffix: '7', intervals: [0, 4, 7, 10] },
+    { label: 'Major 7th', suffix: 'maj7', intervals: [0, 4, 7, 11] },
+    { label: 'Minor 7th', suffix: 'm7', intervals: [0, 3, 7, 10] },
+    { label: 'Sus4', suffix: 'sus4', intervals: [0, 5, 7] },
+    { label: 'Sus2', suffix: 'sus2', intervals: [0, 2, 7] },
+    { label: 'Dim', suffix: 'dim', intervals: [0, 3, 6] },
+    { label: 'Aug', suffix: 'aug', intervals: [0, 4, 8] },
+    { label: '6th', suffix: '6', intervals: [0, 4, 7, 9] },
+    { label: 'Minor 6th', suffix: 'm6', intervals: [0, 3, 7, 9] },
+    { label: '9th', suffix: '9', intervals: [0, 4, 7, 10, 14] },
+    { label: 'Add9', suffix: 'add9', intervals: [0, 4, 7, 14] },
+    { label: 'Dim7', suffix: 'dim7', intervals: [0, 3, 6, 9] },
+    { label: 'Power', suffix: '5', intervals: [0, 7] }
+  ];
+  const ALL_NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  function getChordNotes(root, quality) {
+    var baseOctave = (root === 'A' || root === 'A#' || root === 'B') ? 3 : 4;
+    var rootIdx = ALL_NOTES.indexOf(root);
+    return quality.intervals.map(function (interval) {
+      var noteIdx = (rootIdx + interval) % 12;
+      var octave = baseOctave + Math.floor((rootIdx + interval) / 12);
+      return ALL_NOTES[noteIdx] + octave;
+    });
+  }
+  function getChordName(root, quality) {
+    return root + quality.suffix;
+  }
+  function lookupChordNotes(chordName) {
+    var sortedRoots = CHORD_ROOTS.slice().sort(function (a, b) { return b.length - a.length; });
+    for (var r = 0; r < sortedRoots.length; r++) {
+      var root = sortedRoots[r];
+      if (chordName.indexOf(root) !== 0) continue;
+      var suffix = chordName.slice(root.length);
+      for (var q = 0; q < CHORD_QUALITIES.length; q++) {
+        if (CHORD_QUALITIES[q].suffix === suffix) {
+          return getChordNotes(root, CHORD_QUALITIES[q]);
+        }
+      }
+    }
+    return null;
+  }
   const PLAYER_COLORS = ['#a78bfa', '#e8a0bf', '#7eb8d4', '#e8b07d', '#8cc5a2', '#c9a0d4'];
   const BASS_SOUNDS = {
     'Sub Bass': { harmonicity: 0.5, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.4, sustain: 0.6, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.2 }, volume: -2 },
@@ -912,6 +925,8 @@
     var wrapper = document.createElement('div');
     wrapper.className = 'chord-timeline-wrapper';
 
+    var selectedRoot = 'C';
+    var selectedQuality = CHORD_QUALITIES[0];
     var selectedChord = 'C';
 
     // Sound selector for chords
@@ -931,26 +946,54 @@
     });
     wrapper.appendChild(soundBar);
 
-    // Chord palette
-    var palette = document.createElement('div');
-    palette.className = 'chord-palette-bar';
-    CHORD_NAMES.forEach(function (ch) {
-      var btn = document.createElement('button');
-      btn.className = 'chord-pick' + (ch === 'C' ? ' active' : '');
-      btn.textContent = ch;
-      btn.onclick = function () {
-        palette.querySelectorAll('.chord-pick').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        selectedChord = ch;
-        ensureAudio().then(function () {
-          if (!synths.chords) synths.chords = createChordSynth();
-          var cn = CHORD_NOTES[ch];
-          if (cn) synths.chords.play(cn, '8n');
-        });
-      };
-      palette.appendChild(btn);
+    function updateSelectedChord() {
+      selectedChord = getChordName(selectedRoot, selectedQuality);
+      chordDisplay.textContent = selectedChord;
+      ensureAudio().then(function () {
+        if (!synths.chords) synths.chords = createChordSynth();
+        var cn = getChordNotes(selectedRoot, selectedQuality);
+        synths.chords.play(cn, '8n');
+      });
+    }
+
+    // Chord selector row with dropdowns
+    var selectorRow = document.createElement('div');
+    selectorRow.className = 'chord-selector-row';
+
+    var rootSelect = document.createElement('select');
+    rootSelect.className = 'chord-select';
+    CHORD_ROOTS.forEach(function (r) {
+      var opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = r;
+      rootSelect.appendChild(opt);
     });
-    wrapper.appendChild(palette);
+    rootSelect.onchange = function () {
+      selectedRoot = rootSelect.value;
+      updateSelectedChord();
+    };
+
+    var qualitySelect = document.createElement('select');
+    qualitySelect.className = 'chord-select';
+    CHORD_QUALITIES.forEach(function (q, i) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = q.label;
+      qualitySelect.appendChild(opt);
+    });
+    qualitySelect.onchange = function () {
+      selectedQuality = CHORD_QUALITIES[parseInt(qualitySelect.value)];
+      updateSelectedChord();
+    };
+
+    var chordDisplay = document.createElement('span');
+    chordDisplay.className = 'chord-display';
+    chordDisplay.textContent = 'C';
+
+    selectorRow.appendChild(rootSelect);
+    selectorRow.appendChild(qualitySelect);
+    selectorRow.appendChild(chordDisplay);
+    wrapper.appendChild(selectorRow);
 
     // Timeline
     var timeline = document.createElement('div');
@@ -1040,7 +1083,7 @@
 
       ensureAudio().then(function () {
         if (!synths.chords) synths.chords = createChordSynth();
-        var cn = CHORD_NOTES[selectedChord];
+        var cn = lookupChordNotes(selectedChord);
         if (cn) synths.chords.play(cn, '16n');
       });
     });
@@ -1124,7 +1167,7 @@
         notes.forEach(function (n) {
           if (n.start === s) {
             var dur = n.length * Tone.Time('16n').toSeconds();
-            if (instrument === 'chords') { var cn = CHORD_NOTES[n.note]; if (cn) synths.chords.play(cn, dur); }
+            if (instrument === 'chords') { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, dur); }
             else if (instrument === 'bass') { synths.bass.play(n.note, dur); }
             else { synths.melody.play(n.note, dur); }
           }
@@ -1154,7 +1197,7 @@
         var notes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
           notes.forEach(function (n) {
-            if (n.start === s) { var cn = CHORD_NOTES[n.note]; if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
           });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'bass') {
@@ -1322,7 +1365,7 @@
         var notes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
           notes.forEach(function (n) {
-            if (n.start === s) { var cn = CHORD_NOTES[n.note]; if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
           });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'bass') {
