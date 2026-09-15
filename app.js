@@ -529,6 +529,8 @@
 
   // ── Online game rounds (parallel) ──
   let roundSubmissionsCount = 0;
+  let roundAdvanced = false;
+  let roundTimer = null;
 
   function startGameRoundsOnline() {
     currentRound = 0;
@@ -537,12 +539,15 @@
 
   function startRoundOnline(round) {
     if (round >= 4) {
+      clearTimeout(roundTimer);
       netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
       showReveal();
       return;
     }
     currentRound = round;
     roundSubmissionsCount = 0;
+    roundAdvanced = false;
+    clearTimeout(roundTimer);
     var inst = INSTRUMENTS[round];
     console.log('Starting round ' + round + ' (' + inst + ') for ' + players.length + ' players');
 
@@ -560,6 +565,14 @@
       });
     });
 
+    if (netMode === 'host') {
+      var nextRound = round + 1;
+      var extraDelay = round === 0 ? 0 : 3000;
+      roundTimer = setTimeout(function () {
+        advanceRound(nextRound);
+      }, (BUILD_TIME * 1000) + extraDelay + 2000);
+    }
+
     currentTurnPlayer = 0;
     currentGameIdx = getGameIdx(0, round);
     if (round === 0) {
@@ -575,49 +588,60 @@
     }
   }
 
+  function advanceRound(nextRound) {
+    if (roundAdvanced) return;
+    roundAdvanced = true;
+    clearTimeout(roundTimer);
+    console.log('Advancing to round ' + nextRound);
+    setTimeout(function () { startRoundOnline(nextRound); }, 600);
+  }
+
   function onLayerSubmittedHost() {
     roundSubmissionsCount++;
     console.log('Submissions for round ' + currentRound + ': ' + roundSubmissionsCount + '/' + players.length);
     if (roundSubmissionsCount >= players.length) {
-      var nextRound = currentRound + 1;
-      setTimeout(function () { startRoundOnline(nextRound); }, 600);
+      advanceRound(currentRound + 1);
+    }
+  }
+
+  function submitOnline(instrument) {
+    clearInterval(buildTimer);
+    stopPreview();
+    var data = collectData(instrument);
+    var game = games[currentGameIdx];
+    var guess = '';
+    if (currentRound > 0 && game.enteredBy !== myPlayerIndex) {
+      guess = document.getElementById('guess-input').value.trim();
+    }
+
+    if (netMode === 'host') {
+      game.submissions[instrument] = { data: data, bpm: gameBpm, playerIndex: myPlayerIndex };
+      if (instrument === 'bass') game.submissions[instrument].sound = currentBassSound;
+      if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
+      if (instrument === 'chords') game.submissions[instrument].sound = currentChordSound;
+      if (guess) game.guesses.push({ playerIndex: myPlayerIndex, guess: guess, round: currentRound, instrument: instrument });
+      toast('Layer submitted!');
+      onLayerSubmittedHost();
+      if (!roundAdvanced) {
+        showWaiting('Others', 'are still building...');
+      }
+    } else {
+      netSend(hostConn, {
+        type: 'layer_submitted',
+        playerIndex: myPlayerIndex,
+        data: data,
+        sound: instrument === 'bass' ? currentBassSound : (instrument === 'melody' ? currentMelodySound : (instrument === 'chords' ? currentChordSound : null)),
+        guess: guess
+      });
+      toast('Layer submitted!');
+      showWaiting('Others', 'are still building...');
     }
   }
 
   function showBuildOnline(instrument) {
     showBuild(instrument);
     document.getElementById('btn-submit').onclick = function () {
-      clearInterval(buildTimer);
-      stopPreview();
-      var data = collectData(instrument);
-      var game = games[currentGameIdx];
-      var guess = '';
-      if (currentRound > 0 && game.enteredBy !== myPlayerIndex) {
-        guess = document.getElementById('guess-input').value.trim();
-      }
-
-      if (netMode === 'host') {
-        game.submissions[instrument] = { data: data, bpm: gameBpm, playerIndex: myPlayerIndex };
-        if (instrument === 'bass') game.submissions[instrument].sound = currentBassSound;
-        if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
-        if (instrument === 'chords') game.submissions[instrument].sound = currentChordSound;
-        if (guess) game.guesses.push({ playerIndex: myPlayerIndex, guess: guess, round: currentRound, instrument: instrument });
-        toast('Layer submitted!');
-        onLayerSubmittedHost();
-        if (roundSubmissionsCount < players.length) {
-          showWaiting('Others', 'are still building...');
-        }
-      } else {
-        netSend(hostConn, {
-          type: 'layer_submitted',
-          playerIndex: myPlayerIndex,
-          data: data,
-          sound: instrument === 'bass' ? currentBassSound : (instrument === 'melody' ? currentMelodySound : (instrument === 'chords' ? currentChordSound : null)),
-          guess: guess
-        });
-        toast('Layer submitted!');
-        showWaiting('Others', 'are still building...');
-      }
+      submitOnline(instrument);
     };
   }
 
@@ -1120,7 +1144,11 @@
       buildTimer = setInterval(function () {
         buildSecondsLeft--;
         updateBuildTimer();
-        if (buildSecondsLeft <= 0) { clearInterval(buildTimer); submitLayer(instrument); }
+        if (buildSecondsLeft <= 0) {
+          clearInterval(buildTimer);
+          if (netMode !== 'local') { submitOnline(instrument); }
+          else { submitLayer(instrument); }
+        }
       }, 1000);
     }
 
