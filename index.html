@@ -16,6 +16,7 @@
     <div class="home-container">
       <h1 class="logo">SOUND<br>TELEPHONE</h1>
       <p class="tagline">Recreate songs together, one layer at a time</p>
+      <div id="theme-picker" class="theme-picker"></div>
       <div class="home-actions">
         <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;text-align:center;font-size:1rem;padding:14px 16px">
         <button id="btn-create" class="btn-primary">Multiplayer</button>
@@ -41,7 +42,7 @@
         </div>
         <div class="genre-section">
           <label class="genre-section-label">Genre & BPM suggestion</label>
-          <div id="lobby-genres" class="genre-chips"></div>
+          <div id="lobby-genres" class="genre-roller"></div>
         </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
@@ -68,7 +69,7 @@
         <input id="solo-song" type="text" class="song-input" placeholder="Song name (optional)" maxlength="80" autocomplete="off" spellcheck="false">
         <div class="genre-section">
           <label class="genre-section-label">Genre & BPM suggestion</label>
-          <div id="solo-genres" class="genre-chips"></div>
+          <div id="solo-genres" class="genre-roller"></div>
         </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
@@ -89,8 +90,8 @@
       <p id="songentry-player" class="songentry-player"></p>
       <input id="songentry-input" type="text" class="song-input" placeholder="Enter your song..." maxlength="80" autocomplete="off" spellcheck="false">
       <div class="genre-section">
-        <label class="genre-section-label">Pick a genre for inspiration</label>
-        <div id="songentry-genres" class="genre-chips"></div>
+        <label class="genre-section-label">Need inspiration?</label>
+        <div id="songentry-genres" class="genre-roller"></div>
       </div>
       <button id="btn-songentry-done" class="btn-primary">Done</button>
     </div>

@@ -56,23 +56,62 @@
     'Organ': { harmonicity: 2, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.1 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.1 }, volume: -8 }
   };
   const GENRE_SUGGESTIONS = [
-    { genre: 'Pop', bpm: '100-130', icon: '🎤' },
-    { genre: 'Rock', bpm: '110-140', icon: '🎸' },
-    { genre: 'Hip Hop', bpm: '80-100', icon: '🎧' },
-    { genre: 'EDM / House', bpm: '120-130', icon: '🎛️' },
-    { genre: 'Drum & Bass', bpm: '160-180', icon: '🥁' },
-    { genre: 'R&B / Soul', bpm: '60-80', icon: '🎷' },
-    { genre: 'Reggaeton', bpm: '90-100', icon: '🌴' },
-    { genre: 'Jazz', bpm: '100-160', icon: '🎺' },
-    { genre: 'Country', bpm: '100-120', icon: '🤠' },
-    { genre: 'Funk', bpm: '100-120', icon: '🕺' },
-    { genre: 'Metal', bpm: '120-180', icon: '🤘' },
-    { genre: 'Ballad', bpm: '60-80', icon: '💜' },
-    { genre: 'Disco', bpm: '110-130', icon: '🪩' },
-    { genre: 'Lo-Fi', bpm: '70-90', icon: '☕' },
-    { genre: 'Punk', bpm: '140-180', icon: '⚡' },
-    { genre: 'Latin', bpm: '90-110', icon: '💃' }
+    { genre: 'Pop', bpm: [100,130], icon: '🎤', examples: ['Shape of You','Blinding Lights','Happy','Uptown Funk','Bad Guy','Shake It Off','Rolling in the Deep','Somebody That I Used to Know'] },
+    { genre: 'Rock', bpm: [110,140], icon: '🎸', examples: ['Seven Nation Army','Smells Like Teen Spirit','Back in Black','Smoke on the Water','Highway to Hell','Sweet Child O\' Mine','Bohemian Rhapsody','Stairway to Heaven'] },
+    { genre: 'Hip Hop', bpm: [80,100], icon: '🎧', examples: ['Lose Yourself','HUMBLE.','Sicko Mode','In Da Club','Hotline Bling','Old Town Road','God\'s Plan','Alright'] },
+    { genre: 'EDM / House', bpm: [120,130], icon: '🎛️', examples: ['Levels','Titanium','Lean On','Wake Me Up','Don\'t You Worry Child','Clarity','Animals','This Is What You Came For'] },
+    { genre: 'Drum & Bass', bpm: [160,180], icon: '🥁', examples: ['Gold Dust','Hold Your Colour','T2 - Heartbroken','Netsky - Memory Lane','Chase & Status - Blind Faith','Sub Focus - Splash'] },
+    { genre: 'R&B / Soul', bpm: [60,80], icon: '🎷', examples: ['No Scrubs','Crazy in Love','Stay','Kiss from a Rose','Ain\'t No Sunshine','Superstition','I Will Always Love You','Fallin\''] },
+    { genre: 'Reggaeton', bpm: [90,100], icon: '🌴', examples: ['Despacito','Mi Gente','Dákiti','Gasolina','Tusa','Con Calma','Baila Conmigo','Hawái'] },
+    { genre: 'Jazz', bpm: [100,160], icon: '🎺', examples: ['Take Five','So What','Fly Me to the Moon','Autumn Leaves','My Favorite Things','Blue in Green','Summertime','All of Me'] },
+    { genre: 'Country', bpm: [100,120], icon: '🤠', examples: ['Jolene','Ring of Fire','Take Me Home Country Roads','Wagon Wheel','Friends in Low Places','Chicken Fried','Need You Now','The Gambler'] },
+    { genre: 'Funk', bpm: [100,120], icon: '🕺', examples: ['Superstition','Get Lucky','Le Freak','Play That Funky Music','Brick House','September','I Got You','Give Up the Funk'] },
+    { genre: 'Metal', bpm: [120,180], icon: '🤘', examples: ['Enter Sandman','Master of Puppets','Chop Suey!','Ace of Spades','Iron Man','The Trooper','Raining Blood','Paranoid'] },
+    { genre: 'Ballad', bpm: [60,80], icon: '💜', examples: ['Someone Like You','All of Me','Perfect','Hallelujah','Let It Be','Imagine','Yesterday','My Heart Will Go On'] },
+    { genre: 'Disco', bpm: [110,130], icon: '🪩', examples: ['Stayin\' Alive','I Will Survive','Don\'t Stop \'Til You Get Enough','Le Freak','Funkytown','Night Fever','Boogie Wonderland','Hot Stuff'] },
+    { genre: 'Lo-Fi', bpm: [70,90], icon: '☕', examples: ['Snowman','Coffee','Afternoon','Daydream','Rainy Days','Sunflower','Moonlight','Chillwave'] },
+    { genre: 'Punk', bpm: [140,180], icon: '⚡', examples: ['Basket Case','Blitzkrieg Bop','American Idiot','Dammit','All the Small Things','Anarchy in the U.K.','London Calling','I Wanna Be Sedated'] },
+    { genre: 'Latin', bpm: [90,110], icon: '💃', examples: ['Livin\' La Vida Loca','Bailando','Hips Don\'t Lie','Waka Waka','La Bamba','Conga','Vivir Mi Vida','Mas Que Nada'] }
   ];
+
+  const COLOR_SCHEMES = {
+    purple: { label: 'Purple', color: '#b89cff',
+      bg:'#1a1528', surface:'#241e38', surface2:'#2d2648', surface3:'#362f54', border:'#43396a',
+      text:'#e4ddf5', textMuted:'#9b8fc0', textDim:'#6e6194',
+      accent:'#b89cff', accentSoft:'#8b72d4',
+      grid:'#1b2a3a', gridBeat:'#1f3348', gridAlt:'#172535', gridAltBeat:'#1c2e42', gridBorder:'rgba(70,120,160,0.25)',
+      pianoRollBg:'#1b2a3a', note:'#ef6b5a', noteBorder:'#d44e3d' },
+    blue: { label: 'Blue', color: '#8EB2EB',
+      bg:'#101828', surface:'#182030', surface2:'#1e2940', surface3:'#26324e', border:'#334466',
+      text:'#dde6f5', textMuted:'#8ba0c4', textDim:'#5a7094',
+      accent:'#8EB2EB', accentSoft:'#5C8BD6',
+      grid:'#162030', gridBeat:'#1c2940', gridAlt:'#121c2c', gridAltBeat:'#18253a', gridBorder:'rgba(90,130,200,0.25)',
+      pianoRollBg:'#162030', note:'#f0a050', noteBorder:'#d4883a' },
+    green: { label: 'Green', color: '#8cc5a2',
+      bg:'#101e18', surface:'#182820', surface2:'#1e3228', surface3:'#263c30', border:'#33554a',
+      text:'#d8f0e4', textMuted:'#88b09c', textDim:'#5a8070',
+      accent:'#8cc5a2', accentSoft:'#5ca880',
+      grid:'#142820', gridBeat:'#1a3228', gridAlt:'#10221c', gridAltBeat:'#162c24', gridBorder:'rgba(80,160,120,0.25)',
+      pianoRollBg:'#142820', note:'#e88070', noteBorder:'#c86858' },
+    red: { label: 'Rose', color: '#e8a0bf',
+      bg:'#1e1018', surface:'#2a1822', surface2:'#34202c', surface3:'#3e2836', border:'#553848',
+      text:'#f5dde8', textMuted:'#c08898', textDim:'#945a70',
+      accent:'#e8a0bf', accentSoft:'#c47090',
+      grid:'#281820', gridBeat:'#321e28', gridAlt:'#221420', gridAltBeat:'#2c1a26', gridBorder:'rgba(200,100,140,0.25)',
+      pianoRollBg:'#281820', note:'#70b8e0', noteBorder:'#5098c0' },
+    orange: { label: 'Amber', color: '#e8b07d',
+      bg:'#1e1410', surface:'#2a1e16', surface2:'#34261e', surface3:'#3e2e26', border:'#555040',
+      text:'#f5e8dd', textMuted:'#c0a088', textDim:'#947860',
+      accent:'#e8b07d', accentSoft:'#c48850',
+      grid:'#281e16', gridBeat:'#32241c', gridAlt:'#221a12', gridAltBeat:'#2c2018', gridBorder:'rgba(180,140,80,0.25)',
+      pianoRollBg:'#281e16', note:'#70b0d8', noteBorder:'#5090b8' },
+    yellow: { label: 'Gold', color: '#EED263',
+      bg:'#1a1810', surface:'#242018', surface2:'#2e2820', surface3:'#383028', border:'#504838',
+      text:'#f5f0dd', textMuted:'#c0b888', textDim:'#949060',
+      accent:'#EED263', accentSoft:'#c4a840',
+      grid:'#22201a', gridBeat:'#2a2820', gridAlt:'#1e1c16', gridAltBeat:'#26241c', gridBorder:'rgba(180,160,80,0.25)',
+      pianoRollBg:'#22201a', note:'#7090e0', noteBorder:'#5070c0' }
+  };
   const CELL_W = 28;
   const LABEL_W = 44;
 
@@ -186,22 +225,89 @@
 
   function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  function renderGenreChips(container, tempoSlider, tempoDisplay) {
+  function renderGenreRoller(container, tempoSlider, tempoDisplay) {
     container.innerHTML = '';
-    GENRE_SUGGESTIONS.forEach(function (g) {
-      var chip = document.createElement('button');
-      chip.className = 'genre-chip';
-      chip.textContent = g.icon + ' ' + g.genre;
-      chip.title = g.bpm + ' BPM';
-      chip.onclick = function () {
-        container.querySelectorAll('.genre-chip').forEach(function (c) { c.classList.remove('active'); });
-        chip.classList.add('active');
-        var parts = g.bpm.split('-');
-        var mid = Math.round((+parts[0] + +parts[1]) / 2);
-        if (tempoSlider) { tempoSlider.value = mid; tempoDisplay.textContent = mid; gameBpm = mid; }
+    var resultDiv = document.createElement('div');
+    resultDiv.className = 'genre-result';
+    resultDiv.style.display = 'none';
+
+    var genreLabel = document.createElement('div');
+    genreLabel.className = 'genre-result-genre';
+    var bpmLabel = document.createElement('div');
+    bpmLabel.className = 'genre-result-bpm';
+    var exampleLabel = document.createElement('div');
+    exampleLabel.className = 'genre-result-example';
+
+    resultDiv.appendChild(genreLabel);
+    resultDiv.appendChild(bpmLabel);
+    resultDiv.appendChild(exampleLabel);
+
+    var btn = document.createElement('button');
+    btn.className = 'btn-secondary genre-roll-btn';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg> Random Genre';
+    btn.onclick = function () {
+      var g = GENRE_SUGGESTIONS[Math.floor(Math.random() * GENRE_SUGGESTIONS.length)];
+      var mid = Math.round((g.bpm[0] + g.bpm[1]) / 2);
+      var example = g.examples[Math.floor(Math.random() * g.examples.length)];
+      genreLabel.textContent = g.icon + ' ' + g.genre;
+      bpmLabel.textContent = g.bpm[0] + '-' + g.bpm[1] + ' BPM';
+      exampleLabel.textContent = 'Try: ' + example;
+      resultDiv.style.display = 'flex';
+      resultDiv.classList.add('genre-result-pop');
+      setTimeout(function () { resultDiv.classList.remove('genre-result-pop'); }, 300);
+      if (tempoSlider) { tempoSlider.value = mid; tempoDisplay.textContent = mid; gameBpm = mid; }
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg> Roll Again';
+    };
+    container.appendChild(btn);
+    container.appendChild(resultDiv);
+  }
+
+  function applyColorScheme(name) {
+    var s = COLOR_SCHEMES[name];
+    if (!s) return;
+    var r = document.documentElement.style;
+    r.setProperty('--bg', s.bg);
+    r.setProperty('--surface', s.surface);
+    r.setProperty('--surface-2', s.surface2);
+    r.setProperty('--surface-3', s.surface3);
+    r.setProperty('--border', s.border);
+    r.setProperty('--text', s.text);
+    r.setProperty('--text-muted', s.textMuted);
+    r.setProperty('--text-dim', s.textDim);
+    r.setProperty('--accent', s.accent);
+    r.setProperty('--accent-soft', s.accentSoft);
+    var hex = s.accent.replace('#','');
+    var rr = parseInt(hex.substr(0,2),16), gg = parseInt(hex.substr(2,2),16), bb = parseInt(hex.substr(4,2),16);
+    r.setProperty('--accent-glow', 'rgba('+rr+','+gg+','+bb+',0.25)');
+    r.setProperty('--grid-cell', s.grid);
+    r.setProperty('--grid-beat', s.gridBeat);
+    r.setProperty('--grid-alt', s.gridAlt);
+    r.setProperty('--grid-alt-beat', s.gridAltBeat);
+    r.setProperty('--grid-border', s.gridBorder);
+    r.setProperty('--piano-roll-bg', s.pianoRollBg);
+    r.setProperty('--note-color', s.note);
+    r.setProperty('--note-border', s.noteBorder);
+    localStorage.setItem('st-theme', name);
+  }
+
+  function initThemePicker() {
+    var container = document.getElementById('theme-picker');
+    if (!container) return;
+    var saved = localStorage.getItem('st-theme') || 'purple';
+    Object.keys(COLOR_SCHEMES).forEach(function (key) {
+      var s = COLOR_SCHEMES[key];
+      var dot = document.createElement('button');
+      dot.className = 'theme-dot' + (key === saved ? ' active' : '');
+      dot.style.background = s.color;
+      dot.title = s.label;
+      dot.onclick = function () {
+        container.querySelectorAll('.theme-dot').forEach(function (d) { d.classList.remove('active'); });
+        dot.classList.add('active');
+        applyColorScheme(key);
       };
-      container.appendChild(chip);
+      container.appendChild(dot);
     });
+    applyColorScheme(saved);
   }
 
   function generateCode() {
@@ -248,7 +354,7 @@
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
     var gc = document.getElementById('solo-genres');
-    if (gc) renderGenreChips(gc, ts, tv);
+    if (gc) renderGenreRoller(gc, ts, tv);
     document.getElementById('btn-solo-start').onclick = function () {
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
       soloInstIdx = 0;
@@ -283,7 +389,7 @@
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
     var lgc = document.getElementById('lobby-genres');
-    if (lgc) renderGenreChips(lgc, ts, tv);
+    if (lgc) renderGenreRoller(lgc, ts, tv);
 
     var startBtn = document.getElementById('btn-start');
     startBtn.onclick = function () {
@@ -365,7 +471,7 @@
     var input = document.getElementById('songentry-input');
     input.value = '';
     var gc = document.getElementById('songentry-genres');
-    if (gc) renderGenreChips(gc, null, null);
+    if (gc) renderGenreRoller(gc, null, null);
     setTimeout(function () { input.focus(); }, 100);
     document.getElementById('btn-songentry-done').onclick = function () {
       var song = input.value.trim();
@@ -1200,5 +1306,6 @@
     seqs.length = 0;
   }
 
+  initThemePicker();
   initHome();
 })();
