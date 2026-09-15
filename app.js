@@ -6,9 +6,9 @@
   const INSTRUMENTS = ['drums', 'chords', 'bass', 'melody'];
   const STEPS = 32;
   const BUILD_TIME = 120;
-  const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash'];
-  const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3'];
-  const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5'];
+  const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash', 'Cowbell', 'Shaker', 'Conga'];
+  const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3'];
+  const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6'];
   const CHORD_NAMES = ['C','Cm','D','Dm','E','Em','F','Fm','G','Gm','A','Am','B','Bm',
     'C7','D7','E7','F7','G7','A7','B7',
     'Cmaj7','Dmaj7','Fmaj7','Gmaj7',
@@ -46,14 +46,35 @@
     'Sub Bass': { harmonicity: 0.5, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.4, sustain: 0.6, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.2 }, volume: -2 },
     'Analog Bass': { harmonicity: 1, modulationIndex: 2, envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.3 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.2 }, volume: -4 },
     'Pluck Bass': { harmonicity: 2, modulationIndex: 4, envelope: { attack: 0.005, decay: 0.15, sustain: 0.1, release: 0.2 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.2, release: 0.1 }, volume: -4 },
-    'Round Bass': { harmonicity: 1.5, modulationIndex: 0.5, envelope: { attack: 0.02, decay: 0.5, sustain: 0.5, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.3 }, volume: -4 }
+    'Round Bass': { harmonicity: 1.5, modulationIndex: 0.5, envelope: { attack: 0.02, decay: 0.5, sustain: 0.5, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.3 }, volume: -4 },
+    'Wobble Bass': { harmonicity: 3, modulationIndex: 8, envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.3 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.02, decay: 0.4, sustain: 0.3, release: 0.2 }, volume: -4 },
+    'Acid Bass': { harmonicity: 1, modulationIndex: 6, envelope: { attack: 0.005, decay: 0.2, sustain: 0.3, release: 0.15 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.1, release: 0.1 }, volume: -4 },
+    'Reese Bass': { harmonicity: 1.005, modulationIndex: 0.8, envelope: { attack: 0.01, decay: 0.6, sustain: 0.7, release: 0.5 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.4 }, volume: -3 },
+    'Rubber Bass': { harmonicity: 4, modulationIndex: 3, envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.1 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.08, sustain: 0.1, release: 0.05 }, volume: -4 }
   };
   const MELODY_SOUNDS = {
     'Piano': { harmonicity: 3, modulationIndex: 0.8, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.5 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.05, decay: 0.15, sustain: 0.3, release: 0.3 }, volume: -6 },
     'Synth Lead': { harmonicity: 2, modulationIndex: 3, envelope: { attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.4 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.2 }, volume: -8 },
     'Flute': { harmonicity: 1, modulationIndex: 0.3, envelope: { attack: 0.08, decay: 0.1, sustain: 0.7, release: 0.6 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.4 }, volume: -6 },
     'Bell': { harmonicity: 5.07, modulationIndex: 2, envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.3 }, volume: -8 },
-    'Organ': { harmonicity: 2, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.1 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.1 }, volume: -8 }
+    'Organ': { harmonicity: 2, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.1 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.1 }, volume: -8 },
+    'Strings': { harmonicity: 1, modulationIndex: 0.2, envelope: { attack: 0.15, decay: 0.3, sustain: 0.8, release: 0.8 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.2, decay: 0.3, sustain: 0.6, release: 0.5 }, volume: -6 },
+    'Pad': { harmonicity: 1.5, modulationIndex: 0.5, envelope: { attack: 0.3, decay: 0.5, sustain: 0.8, release: 1.2 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.3, decay: 0.4, sustain: 0.5, release: 0.8 }, volume: -8 },
+    'Marimba': { harmonicity: 4, modulationIndex: 1.5, envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 }, volume: -6 },
+    'Pluck': { harmonicity: 3, modulationIndex: 2, envelope: { attack: 0.001, decay: 0.2, sustain: 0.05, release: 0.3 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.1 }, volume: -6 },
+    'Brass': { harmonicity: 1, modulationIndex: 4, envelope: { attack: 0.06, decay: 0.2, sustain: 0.7, release: 0.3 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.08, decay: 0.1, sustain: 0.6, release: 0.2 }, volume: -8 },
+    'Whistle': { harmonicity: 1, modulationIndex: 0.1, envelope: { attack: 0.05, decay: 0.05, sustain: 0.9, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.05, decay: 0.05, sustain: 0.8, release: 0.2 }, volume: -8 },
+    'Retro': { harmonicity: 2, modulationIndex: 5, envelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.2 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.08, sustain: 0.3, release: 0.1 }, volume: -8 }
+  };
+  const CHORD_SOUNDS = {
+    'Piano Chords': { harmonicity: 3, modulationIndex: 0.8, envelope: { attack: 0.02, decay: 0.4, sustain: 0.5, release: 0.8 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.4 }, volume: -8 },
+    'Warm Pad': { harmonicity: 1.5, modulationIndex: 0.3, envelope: { attack: 0.25, decay: 0.6, sustain: 0.8, release: 1.5 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.3, decay: 0.4, sustain: 0.5, release: 0.8 }, volume: -10 },
+    'Bright Keys': { harmonicity: 2, modulationIndex: 2, envelope: { attack: 0.01, decay: 0.25, sustain: 0.3, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.4, release: 0.2 }, volume: -8 },
+    'Electric Piano': { harmonicity: 3.5, modulationIndex: 1.2, envelope: { attack: 0.005, decay: 0.5, sustain: 0.2, release: 0.6 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.3 }, volume: -8 },
+    'Organ Chords': { harmonicity: 2, modulationIndex: 1, envelope: { attack: 0.01, decay: 0.1, sustain: 0.85, release: 0.15 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.1 }, volume: -10 },
+    'Synth Stab': { harmonicity: 1, modulationIndex: 4, envelope: { attack: 0.005, decay: 0.15, sustain: 0.1, release: 0.2 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.08, sustain: 0.2, release: 0.1 }, volume: -8 },
+    'Glass': { harmonicity: 5, modulationIndex: 1.5, envelope: { attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.8 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.5 }, volume: -10 },
+    'Lo-Fi': { harmonicity: 1, modulationIndex: 0.5, envelope: { attack: 0.03, decay: 0.3, sustain: 0.4, release: 0.6 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.05, decay: 0.15, sustain: 0.3, release: 0.3 }, volume: -8 }
   };
   const GENRE_SUGGESTIONS = [
     { genre: 'Pop', bpm: [100,130], icon: '🎤', examples: ['Shape of You','Blinding Lights','Happy','Uptown Funk','Bad Guy','Shake It Off','Rolling in the Deep','Somebody That I Used to Know'] },
@@ -112,8 +133,8 @@
       grid:'#22201a', gridBeat:'#2a2820', gridAlt:'#1e1c16', gridAltBeat:'#26241c', gridBorder:'rgba(180,160,80,0.25)',
       pianoRollBg:'#22201a', note:'#7090e0', noteBorder:'#5070c0' }
   };
-  const CELL_W = 28;
-  const LABEL_W = 44;
+  const CELL_W = 34;
+  const LABEL_W = 54;
 
   // ── State ──
   let players = [];
@@ -131,6 +152,7 @@
   let previewSeqs = [];
   let currentBassSound = 'Analog Bass';
   let currentMelodySound = 'Piano';
+  let currentChordSound = 'Piano Chords';
   let pianoRollNotes = [];
 
   // ── Audio ──
@@ -152,6 +174,9 @@
     var tom = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).connect(vol);
     var rim = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }, volume: -6 }).connect(vol);
     var crash = new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 }).connect(vol);
+    var cowbell = new Tone.MetalSynth({ frequency: 560, envelope: { attack: 0.001, decay: 0.2, sustain: 0 }, harmonicity: 5.1, modulationIndex: 16, resonance: 5000, octaves: 0.5, volume: -12 }).connect(vol);
+    var shaker = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04, sustain: 0 }, volume: -10 }).connect(vol);
+    var conga = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15, sustain: 0 }, volume: -4 }).connect(vol);
     return {
       trigger: function (name) {
         switch (name) {
@@ -163,25 +188,29 @@
           case 'Tom': tom.triggerAttackRelease('E2', '8n'); break;
           case 'Rim': rim.triggerAttackRelease('G4', '32n'); break;
           case 'Crash': crash.triggerAttackRelease('16n'); break;
+          case 'Cowbell': cowbell.triggerAttackRelease('16n'); break;
+          case 'Shaker': shaker.triggerAttackRelease('32n'); break;
+          case 'Conga': conga.triggerAttackRelease('D3', '8n'); break;
         }
       },
-      dispose: function () { [kick, snare, hihat, openHH, clap, tom, rim, crash, vol].forEach(function (n) { n.dispose(); }); }
+      dispose: function () { [kick, snare, hihat, openHH, clap, tom, rim, crash, cowbell, shaker, conga, vol].forEach(function (n) { n.dispose(); }); }
     };
   }
 
-  function createChordSynth() {
+  function createChordSynth(presetName) {
+    var preset = CHORD_SOUNDS[presetName || currentChordSound] || CHORD_SOUNDS['Piano Chords'];
     var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).toDestination();
-    var poly = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3, modulationIndex: 0.8,
-      envelope: { attack: 0.02, decay: 0.4, sustain: 0.5, release: 0.8 },
-      modulation: { type: 'triangle' },
-      modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.4 },
-      volume: -8
-    }).connect(reverb);
+    var poly = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
     return {
       play: function (notes, dur) { poly.triggerAttackRelease(notes, dur); },
       dispose: function () { poly.dispose(); reverb.dispose(); }
     };
+  }
+
+  function getOrCreateChordSynth() {
+    if (synths.chords) { synths.chords.dispose(); synths.chords = null; }
+    synths.chords = createChordSynth();
+    return synths.chords;
   }
 
   function createSynthFromPreset(preset, poly) {
@@ -458,10 +487,10 @@
 
   function showSongEntryHandoff() {
     showScreen('handoff');
-    document.getElementById('handoff-label').textContent = 'Pass the phone to';
+    document.getElementById('handoff-label').textContent = 'It\'s your turn';
     document.getElementById('handoff-player').textContent = players[songEntryIdx].name;
-    document.getElementById('handoff-instrument').textContent = 'Enter your song (others look away!)';
-    document.getElementById('handoff-hint').textContent = '';
+    document.getElementById('handoff-instrument').textContent = 'Enter your song (no peeking, everyone!)';
+    document.getElementById('handoff-hint').textContent = 'Share your screen on Discord when ready';
     document.getElementById('btn-handoff-ready').onclick = function () { showSongEntry(); };
   }
 
@@ -513,12 +542,12 @@
     var game = games[gIdx];
     var existingCount = Object.keys(game.submissions).length;
 
-    document.getElementById('handoff-label').textContent = 'Pass the phone to';
+    document.getElementById('handoff-label').textContent = 'It\'s your turn';
     document.getElementById('handoff-player').textContent = p.name;
     document.getElementById('handoff-instrument').textContent = 'Your instrument: ' + inst.charAt(0).toUpperCase() + inst.slice(1);
 
     if (currentRound === 0) {
-      document.getElementById('handoff-hint').textContent = 'Build ' + inst + ' for your song!';
+      document.getElementById('handoff-hint').textContent = 'Build ' + inst + ' for your song — share your screen!';
     } else {
       document.getElementById('handoff-hint').textContent =
         'Listen to ' + existingCount + ' existing layer' + (existingCount !== 1 ? 's' : '') + ', guess the song, and add ' + inst + '!';
@@ -727,7 +756,7 @@
     canvas.className = 'piano-roll-canvas';
 
     var reversed = noteNames.slice().reverse();
-    var cellH = 28;
+    var cellH = 32;
 
     canvas.style.width = (LABEL_W + STEPS * CELL_W) + 'px';
     canvas.style.height = (reversed.length * cellH) + 'px';
@@ -885,6 +914,23 @@
 
     var selectedChord = 'C';
 
+    // Sound selector for chords
+    var soundBar = document.createElement('div');
+    soundBar.className = 'sound-selector';
+    Object.keys(CHORD_SOUNDS).forEach(function (name) {
+      var btn = document.createElement('button');
+      btn.className = 'sound-btn' + (name === currentChordSound ? ' active' : '');
+      btn.textContent = name;
+      btn.onclick = function () {
+        soundBar.querySelectorAll('.sound-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentChordSound = name;
+        getOrCreateChordSynth();
+      };
+      soundBar.appendChild(btn);
+    });
+    wrapper.appendChild(soundBar);
+
     // Chord palette
     var palette = document.createElement('div');
     palette.className = 'chord-palette-bar';
@@ -913,7 +959,7 @@
     var canvas = document.createElement('div');
     canvas.className = 'chord-timeline-canvas';
 
-    var cellH = 56;
+    var cellH = 64;
     canvas.style.width = (STEPS * CELL_W) + 'px';
     canvas.style.height = cellH + 'px';
     canvas.style.position = 'relative';

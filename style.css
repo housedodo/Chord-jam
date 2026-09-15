@@ -46,7 +46,7 @@
   --radius: 14px;
   --radius-sm: 8px;
   --radius-xs: 6px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-bottom: 0px;
 }
 
 html {
@@ -83,7 +83,7 @@ body {
   margin: auto;
   padding: 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -229,7 +229,7 @@ body {
   margin: auto;
   padding: 24px;
   width: 100%;
-  max-width: 440px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -344,7 +344,7 @@ body {
   margin: auto;
   padding: 24px;
   text-align: center;
-  max-width: 400px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -394,13 +394,13 @@ body {
 
 /* BUILD */
 .build-container {
-  padding: 16px;
-  max-width: 600px;
+  padding: 20px 24px;
+  max-width: 1100px;
   margin: 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-height: 100%;
 }
 
@@ -420,7 +420,7 @@ body {
 .build-song {
   font-size: 0.85rem;
   color: var(--text-muted);
-  max-width: 140px;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -553,8 +553,8 @@ body {
 }
 
 .drum-label {
-  width: 44px;
-  font-size: 0.65rem;
+  width: 56px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--text-muted);
   text-align: right;
@@ -567,7 +567,7 @@ body {
 .drum-cell {
   flex: 1;
   aspect-ratio: 1;
-  max-width: 36px;
+  max-width: 48px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -599,7 +599,7 @@ body {
 }
 
 .note-cell {
-  height: 28px;
+  height: 32px;
   background: var(--surface);
   border: 1px solid transparent;
   border-radius: 3px;
@@ -619,7 +619,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: 28px;
+  height: 32px;
 }
 
 /* Piano Roll */
@@ -652,8 +652,8 @@ body {
 .pr-label {
   position: absolute;
   left: 0;
-  width: 42px;
-  font-size: 0.55rem;
+  width: 52px;
+  font-size: 0.65rem;
   font-weight: 600;
   color: var(--text-dim);
   text-align: right;
@@ -786,7 +786,7 @@ body {
   margin: auto;
   padding: 24px;
   width: 100%;
-  max-width: 440px;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -912,7 +912,7 @@ body {
   margin: auto;
   padding: 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -931,7 +931,7 @@ body {
   margin: auto;
   padding: 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1274,7 +1274,7 @@ body {
   letter-spacing: 0.06em;
 }
 
-/* Responsive */
+/* Desktop enhancements */
 @media (min-width: 601px) {
   .chord-pick:hover {
     background: var(--surface-2);
@@ -1285,4 +1285,27 @@ body {
   }
   .btn-primary:hover:not(:disabled) { opacity: 0.9; }
   .btn-secondary:hover { background: var(--surface-3); }
+  .sound-btn:hover:not(.active) {
+    background: var(--surface-2);
+    border-color: var(--accent-soft);
+  }
+  .theme-dot:hover { transform: scale(1.15); }
+  .pr-cell:hover { background: var(--surface-2) !important; }
+  .ct-cell:hover { background: var(--surface-2) !important; }
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .home-container { max-width: 400px; }
+  .lobby-container { max-width: 440px; }
+  .build-container { max-width: 600px; padding: 16px; }
+  .listen-container { max-width: 440px; }
+  .songentry-container { max-width: 400px; }
+  .handoff-container { max-width: 400px; }
+  .reveal-container { max-width: 400px; }
+  .drum-cell { max-width: 36px; }
+  .drum-label { width: 44px; font-size: 0.65rem; }
+  .note-cell { height: 28px; }
+  .note-label { height: 28px; }
+  .build-song { max-width: 140px; }
 }
