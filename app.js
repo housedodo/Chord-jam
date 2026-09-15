@@ -392,6 +392,29 @@
         }
         break;
 
+      case 'round_start':
+        clearInterval(buildTimer);
+        stopPreview();
+        games = msg.games;
+        currentRound = msg.round;
+        gameBpm = msg.bpm;
+        currentGameIdx = getGameIdx(myPlayerIndex, msg.round);
+        currentTurnPlayer = myPlayerIndex;
+        console.log('Got round_start: round=' + msg.round + ' gameIdx=' + currentGameIdx);
+        var rsInst = INSTRUMENTS[currentRound];
+        if (currentRound === 0) {
+          showBuildOnline(rsInst);
+        } else {
+          showScreen('reveal');
+          var rsGame = games[currentGameIdx];
+          document.getElementById('reveal-song').textContent = rsGame.enteredBy === myPlayerIndex ? rsGame.songName : '???';
+          document.getElementById('reveal-instrument').textContent = rsInst.charAt(0).toUpperCase() + rsInst.slice(1);
+          document.getElementById('reveal-bar').style.width = '100%';
+          setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
+          setTimeout(function () { showBuildOnline(rsInst); }, 3000);
+        }
+        break;
+
       case 'wait_turn':
         showWaiting(players[msg.turnPlayer].name, 'is building ' + msg.instrument + '...');
         break;
@@ -538,12 +561,6 @@
   }
 
   function startRoundOnline(round) {
-    if (round >= 4) {
-      clearTimeout(roundTimer);
-      netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
-      showReveal();
-      return;
-    }
     currentRound = round;
     roundSubmissionsCount = 0;
     roundAdvanced = false;
@@ -555,37 +572,24 @@
       return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
     });
 
+    console.log('Broadcasting your_turn for round ' + round + ' to ' + guestConns.length + ' guests');
     guestConns.forEach(function (c, ci) {
       var guestIdx = ci + 1;
       var gIdx = getGameIdx(guestIdx, round);
-      console.log('Sending your_turn to player ' + guestIdx + ' for game ' + gIdx);
       netSend(c, {
         type: 'your_turn', round: round, turnPlayer: guestIdx,
         gameIdx: gIdx, games: gamesToSend, bpm: gameBpm
       });
     });
 
-    if (netMode === 'host') {
-      var nextRound = round + 1;
-      var extraDelay = round === 0 ? 0 : 3000;
-      roundTimer = setTimeout(function () {
-        advanceRound(nextRound);
-      }, (BUILD_TIME * 1000) + extraDelay + 2000);
-    }
+    // Host round timer: auto-advance when BUILD_TIME expires
+    roundTimer = setTimeout(function () {
+      advanceRound(round + 1);
+    }, (BUILD_TIME * 1000) + 2000);
 
     currentTurnPlayer = 0;
     currentGameIdx = getGameIdx(0, round);
-    if (round === 0) {
-      showBuildOnline(inst);
-    } else {
-      showScreen('reveal');
-      var game = games[currentGameIdx];
-      document.getElementById('reveal-song').textContent = game.enteredBy === 0 ? game.songName : '???';
-      document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
-      document.getElementById('reveal-bar').style.width = '100%';
-      setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
-      setTimeout(function () { showBuildOnline(inst); }, 3000);
-    }
+    showBuildOnline(inst);
   }
 
   function advanceRound(nextRound) {
@@ -593,7 +597,46 @@
     roundAdvanced = true;
     clearTimeout(roundTimer);
     console.log('Advancing to round ' + nextRound);
-    setTimeout(function () { startRoundOnline(nextRound); }, 600);
+    setTimeout(function () {
+      if (nextRound >= 4) {
+        netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
+        showReveal();
+        return;
+      }
+      currentRound = nextRound;
+      roundSubmissionsCount = 0;
+      roundAdvanced = false;
+      clearTimeout(roundTimer);
+
+      var inst = INSTRUMENTS[nextRound];
+      console.log('Starting round ' + nextRound + ' (' + inst + ') for ' + players.length + ' players');
+
+      var gamesToSend = games.map(function (g) {
+        return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
+      });
+
+      // Broadcast round start to all guests at once
+      console.log('Broadcasting round_start for round ' + nextRound + ' to ' + guestConns.length + ' guests');
+      netBroadcast({ type: 'round_start', round: nextRound, games: gamesToSend, bpm: gameBpm });
+
+      // Host round timer (BUILD_TIME + 3s reveal + 2s buffer)
+      var extraDelay = 3000;
+      var nr = nextRound + 1;
+      roundTimer = setTimeout(function () {
+        advanceRound(nr);
+      }, (BUILD_TIME * 1000) + extraDelay + 2000);
+
+      // Host builds
+      currentTurnPlayer = 0;
+      currentGameIdx = getGameIdx(0, nextRound);
+      showScreen('reveal');
+      var game = games[currentGameIdx];
+      document.getElementById('reveal-song').textContent = game.enteredBy === 0 ? game.songName : '???';
+      document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
+      document.getElementById('reveal-bar').style.width = '100%';
+      setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
+      setTimeout(function () { showBuildOnline(inst); }, 3000);
+    }, 600);
   }
 
   function onLayerSubmittedHost() {
