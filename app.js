@@ -1896,7 +1896,7 @@
     previewPlaying = true;
     previewSeqs = [];
 
-    if (!soloMode && currentGameIdx >= 0 && games[currentGameIdx]) {
+    if (currentGameIdx >= 0 && games[currentGameIdx]) {
       addExistingLayerSeqs(currentGameIdx, instrument, previewSeqs);
     }
 
@@ -2191,6 +2191,11 @@
         seqs.push(new Tone.Sequence(function (time, s) {
           SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.sfx.trigger(name); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
+        var vAudio = new Audio(sub.data.dataUrl);
+        vAudio.currentTime = 0;
+        vAudio.play();
+        seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
       }
     });
 
