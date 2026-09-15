@@ -196,9 +196,8 @@
     songInput.value = '';
     startBtn.disabled = true;
 
-    songInput.oninput = () => {
-      startBtn.disabled = !songInput.value.trim() || players.length < 2;
-    };
+    songInput.oninput = () => updateStartBtn();
+    updateStartBtn();
 
     startBtn.onclick = () => {
       songName = songInput.value.trim();
@@ -227,19 +226,21 @@
     addDiv.innerHTML = `
       <div class="player-avatar" style="background:var(--surface-3);color:var(--text-dim)">+</div>
       <input type="text" class="name-input" placeholder="Add player..." maxlength="20" style="flex:1;width:auto;text-align:left" autocomplete="off" spellcheck="false">
+      <button class="btn-secondary" style="padding:8px 14px;font-size:0.8rem">Add</button>
     `;
     const addInput = addDiv.querySelector('input');
-    addInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const n = addInput.value.trim();
-        if (!n) return;
-        if (players.length >= 6) { toast('Max 6 players'); return; }
-        if (players.some(p => p.name === n)) { toast('Name taken'); return; }
-        players.push({ name: n, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
-        renderPlayerList();
-        document.getElementById('input-song').dispatchEvent(new Event('input'));
-      }
-    });
+    const addBtn = addDiv.querySelector('button');
+    function addPlayer() {
+      const n = addInput.value.trim();
+      if (!n) return;
+      if (players.length >= 6) { toast('Max 6 players'); return; }
+      if (players.some(p => p.name === n)) { toast('Name taken'); return; }
+      players.push({ name: n, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
+      renderPlayerList();
+      updateStartBtn();
+    }
+    addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPlayer(); });
+    addBtn.addEventListener('click', addPlayer);
     list.appendChild(addDiv);
 
     players.forEach((p, i) => {
@@ -257,9 +258,25 @@
       btn.onclick = () => {
         players.splice(parseInt(btn.dataset.i), 1);
         renderPlayerList();
-        document.getElementById('input-song').dispatchEvent(new Event('input'));
+        updateStartBtn();
       };
     });
+  }
+
+  function updateStartBtn() {
+    const songInput = document.getElementById('input-song');
+    const startBtn = document.getElementById('btn-start');
+    if (!songInput || !startBtn) return;
+    const hasSong = songInput.value.trim().length > 0;
+    const hasPlayers = players.length >= 2;
+    startBtn.disabled = !hasSong || !hasPlayers;
+    if (!hasPlayers) {
+      startBtn.textContent = 'Add more players to start';
+    } else if (!hasSong) {
+      startBtn.textContent = 'Enter a song name to start';
+    } else {
+      startBtn.textContent = 'Start Game';
+    }
   }
 
   function generateCode() {
