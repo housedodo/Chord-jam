@@ -329,8 +329,7 @@
         game.submissions[inst] = { data: msg.data, bpm: gameBpm, playerIndex: msg.playerIndex };
         if (msg.sound) game.submissions[inst].sound = msg.sound;
         if (msg.guess) game.guesses.push({ playerIndex: msg.playerIndex, guess: msg.guess, round: currentRound, instrument: inst });
-        currentTurnPlayer++;
-        nextTurnOnline();
+        onLayerSubmittedHost();
         break;
     }
   }
@@ -521,64 +520,56 @@
     };
   }
 
-  // ── Online game rounds ──
+  // ── Online game rounds (parallel) ──
+  let roundSubmissionsCount = 0;
+
   function startGameRoundsOnline() {
     currentRound = 0;
-    currentTurnPlayer = 0;
-    nextTurnOnline();
+    startRoundOnline(0);
   }
 
-  function nextTurnOnline() {
-    if (currentRound >= 4) {
+  function startRoundOnline(round) {
+    if (round >= 4) {
       netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
       showReveal();
       return;
     }
-    if (currentTurnPlayer >= players.length) {
-      currentRound++;
-      currentTurnPlayer = 0;
-      nextTurnOnline();
-      return;
-    }
+    currentRound = round;
+    roundSubmissionsCount = 0;
+    var inst = INSTRUMENTS[round];
 
-    var inst = INSTRUMENTS[currentRound];
-    var gIdx = getGameIdx(currentTurnPlayer, currentRound);
-    currentGameIdx = gIdx;
+    var gamesToSend = games.map(function (g) {
+      return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
+    });
 
-    if (currentTurnPlayer === 0) {
-      // Host's turn
-      var gamesToSend = games.map(function (g) {
-        return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
+    guestConns.forEach(function (c, ci) {
+      var guestIdx = ci + 1;
+      var gIdx = getGameIdx(guestIdx, round);
+      netSend(c, {
+        type: 'your_turn', round: round, turnPlayer: guestIdx,
+        gameIdx: gIdx, games: gamesToSend, bpm: gameBpm
       });
-      netBroadcast({ type: 'wait_turn', turnPlayer: 0, instrument: inst });
+    });
 
-      if (currentRound === 0) {
-        showBuildOnline(inst);
-      } else {
-        showScreen('reveal');
-        var game = games[gIdx];
-        document.getElementById('reveal-song').textContent = game.enteredBy === 0 ? game.songName : '???';
-        document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
-        document.getElementById('reveal-bar').style.width = '100%';
-        setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
-        setTimeout(function () { showBuildOnline(inst); }, 3000);
-      }
+    currentTurnPlayer = 0;
+    currentGameIdx = getGameIdx(0, round);
+    if (round === 0) {
+      showBuildOnline(inst);
     } else {
-      // Guest's turn
-      var connIdx = currentTurnPlayer - 1;
-      if (connIdx < guestConns.length) {
-        var gamesToSend = games.map(function (g) {
-          return { songName: g.songName, enteredBy: g.enteredBy, submissions: g.submissions, guesses: g.guesses };
-        });
-        netSend(guestConns[connIdx], {
-          type: 'your_turn', round: currentRound, turnPlayer: currentTurnPlayer,
-          gameIdx: gIdx, games: gamesToSend, bpm: gameBpm
-        });
-        guestConns.forEach(function (c, ci) {
-          if (ci !== connIdx) netSend(c, { type: 'wait_turn', turnPlayer: currentTurnPlayer, instrument: inst });
-        });
-        showWaiting(players[currentTurnPlayer].name, 'is building ' + inst + '...');
-      }
+      showScreen('reveal');
+      var game = games[currentGameIdx];
+      document.getElementById('reveal-song').textContent = game.enteredBy === 0 ? game.songName : '???';
+      document.getElementById('reveal-instrument').textContent = inst.charAt(0).toUpperCase() + inst.slice(1);
+      document.getElementById('reveal-bar').style.width = '100%';
+      setTimeout(function () { document.getElementById('reveal-bar').style.width = '0%'; }, 50);
+      setTimeout(function () { showBuildOnline(inst); }, 3000);
+    }
+  }
+
+  function onLayerSubmittedHost() {
+    roundSubmissionsCount++;
+    if (roundSubmissionsCount >= players.length) {
+      setTimeout(function () { startRoundOnline(currentRound + 1); }, 600);
     }
   }
 
@@ -600,9 +591,11 @@
         if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
         if (instrument === 'chords') game.submissions[instrument].sound = currentChordSound;
         if (guess) game.guesses.push({ playerIndex: myPlayerIndex, guess: guess, round: currentRound, instrument: instrument });
-        currentTurnPlayer++;
         toast('Layer submitted!');
-        setTimeout(function () { nextTurnOnline(); }, 600);
+        onLayerSubmittedHost();
+        if (roundSubmissionsCount < players.length) {
+          showWaiting('Others', 'are still building...');
+        }
       } else {
         netSend(hostConn, {
           type: 'layer_submitted',
@@ -612,7 +605,7 @@
           guess: guess
         });
         toast('Layer submitted!');
-        showWaiting('Others', 'are building...');
+        showWaiting('Others', 'are still building...');
       }
     };
   }
@@ -1072,17 +1065,20 @@
       if (bpm) bpm.textContent = gameBpm + ' BPM';
     });
 
-    // Listen: plays existing layers + current instrument together
+    // Listen: plays previous layer + current instrument together
     var listenBtn = document.getElementById('btn-listen-existing');
-    var hasExisting = Object.keys(game.submissions).length > 0;
+    var instIdx = INSTRUMENTS.indexOf(instrument);
+    var prevInst = instIdx > 0 ? INSTRUMENTS[instIdx - 1] : null;
+    var hasPrev = prevInst && game.submissions[prevInst];
     var listeningExisting = false;
-    listenBtn.style.display = hasExisting ? 'flex' : 'none';
-    listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with Existing Layers';
+    listenBtn.style.display = hasPrev ? 'flex' : 'none';
+    var prevLabel = prevInst ? prevInst.charAt(0).toUpperCase() + prevInst.slice(1) : '';
+    listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with ' + prevLabel;
     listenBtn.onclick = function () {
       ensureAudio().then(function () {
         if (listeningExisting) {
           stopPreview();
-          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with Existing Layers';
+          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with ' + prevLabel;
           listeningExisting = false;
         } else {
           stopPreview();
@@ -1661,10 +1657,14 @@
     Tone.Transport.start();
   }
 
-  function addExistingLayerSeqs(gameIdx, skipInst, seqs) {
+  function addExistingLayerSeqs(gameIdx, currentInst, seqs) {
     var game = games[gameIdx];
-    INSTRUMENTS.forEach(function (inst) {
-      if (inst === skipInst) return;
+    var curIdx = INSTRUMENTS.indexOf(currentInst);
+    var prevInst = curIdx > 0 ? INSTRUMENTS[curIdx - 1] : null;
+    if (!prevInst) return;
+
+    var allowedInsts = [prevInst];
+    allowedInsts.forEach(function (inst) {
       var sub = game.submissions[inst];
       if (!sub) return;
 
