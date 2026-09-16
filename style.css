@@ -2438,6 +2438,9 @@ body {
   gap: 8px 14px;
 }
 
+/* Cutoff is the one people sweep, so give it the full width */
+.producer-knob.knob-wide { grid-column: 1 / -1; }
+
 .producer-knob {
   display: grid;
   grid-template-columns: 58px 1fr 46px;

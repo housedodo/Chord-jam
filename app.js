@@ -979,7 +979,9 @@
   // preset. The patch travels with the layer so everyone hears the same sound.
   const PRODUCER_SOUND = 'Producer Edition';
   const PRODUCER_WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
-  const PRODUCER_DEFAULT = { wave: 'sawtooth', attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4 };
+  const PRODUCER_DEFAULT = { wave: 'sawtooth', attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4, cutoff: 6000 };
+  const CUTOFF_MIN = 80;
+  const CUTOFF_MAX = 14000;
   let melodyPatch = Object.assign({}, PRODUCER_DEFAULT);
 
   function normalisePatch(patch) {
@@ -990,21 +992,34 @@
     });
     p.sustain = Math.max(0, Math.min(1, +p.sustain));
     if (isNaN(p.sustain)) p.sustain = PRODUCER_DEFAULT.sustain;
+    p.cutoff = Math.max(CUTOFF_MIN, Math.min(CUTOFF_MAX, +p.cutoff || PRODUCER_DEFAULT.cutoff));
     return p;
+  }
+
+  // Pitch is perceived logarithmically, so the cutoff slider is too — a linear
+  // one would bury everything useful in its first tenth.
+  function cutoffToSlider(hz) {
+    return Math.log(hz / CUTOFF_MIN) / Math.log(CUTOFF_MAX / CUTOFF_MIN);
+  }
+  function sliderToCutoff(t) {
+    return CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, t);
   }
 
   function createProducerSynth(patch, inst) {
     var p = normalisePatch(patch);
     var bus = makeBus(inst);
     var reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 }).connect(bus);
+    var filter = new Tone.Filter({ type: 'lowpass', frequency: p.cutoff, rolloff: -24, Q: 1 }).connect(reverb);
     var syn = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: p.wave },
       envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release },
       volume: -10
-    }).connect(reverb);
+    }).connect(filter);
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
-      dispose: function () { syn.dispose(); reverb.dispose(); bus.dispose(); }
+      // Sweeping the cutoff should not tear the synth down and rebuild it.
+      setCutoff: function (hz) { filter.frequency.rampTo(hz, 0.03); },
+      dispose: function () { syn.dispose(); filter.dispose(); reverb.dispose(); bus.dispose(); }
     };
   }
 
@@ -1695,29 +1710,41 @@
 
     var knobs = document.createElement('div');
     knobs.className = 'producer-knobs';
+    function secs(v) { return (+v).toFixed(2) + 's'; }
     [
-      { key: 'attack', label: 'Attack', min: 0.001, max: 2, step: 0.001 },
-      { key: 'decay', label: 'Decay', min: 0.001, max: 2, step: 0.001 },
-      { key: 'sustain', label: 'Sustain', min: 0, max: 1, step: 0.01 },
-      { key: 'release', label: 'Release', min: 0.001, max: 2, step: 0.001 }
+      { key: 'cutoff', label: 'Cutoff', log: true, live: true,
+        fmt: function (v) { return v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + 'Hz'; } },
+      { key: 'attack', label: 'Attack', min: 0.001, max: 2, step: 0.001, fmt: secs },
+      { key: 'decay', label: 'Decay', min: 0.001, max: 2, step: 0.001, fmt: secs },
+      { key: 'sustain', label: 'Sustain', min: 0, max: 1, step: 0.01,
+        fmt: function (v) { return Math.round(v * 100) + '%'; } },
+      { key: 'release', label: 'Release', min: 0.001, max: 2, step: 0.001, fmt: secs }
     ].forEach(function (c) {
       var wrap = document.createElement('label');
-      wrap.className = 'producer-knob';
+      wrap.className = 'producer-knob' + (c.log ? ' knob-wide' : '');
       var name = document.createElement('span');
       name.className = 'knob-label';
       name.textContent = c.label;
       var val = document.createElement('span');
       val.className = 'knob-value';
-      var fmt = function (v) { return c.key === 'sustain' ? Math.round(v * 100) + '%' : (+v).toFixed(2) + 's'; };
-      val.textContent = fmt(melodyPatch[c.key]);
+      val.textContent = c.fmt(melodyPatch[c.key]);
       var slider = document.createElement('input');
       slider.type = 'range';
-      slider.min = c.min; slider.max = c.max; slider.step = c.step;
-      slider.value = melodyPatch[c.key];
+      if (c.log) {
+        slider.min = 0; slider.max = 1; slider.step = 0.001;
+        slider.value = cutoffToSlider(melodyPatch[c.key]);
+      } else {
+        slider.min = c.min; slider.max = c.max; slider.step = c.step;
+        slider.value = melodyPatch[c.key];
+      }
       slider.oninput = function () {
-        melodyPatch[c.key] = +slider.value;
-        val.textContent = fmt(slider.value);
-        repatch();
+        var v = c.log ? sliderToCutoff(+slider.value) : +slider.value;
+        melodyPatch[c.key] = v;
+        val.textContent = c.fmt(v);
+        // A cutoff sweep updates the live filter; everything else needs the
+        // voices rebuilt, which is debounced so dragging does not thrash.
+        if (c.live && synths.melody && synths.melody.setCutoff) synths.melody.setCutoff(v);
+        else repatch();
       };
       wrap.appendChild(name);
       wrap.appendChild(slider);
@@ -1755,10 +1782,15 @@
     return panel;
   }
 
-  // Tone has no live patch update for PolySynth voices, so rebuild on change.
+  // Tone has no live patch update for PolySynth voices, so rebuild on change —
+  // debounced, or dragging a slider disposes and recreates the synth per tick.
+  var repatchTimer = null;
   function repatch() {
     if (currentMelodySound !== PRODUCER_SOUND) return;
-    ensureAudio().then(getOrCreateMelodySynth);
+    clearTimeout(repatchTimer);
+    repatchTimer = setTimeout(function () {
+      ensureAudio().then(getOrCreateMelodySynth);
+    }, 120);
   }
 
   function waveIcon(type) {
