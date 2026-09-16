@@ -1,25 +1,38 @@
 {
   "name": "Draga bass pack",
   "baseUrl": "samples/",
-
   "bass": {
     "Moog": {
       "baseUrl": "bass/",
-      "urls": { "C1": "moog.mp3" },
+      "urls": {
+        "C1": "moog.mp3"
+      },
       "release": 0.3,
-      "gain": -10
+      "gain": -14.6
+    },
+    "Moog Bright": {
+      "baseUrl": "bass/",
+      "urls": {
+        "C1": "moog-bright.mp3"
+      },
+      "release": 0.3,
+      "gain": -14.2
     },
     "Juno": {
       "baseUrl": "bass/",
-      "urls": { "C1": "juno.mp3" },
+      "urls": {
+        "C2": "juno.mp3"
+      },
       "release": 0.3,
-      "gain": -12
+      "gain": -17.6
     },
     "Synthwave": {
       "baseUrl": "bass/",
-      "urls": { "C2": "synthwave.mp3" },
+      "urls": {
+        "C2": "synthwave.mp3"
+      },
       "release": 0.4,
-      "gain": -9
+      "gain": -11.3
     }
   }
 }
