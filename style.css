@@ -7,19 +7,21 @@
 }
 
 :root {
-  --bg: #1a1528;
-  --surface: #241e38;
-  --surface-2: #2d2648;
-  --surface-3: #362f54;
-  --border: #43396a;
-  --text: #e4ddf5;
-  --text-muted: #9b8fc0;
-  --text-dim: #6e6194;
+  /* Paper defaults: both skins are light, so first paint matches
+     what applyColorScheme() sets and there is no dark flash. */
+  --bg: #f6eeda;
+  --surface: #fffbf0;
+  --surface-2: #f3ead6;
+  --surface-3: #ebe0c8;
+  --border: #23324f;
+  --text: #23324f;
+  --text-muted: #7a6a55;
+  --text-dim: #9aa6b8;
 
-  --accent: #b89cff;
-  --accent-soft: #8b72d4;
-  --accent-glow: rgba(184, 156, 255, 0.25);
-  --accent-bg: rgba(184, 156, 255, 0.1);
+  --accent: #23324f;
+  --accent-soft: #41568a;
+  --accent-glow: rgba(35, 50, 79, 0.2);
+  --accent-bg: rgba(35, 50, 79, 0.08);
 
   --rose: #e8a0bf;
   --peach: #e8b07d;
@@ -35,14 +37,14 @@
   --bass-color: #e8b07d;
   --melody-color: #8cc5a2;
 
-  --grid-cell: #1b2a3a;
-  --grid-beat: #1f3348;
-  --grid-alt: #172535;
-  --grid-alt-beat: #1c2e42;
-  --grid-border: rgba(70, 120, 160, 0.25);
-  --piano-roll-bg: #1b2a3a;
-  --note-color: #ef6b5a;
-  --note-border: #d44e3d;
+  --grid-cell: #fffbf0;
+  --grid-beat: #f1ead8;
+  --grid-alt: #fdf8ec;
+  --grid-alt-beat: #efe7d3;
+  --grid-border: rgba(35, 50, 79, 0.18);
+  --piano-roll-bg: #fffbf0;
+  --note-color: #e8a33c;
+  --note-border: #23324f;
 
   --radius: 14px;
   --radius-sm: 8px;
@@ -2065,4 +2067,299 @@ body {
   border: 2.5px solid var(--ink);
   border-radius: var(--sketch-radius);
   box-shadow: 3px 3px 0 rgba(35, 50, 79, 0.2);
+}
+
+/* ============================================================
+   RISOGRAPH SKIN
+   Two spot inks on grainy paper. The misregistration effect is done
+   with zero-blur offset shadows rather than duplicated elements, so
+   it costs nothing and never fights existing pseudo-elements.
+   ============================================================ */
+
+:root[data-skin="riso"] {
+  --riso-pink: #ff4f9a;
+  --riso-blue: #0a8fd8;
+  --riso-ink: #17161a;
+  --riso-paper: #f2efe2;
+}
+
+:root[data-skin="riso"] body {
+  font-family: 'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+  font-weight: 500;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.2'/%3E%3C/svg%3E");
+}
+
+/* Title: the pink plate printed a few px off the black one */
+:root[data-skin="riso"] .logo {
+  font-family: 'Archivo Black', 'Archivo', sans-serif;
+  font-weight: 400;
+  font-size: 3.5rem;
+  letter-spacing: -0.02em;
+  line-height: 0.88;
+  color: var(--riso-ink);
+  text-shadow: 4px 4px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .listen-title,
+:root[data-skin="riso"] .voting-title,
+:root[data-skin="riso"] .reveal-song,
+:root[data-skin="riso"] .handoff-player,
+:root[data-skin="riso"] .listen-song,
+:root[data-skin="riso"] .room-code {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  color: var(--riso-ink);
+  text-shadow: 2px 2px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .tagline,
+:root[data-skin="riso"] .home-hint {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--riso-blue);
+}
+
+/* Panels: heavy black keyline plus an offset second ink */
+:root[data-skin="riso"] .sequencer,
+:root[data-skin="riso"] .guess-section,
+:root[data-skin="riso"] .game-options,
+:root[data-skin="riso"] .layer-card,
+:root[data-skin="riso"] .guess-row,
+:root[data-skin="riso"] .arp-controls,
+:root[data-skin="riso"] .vocal-timeline,
+:root[data-skin="riso"] .option-toggle,
+:root[data-skin="riso"] .song-input,
+:root[data-skin="riso"] .name-input,
+:root[data-skin="riso"] .code-input,
+:root[data-skin="riso"] .piano-roll,
+:root[data-skin="riso"] .chord-timeline,
+:root[data-skin="riso"] .vocal-waveform,
+:root[data-skin="riso"] .player-card {
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: 4px 4px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .btn-primary {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--riso-blue);
+  color: var(--riso-paper);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--riso-ink);
+}
+:root[data-skin="riso"] .btn-primary:active {
+  transform: translate(3px, 3px);
+  box-shadow: 2px 2px 0 var(--riso-ink);
+  opacity: 1;
+}
+
+:root[data-skin="riso"] .btn-secondary {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  background: var(--surface);
+  color: var(--riso-ink);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-pink);
+}
+:root[data-skin="riso"] .btn-secondary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .btn-text {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.76rem;
+  color: var(--riso-blue);
+}
+
+:root[data-skin="riso"] .btn-seq-play,
+:root[data-skin="riso"] .btn-icon {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-blue);
+}
+
+/* Drum hits: pink block, blue plate showing through underneath */
+:root[data-skin="riso"] .drum-cell {
+  background: var(--surface);
+  border: 2px solid var(--riso-ink);
+  border-radius: 0;
+}
+:root[data-skin="riso"] .drum-cell.beat { background: #e6e2d2; }
+:root[data-skin="riso"] .drum-cell.on {
+  background: var(--riso-pink);
+  border-color: var(--riso-ink);
+  box-shadow: inset -2px -2px 0 rgba(10, 143, 216, 0.85);
+}
+:root[data-skin="riso"] .drum-cell.playing {
+  background: var(--riso-blue);
+  box-shadow: none;
+}
+
+:root[data-skin="riso"] .drum-label {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--riso-ink);
+}
+
+/* The roll is the dark plate, so its labels invert */
+:root[data-skin="riso"] .pr-label {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 0.6rem;
+  color: var(--riso-paper);
+}
+:root[data-skin="riso"] .pr-label-sharp { color: #6e6b75; opacity: 1; }
+
+:root[data-skin="riso"] .pr-cell.pr-sharp,
+:root[data-skin="riso"] .pr-cell.pr-sharp.pr-beat { filter: none; }
+:root[data-skin="riso"] .pr-cell.pr-sharp { background: #141317; }
+:root[data-skin="riso"] .pr-cell.pr-sharp.pr-beat { background: #1c1b20; }
+
+:root[data-skin="riso"] .pr-note-block,
+:root[data-skin="riso"] .ct-block {
+  border-radius: 0 !important;
+  border: 2.5px solid var(--riso-paper) !important;
+  background: var(--riso-blue) !important;
+  color: var(--riso-paper) !important;
+  box-shadow: none !important;
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+}
+
+:root[data-skin="riso"] .vocal-block {
+  border-radius: 0;
+  border: 3px solid var(--riso-ink);
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  font-family: 'Archivo Black', sans-serif;
+  box-shadow: 4px 4px 0 var(--riso-blue);
+}
+
+:root[data-skin="riso"] .build-badge,
+:root[data-skin="riso"] .layer-badge,
+:root[data-skin="riso"] .guess-badge {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-ink);
+}
+
+:root[data-skin="riso"] .sound-btn,
+:root[data-skin="riso"] .chord-pick,
+:root[data-skin="riso"] .chord-select {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--riso-ink);
+}
+:root[data-skin="riso"] .sound-btn.active,
+:root[data-skin="riso"] .chord-pick.active {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-blue);
+}
+
+:root[data-skin="riso"] .crystal-pill,
+:root[data-skin="riso"] .listen-counter,
+:root[data-skin="riso"] .bpm-display,
+:root[data-skin="riso"] .build-timer,
+:root[data-skin="riso"] .vocal-status,
+:root[data-skin="riso"] .genre-lock-label {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.74rem;
+  color: var(--riso-ink);
+}
+
+:root[data-skin="riso"] .theme-dot {
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+}
+
+:root[data-skin="riso"] .toast {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  background: var(--riso-blue);
+  color: var(--riso-paper);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-ink);
+}
+
+/* Halftone rule under the home logo */
+:root[data-skin="riso"] .tagline::after {
+  content: '';
+  display: block;
+  height: 8px;
+  margin-top: 10px;
+  background-image: radial-gradient(var(--riso-ink) 1.7px, transparent 1.8px);
+  background-size: 9px 9px;
+  opacity: 0.5;
+}
+
+/* The label gutter is the panel, not the cells: leaving it white made the
+   near-white natural labels invisible. Riso's roll is the dark plate. */
+:root[data-skin="riso"] .piano-roll,
+:root[data-skin="riso"] .chord-timeline {
+  background: var(--piano-roll-bg);
+}
+
+@media (max-width: 420px) {
+  :root[data-skin="riso"] .logo { font-size: 2.6rem; }
+  :root[data-skin="notebook"] .logo { font-size: 2.5rem; }
+}
+
+/* At ~9px cells a 2px keyline plus an inset second ink leaves no room for
+   the fill to read. Keep the misregistration on chrome, not on the grid. */
+:root[data-skin="riso"] .drum-cell {
+  border-width: 1.5px;
+}
+:root[data-skin="riso"] .drum-cell.on {
+  background: var(--riso-pink);
+  box-shadow: none;
+}
+
+/* Archivo Black is too wide for the 56px label gutter */
+:root[data-skin="riso"] .drum-label {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0;
 }

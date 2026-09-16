@@ -125,51 +125,22 @@
     { genre: 'Latin', bpm: [90,110], icon: '💃', examples: ['Livin\' La Vida Loca','Bailando','Hips Don\'t Lie','Waka Waka','La Bamba','Conga','Vivir Mi Vida','Mas Que Nada'] }
   ];
 
+  // Two skins, both paper-based. `skin` drives shape/texture rules in CSS;
+  // colour variables alone were never enough to change the app's character.
+  const DEFAULT_SCHEME = 'notebook';
   const COLOR_SCHEMES = {
-    // Paper skin. `skin` switches shape/texture rules in CSS, not just hues —
-    // the other schemes are colour-only and leave the default flat look alone.
     notebook: { label: 'Notebook', color: '#f6eeda', skin: 'notebook',
       bg:'#f6eeda', surface:'#fffbf0', surface2:'#f3ead6', surface3:'#ebe0c8', border:'#23324f',
       text:'#23324f', textMuted:'#7a6a55', textDim:'#9aa6b8',
       accent:'#23324f', accentSoft:'#41568a',
       grid:'#fffbf0', gridBeat:'#f1ead8', gridAlt:'#fdf8ec', gridAltBeat:'#efe7d3', gridBorder:'rgba(35,50,79,0.18)',
       pianoRollBg:'#fffbf0', note:'#e8a33c', noteBorder:'#23324f' },
-    purple: { label: 'Purple', color: '#b89cff',
-      bg:'#1a1528', surface:'#241e38', surface2:'#2d2648', surface3:'#362f54', border:'#43396a',
-      text:'#e4ddf5', textMuted:'#9b8fc0', textDim:'#6e6194',
-      accent:'#b89cff', accentSoft:'#8b72d4',
-      grid:'#1b2a3a', gridBeat:'#1f3348', gridAlt:'#172535', gridAltBeat:'#1c2e42', gridBorder:'rgba(70,120,160,0.25)',
-      pianoRollBg:'#1b2a3a', note:'#ef6b5a', noteBorder:'#d44e3d' },
-    blue: { label: 'Blue', color: '#8EB2EB',
-      bg:'#101828', surface:'#182030', surface2:'#1e2940', surface3:'#26324e', border:'#334466',
-      text:'#dde6f5', textMuted:'#8ba0c4', textDim:'#5a7094',
-      accent:'#8EB2EB', accentSoft:'#5C8BD6',
-      grid:'#162030', gridBeat:'#1c2940', gridAlt:'#121c2c', gridAltBeat:'#18253a', gridBorder:'rgba(90,130,200,0.25)',
-      pianoRollBg:'#162030', note:'#f0a050', noteBorder:'#d4883a' },
-    green: { label: 'Green', color: '#8cc5a2',
-      bg:'#101e18', surface:'#182820', surface2:'#1e3228', surface3:'#263c30', border:'#33554a',
-      text:'#d8f0e4', textMuted:'#88b09c', textDim:'#5a8070',
-      accent:'#8cc5a2', accentSoft:'#5ca880',
-      grid:'#142820', gridBeat:'#1a3228', gridAlt:'#10221c', gridAltBeat:'#162c24', gridBorder:'rgba(80,160,120,0.25)',
-      pianoRollBg:'#142820', note:'#e88070', noteBorder:'#c86858' },
-    red: { label: 'Rose', color: '#e8a0bf',
-      bg:'#1e1018', surface:'#2a1822', surface2:'#34202c', surface3:'#3e2836', border:'#553848',
-      text:'#f5dde8', textMuted:'#c08898', textDim:'#945a70',
-      accent:'#e8a0bf', accentSoft:'#c47090',
-      grid:'#281820', gridBeat:'#321e28', gridAlt:'#221420', gridAltBeat:'#2c1a26', gridBorder:'rgba(200,100,140,0.25)',
-      pianoRollBg:'#281820', note:'#70b8e0', noteBorder:'#5098c0' },
-    orange: { label: 'Amber', color: '#e8b07d',
-      bg:'#1e1410', surface:'#2a1e16', surface2:'#34261e', surface3:'#3e2e26', border:'#555040',
-      text:'#f5e8dd', textMuted:'#c0a088', textDim:'#947860',
-      accent:'#e8b07d', accentSoft:'#c48850',
-      grid:'#281e16', gridBeat:'#32241c', gridAlt:'#221a12', gridAltBeat:'#2c2018', gridBorder:'rgba(180,140,80,0.25)',
-      pianoRollBg:'#281e16', note:'#70b0d8', noteBorder:'#5090b8' },
-    yellow: { label: 'Gold', color: '#EED263',
-      bg:'#1a1810', surface:'#242018', surface2:'#2e2820', surface3:'#383028', border:'#504838',
-      text:'#f5f0dd', textMuted:'#c0b888', textDim:'#949060',
-      accent:'#EED263', accentSoft:'#c4a840',
-      grid:'#22201a', gridBeat:'#2a2820', gridAlt:'#1e1c16', gridAltBeat:'#26241c', gridBorder:'rgba(180,160,80,0.25)',
-      pianoRollBg:'#22201a', note:'#7090e0', noteBorder:'#5070c0' }
+    riso: { label: 'Riso Zine', color: '#ff4f9a', skin: 'riso',
+      bg:'#f2efe2', surface:'#ffffff', surface2:'#e9e5d5', surface3:'#ddd8c6', border:'#17161a',
+      text:'#17161a', textMuted:'#5f5c55', textDim:'#8d8980',
+      accent:'#0a8fd8', accentSoft:'#0a63a8',
+      grid:'#201f24', gridBeat:'#2a282e', gridAlt:'#1b1a1f', gridAltBeat:'#252329', gridBorder:'#3a383f',
+      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' }
   };
   const CELL_W = 34;
   const LABEL_W = 54;
@@ -964,8 +935,9 @@
   }
 
   function applyColorScheme(name) {
-    var s = COLOR_SCHEMES[name];
+    var s = COLOR_SCHEMES[name] || COLOR_SCHEMES[DEFAULT_SCHEME];
     if (!s) return;
+    name = COLOR_SCHEMES[name] ? name : DEFAULT_SCHEME;
     var r = document.documentElement.style;
     r.setProperty('--bg', s.bg);
     r.setProperty('--surface', s.surface);
@@ -996,7 +968,8 @@
   function initThemePicker() {
     var container = document.getElementById('theme-picker');
     if (!container) return;
-    var saved = localStorage.getItem('st-theme') || 'notebook';
+    var saved = localStorage.getItem('st-theme');
+    if (!COLOR_SCHEMES[saved]) saved = DEFAULT_SCHEME;
     Object.keys(COLOR_SCHEMES).forEach(function (key) {
       var s = COLOR_SCHEMES[key];
       var dot = document.createElement('button');
