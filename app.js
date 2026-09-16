@@ -2531,7 +2531,17 @@
   var pendingAudioLoads = [];
   var playbackGeneration = 0;
 
+  // One bar of the grid, in seconds at the current tempo.
+  function loopSeconds() { return STEPS * stepSeconds(); }
+
   function startTransportWhenReady() {
+    // Tone.Sequence loops itself, but a synced Player is scheduled once at an
+    // absolute transport time — without a Transport loop on the same period it
+    // fires on the first pass only while everything else keeps repeating.
+    Tone.Transport.loop = true;
+    Tone.Transport.loopStart = 0;
+    Tone.Transport.loopEnd = loopSeconds();
+
     var waiting = pendingAudioLoads;
     pendingAudioLoads = [];
     if (!waiting.length) { Tone.Transport.start(); return; }
@@ -2566,7 +2576,9 @@
         url: d.dataUrl,
         onload: function () {
           try {
-            player.sync().start((d.start || 0) * stepSeconds());
+            // Cut at the bar line so a clip longer than the loop cannot
+            // overlap its own restart on the next pass.
+            player.sync().start((d.start || 0) * stepSeconds()).stop(loopSeconds());
           } catch (e) { /* transport torn down before load finished */ }
           resolve();
         },
