@@ -10,8 +10,22 @@
   const SPEED_TIME = 60;
   const SFX_NAMES = ['Siren', 'Laser', 'Boom', 'Sweep', 'Zap', 'Whoosh', 'Glitch', 'Drop'];
   const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash', 'Cowbell', 'Shaker', 'Conga'];
-  const NOTE_NAMES_BASS = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3'];
-  const NOTE_NAMES_MELODY = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6'];
+  const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function buildRange(startNote, startOct, endNote, endOct) {
+    var out = [];
+    var i = CHROMATIC.indexOf(startNote);
+    var oct = startOct;
+    for (;;) {
+      out.push(CHROMATIC[i] + oct);
+      if (CHROMATIC[i] === endNote && oct === endOct) break;
+      i++;
+      if (i >= CHROMATIC.length) { i = 0; oct++; }
+    }
+    return out;
+  }
+  const NOTE_NAMES_BASS = buildRange('C', 2, 'G', 3);
+  const NOTE_NAMES_MELODY = buildRange('C', 4, 'C', 6);
+  function isSharp(noteName) { return noteName.indexOf('#') !== -1; }
   const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const CHORD_QUALITIES = [
     { label: 'Major', suffix: '', intervals: [0, 4, 7] },
@@ -769,8 +783,24 @@
     return Tone.start().then(function () { audioReady = true; });
   }
 
+  // Per-instrument trims so every layer lands near the same peak level.
+  // Measured untrimmed with correct transport scheduling, drums peak near
+  // -4 dB while chords/bass/melody sit between -15 and -19. These bring all
+  // of them to roughly -10.
+  const MIX_TRIM = { drums: -6, sfx: -6, chords: 5, bass: 7, melody: 9, vocal: 6 };
+  let masterBus = null;
+
+  function getMasterBus() {
+    if (!masterBus) masterBus = new Tone.Limiter(-1).toDestination();
+    return masterBus;
+  }
+
+  function makeBus(inst) {
+    return new Tone.Volume(MIX_TRIM[inst] || 0).connect(getMasterBus());
+  }
+
   function createDrumSynth() {
-    var vol = new Tone.Volume(-4).toDestination();
+    var vol = makeBus('drums');
     var kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }).connect(vol);
     var snare = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(vol);
     var hihat = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.06, sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -12 }).connect(vol);
@@ -783,19 +813,19 @@
     var shaker = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04, sustain: 0 }, volume: -10 }).connect(vol);
     var conga = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15, sustain: 0 }, volume: -4 }).connect(vol);
     return {
-      trigger: function (name) {
+      trigger: function (name, time) {
         switch (name) {
-          case 'Kick': kick.triggerAttackRelease('C1', '8n'); break;
-          case 'Snare': snare.triggerAttackRelease('8n'); break;
-          case 'HiHat': hihat.triggerAttackRelease('32n'); break;
-          case 'OpenHH': openHH.triggerAttackRelease('16n'); break;
-          case 'Clap': clap.triggerAttackRelease('16n'); break;
-          case 'Tom': tom.triggerAttackRelease('E2', '8n'); break;
-          case 'Rim': rim.triggerAttackRelease('G4', '32n'); break;
-          case 'Crash': crash.triggerAttackRelease('16n'); break;
-          case 'Cowbell': cowbell.triggerAttackRelease('16n'); break;
-          case 'Shaker': shaker.triggerAttackRelease('32n'); break;
-          case 'Conga': conga.triggerAttackRelease('D3', '8n'); break;
+          case 'Kick': kick.triggerAttackRelease('C1', '8n', time); break;
+          case 'Snare': snare.triggerAttackRelease('8n', time); break;
+          case 'HiHat': hihat.triggerAttackRelease('32n', time); break;
+          case 'OpenHH': openHH.triggerAttackRelease('16n', time); break;
+          case 'Clap': clap.triggerAttackRelease('16n', time); break;
+          case 'Tom': tom.triggerAttackRelease('E2', '8n', time); break;
+          case 'Rim': rim.triggerAttackRelease('G4', '32n', time); break;
+          case 'Crash': crash.triggerAttackRelease('16n', time); break;
+          case 'Cowbell': cowbell.triggerAttackRelease('16n', time); break;
+          case 'Shaker': shaker.triggerAttackRelease('32n', time); break;
+          case 'Conga': conga.triggerAttackRelease('D3', '8n', time); break;
         }
       },
       dispose: function () { [kick, snare, hihat, openHH, clap, tom, rim, crash, cowbell, shaker, conga, vol].forEach(function (n) { n.dispose(); }); }
@@ -803,7 +833,7 @@
   }
 
   function createSfxSynth() {
-    var vol = new Tone.Volume(-4).toDestination();
+    var vol = makeBus('sfx');
     var siren = new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.2 } }).connect(vol);
     var laser = new Tone.FMSynth({ harmonicity: 5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }).connect(vol);
     var boom = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 8, envelope: { attack: 0.001, decay: 0.6, sustain: 0 } }).connect(vol);
@@ -813,16 +843,16 @@
     var glitch = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }, volume: -8 }).connect(vol);
     var drop = new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, volume: 2 }).connect(vol);
     return {
-      trigger: function (name) {
+      trigger: function (name, time) {
         switch (name) {
-          case 'Siren': siren.triggerAttackRelease('C5', '8n'); break;
-          case 'Laser': laser.triggerAttackRelease('G6', '16n'); break;
-          case 'Boom': boom.triggerAttackRelease('C1', '4n'); break;
-          case 'Sweep': sweep.triggerAttackRelease('8n'); break;
-          case 'Zap': zap.triggerAttackRelease('A5', '32n'); break;
-          case 'Whoosh': whoosh.triggerAttackRelease('8n'); break;
-          case 'Glitch': glitch.triggerAttackRelease('32n'); break;
-          case 'Drop': drop.triggerAttackRelease('C1', '4n'); break;
+          case 'Siren': siren.triggerAttackRelease('C5', '8n', time); break;
+          case 'Laser': laser.triggerAttackRelease('G6', '16n', time); break;
+          case 'Boom': boom.triggerAttackRelease('C1', '4n', time); break;
+          case 'Sweep': sweep.triggerAttackRelease('8n', time); break;
+          case 'Zap': zap.triggerAttackRelease('A5', '32n', time); break;
+          case 'Whoosh': whoosh.triggerAttackRelease('8n', time); break;
+          case 'Glitch': glitch.triggerAttackRelease('32n', time); break;
+          case 'Drop': drop.triggerAttackRelease('C1', '4n', time); break;
         }
       },
       dispose: function () { [siren, laser, boom, sweep, zap, whoosh, glitch, drop, vol].forEach(function (n) { n.dispose(); }); }
@@ -831,11 +861,12 @@
 
   function createChordSynth(presetName) {
     var preset = CHORD_SOUNDS[presetName || currentChordSound] || CHORD_SOUNDS['Piano Chords'];
-    var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).toDestination();
+    var bus = makeBus('chords');
+    var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).connect(bus);
     var poly = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
     return {
-      play: function (notes, dur) { poly.triggerAttackRelease(notes, dur); },
-      dispose: function () { poly.dispose(); reverb.dispose(); }
+      play: function (notes, dur, time) { poly.triggerAttackRelease(notes, dur, time); },
+      dispose: function () { poly.dispose(); reverb.dispose(); bus.dispose(); }
     };
   }
 
@@ -845,8 +876,9 @@
     return synths.chords;
   }
 
-  function createSynthFromPreset(preset, poly) {
-    var reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).toDestination();
+  function createSynthFromPreset(preset, poly, inst) {
+    var bus = makeBus(inst || (poly ? 'melody' : 'bass'));
+    var reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).connect(bus);
     var syn;
     if (poly) {
       syn = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
@@ -854,8 +886,8 @@
       syn = new Tone.FMSynth(preset).connect(reverb);
     }
     return {
-      play: function (note, dur) { syn.triggerAttackRelease(note, dur); },
-      dispose: function () { syn.dispose(); reverb.dispose(); }
+      play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
+      dispose: function () { syn.dispose(); reverb.dispose(); bus.dispose(); }
     };
   }
 
@@ -1276,7 +1308,7 @@
           listeningExisting = false;
         } else {
           stopPreview();
-          startPreview(instrument);
+          startPreview(instrument, true);
           listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
           listeningExisting = true;
         }
@@ -1380,7 +1412,9 @@
       return sfxGrid;
     }
     if (instrument === 'vocal') {
-      return { dataUrl: vocalDataUrl || null };
+      return vocalClip
+        ? { dataUrl: vocalClip.dataUrl, start: vocalClip.start, steps: vocalClip.steps }
+        : { dataUrl: null };
     }
     if (instrument === 'chords' && gameSettings.arp) {
       return applyArpToChords(pianoRollNotes.slice());
@@ -1396,7 +1430,12 @@
     else if (instrument === 'bass') initPianoRoll('bass', NOTE_NAMES_BASS, false);
     else if (instrument === 'melody') initPianoRoll('melody', NOTE_NAMES_MELODY, true);
     else if (instrument === 'sfx') initSfxGrid();
-    else if (instrument === 'vocal') { initVocalRecorder(); return; }
+    else if (instrument === 'vocal') {
+      initVocalRecorder();
+      var arpElV = document.getElementById('arp-controls');
+      if (arpElV) arpElV.style.display = 'none';
+      return;
+    }
 
     // Show arp controls when building chords with arp enabled
     var arpEl = document.getElementById('arp-controls');
@@ -1431,7 +1470,7 @@
     playBtn.onclick = function () {
       ensureAudio().then(function () {
         if (previewPlaying) stopPreview();
-        else startPreview(instrument);
+        else startPreview(instrument, false);
         playIcon.style.display = previewPlaying ? 'none' : 'block';
         stopIcon.style.display = previewPlaying ? 'block' : 'none';
       });
@@ -1519,7 +1558,7 @@
 
     reversed.forEach(function (name, ri) {
       var label = document.createElement('div');
-      label.className = 'pr-label';
+      label.className = 'pr-label' + (isSharp(name) ? ' pr-label-sharp' : '');
       label.style.top = (ri * cellH) + 'px';
       label.style.height = cellH + 'px';
       label.style.lineHeight = cellH + 'px';
@@ -1528,7 +1567,7 @@
 
       for (var s = 0; s < STEPS; s++) {
         var cell = document.createElement('div');
-        cell.className = 'pr-cell' + (s % 4 === 0 ? ' pr-beat' : '') + (ri % 2 === 0 ? ' pr-alt' : '');
+        cell.className = 'pr-cell' + (s % 4 === 0 ? ' pr-beat' : '') + (isSharp(name) ? ' pr-sharp' : '');
         cell.style.left = (LABEL_W + s * CELL_W) + 'px';
         cell.style.top = (ri * cellH) + 'px';
         cell.style.width = CELL_W + 'px';
@@ -1889,14 +1928,14 @@
   }
 
   // ── Preview ──
-  function startPreview(instrument) {
+  function startPreview(instrument, includePrevious) {
     Tone.Transport.bpm.value = gameBpm;
     Tone.Transport.stop();
     Tone.Transport.cancel();
     previewPlaying = true;
     previewSeqs = [];
 
-    if (currentGameIdx >= 0 && games[currentGameIdx]) {
+    if (includePrevious && currentGameIdx >= 0 && games[currentGameIdx]) {
       addExistingLayerSeqs(currentGameIdx, instrument, previewSeqs);
     }
 
@@ -1906,7 +1945,7 @@
         Tone.Draw.schedule(function () { highlightDrumStep(s); }, time);
         DRUM_NAMES.forEach(function (name) {
           var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          if (cell && cell.classList.contains('on')) synths.drums.trigger(name);
+          if (cell && cell.classList.contains('on')) synths.drums.trigger(name, time);
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq);
@@ -1916,10 +1955,12 @@
         Tone.Draw.schedule(function () { highlightSfxStep(s); }, time);
         SFX_NAMES.forEach(function (name) {
           var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          if (cell && cell.classList.contains('on')) synths.sfx.trigger(name);
+          if (cell && cell.classList.contains('on')) synths.sfx.trigger(name, time);
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(sfxSeq);
+    } else if (instrument === 'vocal') {
+      pendingAudioLoads.push(addVocalToTransport({ data: vocalClip }, previewSeqs));
     } else {
       if (instrument === 'chords') { if (!synths.chords) synths.chords = createChordSynth(); }
       else if (instrument === 'bass') { if (!synths.bass) getOrCreateBassSynth(); }
@@ -1931,16 +1972,16 @@
         notes.forEach(function (n) {
           if (n.start === s) {
             var dur = n.length * Tone.Time('16n').toSeconds();
-            if (instrument === 'chords') { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, dur); }
-            else if (instrument === 'bass') { synths.bass.play(n.note, dur); }
-            else { synths.melody.play(n.note, dur); }
+            if (instrument === 'chords') { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, dur, time); }
+            else if (instrument === 'bass') { synths.bass.play(n.note, dur, time); }
+            else { synths.melody.play(n.note, dur, time); }
           }
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq2);
     }
 
-    Tone.Transport.start();
+    startTransportWhenReady();
   }
 
   function addExistingLayerSeqs(gameIdx, currentInst, seqs) {
@@ -1968,39 +2009,36 @@
       if (!synths.bgDrums) synths.bgDrums = createDrumSynth();
       var data = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
-        DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name); });
+        DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name, time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
       if (!synths.bgSfx) synths.bgSfx = createSfxSynth();
       var sfxData = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
-        SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name); });
+        SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name, time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
       if (!synths.bgChords) synths.bgChords = createChordSynth();
       var notes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
         notes.forEach(function (n) {
-          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
       if (!synths.bgBass) synths.bgBass = createSynthFromPreset(BASS_SOUNDS[sub.sound || 'Analog Bass'], false);
       var bnotes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
-        bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+        bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
       if (!synths.bgMelody) synths.bgMelody = createSynthFromPreset(MELODY_SOUNDS[sub.sound || 'Piano'], true);
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
-        mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+        mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
-      var vAudio = new Audio(sub.data.dataUrl);
-      vAudio.currentTime = 0;
-      vAudio.play();
-      seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
+      pendingAudioLoads.push(addVocalToTransport(sub, seqs));
     }
   }
 
@@ -2011,11 +2049,12 @@
     previewPlaying = true;
     previewSeqs = [];
     addExistingLayerSeqs(gameIdx, null, previewSeqs);
-    Tone.Transport.start();
+    startTransportWhenReady();
   }
 
   function stopPreview() {
     previewPlaying = false;
+    cancelPendingPlayback();
     previewSeqs.forEach(function (s) { s.dispose(); });
     previewSeqs = [];
     Tone.Transport.stop();
@@ -2161,14 +2200,14 @@
         if (!synths.drums) synths.drums = createDrumSynth();
         var data = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
-          DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.drums.trigger(name); });
+          DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.drums.trigger(name, time); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'chords') {
         if (!synths.chords) synths.chords = createChordSynth();
         var notes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
           notes.forEach(function (n) {
-            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
           });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'bass') {
@@ -2176,30 +2215,27 @@
         getOrCreateBassSynth();
         var bnotes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
-          bnotes.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+          bnotes.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'melody') {
         currentMelodySound = sub.sound || 'Piano';
         getOrCreateMelodySynth();
         var mnotes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
-          mnotes.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+          mnotes.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'sfx') {
         if (!synths.sfx) synths.sfx = createSfxSynth();
         var sfxData = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
-          SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.sfx.trigger(name); });
+          SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.sfx.trigger(name, time); });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
-        var vAudio = new Audio(sub.data.dataUrl);
-        vAudio.currentTime = 0;
-        vAudio.play();
-        seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
+        pendingAudioLoads.push(addVocalToTransport(sub, seqs));
       }
     });
 
-    Tone.Transport.start();
+    startTransportWhenReady();
   }
 
   // ── Voting ──
@@ -2345,7 +2381,7 @@
         var inst = submittedInsts[i];
         addLayerSeqForPlayAll(inst, game, allSeqs);
       }
-      Tone.Transport.start();
+      startTransportWhenReady();
       updateStatus();
     }
 
@@ -2386,41 +2422,39 @@
     if (inst === 'drums') {
       if (!synths.drums) synths.drums = createDrumSynth();
       seqs.push(new Tone.Sequence(function (time, s) {
-        DRUM_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.drums.trigger(name); });
+        DRUM_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.drums.trigger(name, time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
       if (!synths.chords) synths.chords = createChordSynth();
       seqs.push(new Tone.Sequence(function (time, s) {
         sub.data.forEach(function (n) {
-          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds()); }
+          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
       currentBassSound = sub.sound || 'Analog Bass';
       getOrCreateBassSynth();
       seqs.push(new Tone.Sequence(function (time, s) {
-        sub.data.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+        sub.data.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
       currentMelodySound = sub.sound || 'Piano';
       getOrCreateMelodySynth();
       seqs.push(new Tone.Sequence(function (time, s) {
-        sub.data.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds()); });
+        sub.data.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
       if (!synths.sfx) synths.sfx = createSfxSynth();
       seqs.push(new Tone.Sequence(function (time, s) {
-        SFX_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.sfx.trigger(name); });
+        SFX_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.sfx.trigger(name, time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
-      var vAudio = new Audio(sub.data.dataUrl);
-      vAudio.currentTime = 0;
-      vAudio.play();
-      seqs.push({ dispose: function () { vAudio.pause(); vAudio.currentTime = 0; } });
+      pendingAudioLoads.push(addVocalToTransport(sub, seqs));
     }
   }
 
   function stopAllLayers(seqs) {
+    cancelPendingPlayback();
     Tone.Transport.stop();
     Tone.Transport.cancel();
     seqs.forEach(function (s) { s.dispose(); });
@@ -2504,7 +2538,66 @@
   }
 
   // ── Vocal Recording ──
-  var vocalDataUrl = null;
+  // The clip is a block on the 32-step grid like a chord: { dataUrl, start, steps }
+  var vocalClip = null;
+
+  function stepSeconds() { return Tone.Time('16n').toSeconds(); }
+
+  // Audio clips decode asynchronously; the Transport must not start until every
+  // scheduled buffer is armed, or the clip silently misses its slot.
+  var pendingAudioLoads = [];
+  var playbackGeneration = 0;
+
+  function startTransportWhenReady() {
+    var waiting = pendingAudioLoads;
+    pendingAudioLoads = [];
+    if (!waiting.length) { Tone.Transport.start(); return; }
+    var gen = playbackGeneration;
+    Promise.all(waiting).then(function () {
+      if (gen === playbackGeneration) Tone.Transport.start();
+    });
+  }
+
+  // Invalidates any in-flight buffer loads so a slow decode cannot restart
+  // playback after the user has already stopped it.
+  function cancelPendingPlayback() {
+    playbackGeneration++;
+    pendingAudioLoads = [];
+  }
+
+  // Decode a data URL into an AudioBuffer so we know how many steps the clip spans.
+  function decodeVocal(dataUrl) {
+    return fetch(dataUrl)
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (buf) { return Tone.getContext().rawContext.decodeAudioData(buf); });
+  }
+
+  // Schedules the clip on the Transport so it lines up with every other layer.
+  // Returns a promise that resolves once the buffer is loaded and armed.
+  function addVocalToTransport(sub, seqs) {
+    var d = sub && sub.data;
+    if (!d || !d.dataUrl) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var bus = makeBus('vocal');
+      var player = new Tone.Player({
+        url: d.dataUrl,
+        onload: function () {
+          try {
+            player.sync().start((d.start || 0) * stepSeconds());
+          } catch (e) { /* transport torn down before load finished */ }
+          resolve();
+        },
+        onerror: function () { resolve(); }
+      }).connect(bus);
+      seqs.push({
+        dispose: function () {
+          try { player.unsync(); player.stop(); } catch (e) { /* not started */ }
+          player.dispose();
+          bus.dispose();
+        }
+      });
+    });
+  }
 
   function initVocalRecorder() {
     var recBtn = document.getElementById('vocal-rec');
@@ -2517,9 +2610,10 @@
     var chunks = [];
     var recordTimeout = null;
 
-    vocalDataUrl = null;
+    vocalClip = null;
     playBtn.style.display = 'none';
     statusEl.textContent = 'Tap to record (max 8s)';
+    renderVocalTimeline();
 
     function drawWaveform(analyser) {
       if (!recording) return;
@@ -2574,9 +2668,19 @@
           var blob = new Blob(chunks, { type: 'audio/webm' });
           var reader = new FileReader();
           reader.onloadend = function () {
-            vocalDataUrl = reader.result;
-            playBtn.style.display = 'inline-flex';
-            statusEl.textContent = 'Recorded! Tap play to preview';
+            var url = reader.result;
+            decodeVocal(url).then(function (buf) {
+              var steps = Math.max(1, Math.min(STEPS, Math.ceil(buf.duration / stepSeconds())));
+              vocalClip = { dataUrl: url, start: 0, steps: steps };
+              playBtn.style.display = 'inline-flex';
+              statusEl.textContent = 'Drag the block to place your clip';
+              renderVocalTimeline();
+            }).catch(function () {
+              vocalClip = { dataUrl: url, start: 0, steps: 8 };
+              playBtn.style.display = 'inline-flex';
+              statusEl.textContent = 'Drag the block to place your clip';
+              renderVocalTimeline();
+            });
           };
           reader.readAsDataURL(blob);
           audioCtx.close();
@@ -2595,11 +2699,65 @@
     };
 
     playBtn.onclick = function () {
-      if (vocalDataUrl) {
-        var audio = new Audio(vocalDataUrl);
-        audio.play();
-      }
+      if (!vocalClip) return;
+      ensureAudio().then(function () {
+        if (previewPlaying) { stopPreview(); return; }
+        startPreview('vocal', false);
+      });
     };
+  }
+
+  // Draggable clip block on the same 32-step grid the other instruments use.
+  function renderVocalTimeline() {
+    var strip = document.getElementById('vocal-timeline');
+    if (!strip) return;
+    strip.innerHTML = '';
+
+    var canvas = document.createElement('div');
+    canvas.className = 'vocal-timeline-canvas';
+    canvas.style.width = (STEPS * CELL_W) + 'px';
+
+    for (var s = 0; s < STEPS; s++) {
+      var cell = document.createElement('div');
+      cell.className = 'vocal-cell' + (s % 4 === 0 ? ' beat' : '');
+      cell.style.left = (s * CELL_W) + 'px';
+      cell.style.width = CELL_W + 'px';
+      canvas.appendChild(cell);
+    }
+
+    if (vocalClip) {
+      var block = document.createElement('div');
+      block.className = 'vocal-block';
+      block.style.left = (vocalClip.start * CELL_W) + 'px';
+      block.style.width = (vocalClip.steps * CELL_W) + 'px';
+      block.textContent = 'Vocal';
+      canvas.appendChild(block);
+
+      var dragging = false;
+      var grabOffset = 0;
+      canvas.addEventListener('pointerdown', function (e) {
+        if (!e.target.closest('.vocal-block')) return;
+        dragging = true;
+        grabOffset = e.clientX - block.getBoundingClientRect().left;
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var x = e.clientX - canvas.getBoundingClientRect().left - grabOffset;
+        var step = Math.round(x / CELL_W);
+        step = Math.max(0, Math.min(STEPS - vocalClip.steps, step));
+        vocalClip.start = step;
+        block.style.left = (step * CELL_W) + 'px';
+      });
+      canvas.addEventListener('pointerup', function (e) {
+        if (!dragging) return;
+        dragging = false;
+        canvas.releasePointerCapture(e.pointerId);
+      });
+    }
+
+    strip.appendChild(canvas);
   }
 
   initThemePicker();
