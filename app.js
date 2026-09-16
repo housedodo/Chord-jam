@@ -391,6 +391,7 @@
         var inst = INSTRUMENTS[currentRound];
         game.submissions[inst] = { data: msg.data, bpm: gameBpm, playerIndex: msg.playerIndex };
         if (msg.sound) game.submissions[inst].sound = msg.sound;
+        if (msg.patch) game.submissions[inst].patch = normalisePatch(msg.patch);
         if (msg.guess) game.guesses.push({ playerIndex: msg.playerIndex, guess: msg.guess, round: currentRound, instrument: inst });
         onLayerSubmittedHost();
         break;
@@ -719,7 +720,10 @@
     if (netMode === 'host') {
       game.submissions[instrument] = { data: data, bpm: gameBpm, playerIndex: myPlayerIndex };
       if (instrument === 'bass') game.submissions[instrument].sound = currentBassSound;
-      if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
+      if (instrument === 'melody') {
+        game.submissions[instrument].sound = currentMelodySound;
+        if (currentMelodySound === PRODUCER_SOUND) game.submissions[instrument].patch = normalisePatch(melodyPatch);
+      }
       if (instrument === 'chords') game.submissions[instrument].sound = currentChordSound;
       if (guess) game.guesses.push({ playerIndex: myPlayerIndex, guess: guess, round: currentRound, instrument: instrument });
       toast('Layer submitted!');
@@ -733,6 +737,7 @@
         playerIndex: myPlayerIndex,
         data: data,
         sound: instrument === 'bass' ? currentBassSound : (instrument === 'melody' ? currentMelodySound : (instrument === 'chords' ? currentChordSound : null)),
+        patch: (instrument === 'melody' && currentMelodySound === PRODUCER_SOUND) ? normalisePatch(melodyPatch) : null,
         guess: guess
       });
       toast('Layer submitted!');
@@ -969,7 +974,42 @@
     };
   }
 
-  function createInstrument(group, soundName, poly) {
+  // ── Producer Edition ──
+  // A plain oscillator + ADSR the player can dial in, rather than a fixed
+  // preset. The patch travels with the layer so everyone hears the same sound.
+  const PRODUCER_SOUND = 'Producer Edition';
+  const PRODUCER_WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
+  const PRODUCER_DEFAULT = { wave: 'sawtooth', attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4 };
+  let melodyPatch = Object.assign({}, PRODUCER_DEFAULT);
+
+  function normalisePatch(patch) {
+    var p = Object.assign({}, PRODUCER_DEFAULT, patch || {});
+    if (PRODUCER_WAVES.indexOf(p.wave) < 0) p.wave = PRODUCER_DEFAULT.wave;
+    ['attack', 'decay', 'release'].forEach(function (k) {
+      p[k] = Math.max(0.001, Math.min(2, +p[k] || PRODUCER_DEFAULT[k]));
+    });
+    p.sustain = Math.max(0, Math.min(1, +p.sustain));
+    if (isNaN(p.sustain)) p.sustain = PRODUCER_DEFAULT.sustain;
+    return p;
+  }
+
+  function createProducerSynth(patch, inst) {
+    var p = normalisePatch(patch);
+    var bus = makeBus(inst);
+    var reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 }).connect(bus);
+    var syn = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: p.wave },
+      envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release },
+      volume: -10
+    }).connect(reverb);
+    return {
+      play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
+      dispose: function () { syn.dispose(); reverb.dispose(); bus.dispose(); }
+    };
+  }
+
+  function createInstrument(group, soundName, poly, patch) {
+    if (soundName === PRODUCER_SOUND) return createProducerSynth(patch, group);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group);
     var bank = group === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
@@ -985,7 +1025,7 @@
 
   function getOrCreateMelodySynth() {
     if (synths.melody) synths.melody.dispose();
-    synths.melody = createInstrument('melody', currentMelodySound, true);
+    synths.melody = createInstrument('melody', currentMelodySound, true, melodyPatch);
     return synths.melody;
   }
 
@@ -1453,7 +1493,10 @@
     var game = games[currentGameIdx];
     game.submissions[instrument] = { data: data, bpm: gameBpm, playerIndex: currentTurnPlayer };
     if (instrument === 'bass') game.submissions[instrument].sound = currentBassSound;
-    if (instrument === 'melody') game.submissions[instrument].sound = currentMelodySound;
+    if (instrument === 'melody') {
+      game.submissions[instrument].sound = currentMelodySound;
+      if (currentMelodySound === PRODUCER_SOUND) game.submissions[instrument].patch = normalisePatch(melodyPatch);
+    }
 
     if (currentRound > 0 && game.enteredBy !== currentTurnPlayer && !soloMode) {
       var guess = document.getElementById('guess-input').value.trim();
@@ -1629,6 +1672,117 @@
     return null;
   }
 
+  function buildProducerPanel() {
+    var panel = document.createElement('div');
+    panel.className = 'producer-panel';
+
+    var waveRow = document.createElement('div');
+    waveRow.className = 'producer-waves';
+    PRODUCER_WAVES.forEach(function (w) {
+      var b = document.createElement('button');
+      b.className = 'wave-btn' + (melodyPatch.wave === w ? ' active' : '');
+      b.title = w;
+      b.appendChild(waveIcon(w));
+      b.onclick = function () {
+        waveRow.querySelectorAll('.wave-btn').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        melodyPatch.wave = w;
+        repatch();
+      };
+      waveRow.appendChild(b);
+    });
+    panel.appendChild(waveRow);
+
+    var knobs = document.createElement('div');
+    knobs.className = 'producer-knobs';
+    [
+      { key: 'attack', label: 'Attack', min: 0.001, max: 2, step: 0.001 },
+      { key: 'decay', label: 'Decay', min: 0.001, max: 2, step: 0.001 },
+      { key: 'sustain', label: 'Sustain', min: 0, max: 1, step: 0.01 },
+      { key: 'release', label: 'Release', min: 0.001, max: 2, step: 0.001 }
+    ].forEach(function (c) {
+      var wrap = document.createElement('label');
+      wrap.className = 'producer-knob';
+      var name = document.createElement('span');
+      name.className = 'knob-label';
+      name.textContent = c.label;
+      var val = document.createElement('span');
+      val.className = 'knob-value';
+      var fmt = function (v) { return c.key === 'sustain' ? Math.round(v * 100) + '%' : (+v).toFixed(2) + 's'; };
+      val.textContent = fmt(melodyPatch[c.key]);
+      var slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = c.min; slider.max = c.max; slider.step = c.step;
+      slider.value = melodyPatch[c.key];
+      slider.oninput = function () {
+        melodyPatch[c.key] = +slider.value;
+        val.textContent = fmt(slider.value);
+        repatch();
+      };
+      wrap.appendChild(name);
+      wrap.appendChild(slider);
+      wrap.appendChild(val);
+      knobs.appendChild(wrap);
+    });
+    panel.appendChild(knobs);
+
+    var footer = document.createElement('div');
+    footer.className = 'producer-footer';
+    var preview = document.createElement('button');
+    preview.className = 'btn-secondary btn-sm';
+    preview.textContent = 'Hear it';
+    preview.onclick = function () {
+      ensureAudio().then(function () {
+        var s = getOrCreateMelodySynth();
+        var now = Tone.now();
+        ['C4', 'E4', 'G4'].forEach(function (n, i) { s.play(n, 0.4, now + i * 0.16); });
+      });
+    };
+    var reset = document.createElement('button');
+    reset.className = 'btn-text';
+    reset.textContent = 'Reset';
+    reset.onclick = function () {
+      melodyPatch = Object.assign({}, PRODUCER_DEFAULT);
+      var fresh = buildProducerPanel();
+      fresh.style.display = 'flex';
+      panel.replaceWith(fresh);
+      repatch();
+    };
+    footer.appendChild(preview);
+    footer.appendChild(reset);
+    panel.appendChild(footer);
+
+    return panel;
+  }
+
+  // Tone has no live patch update for PolySynth voices, so rebuild on change.
+  function repatch() {
+    if (currentMelodySound !== PRODUCER_SOUND) return;
+    ensureAudio().then(getOrCreateMelodySynth);
+  }
+
+  function waveIcon(type) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 32 16');
+    svg.setAttribute('width', '30');
+    svg.setAttribute('height', '15');
+    var d = {
+      sine: 'M1 8 Q5 0 9 8 T17 8 T25 8 T31 8',
+      triangle: 'M1 13 L7 3 L13 13 L19 3 L25 13 L31 5',
+      sawtooth: 'M1 13 L8 3 L8 13 L15 3 L15 13 L22 3 L22 13 L29 3',
+      square: 'M1 13 L1 3 L8 3 L8 13 L15 13 L15 3 L22 3 L22 13 L29 13 L29 3'
+    }[type];
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
+    return svg;
+  }
+
   // ── Piano Roll (bass/melody with edge-drag) ──
   function initPianoRoll(inst, noteNames, polyphonic) {
     var grid = document.getElementById(inst + '-grid');
@@ -1655,7 +1809,36 @@
       };
       soundBar.appendChild(btn);
     });
+
+    var producerPanel = null;
+    if (inst === 'melody') {
+      var pBtn = document.createElement('button');
+      pBtn.className = 'sound-btn sound-btn-producer' + (curSound === PRODUCER_SOUND ? ' active' : '');
+      pBtn.textContent = PRODUCER_SOUND;
+      pBtn.onclick = function () {
+        soundBar.querySelectorAll('.sound-btn').forEach(function (b) { b.classList.remove('active'); });
+        pBtn.classList.add('active');
+        currentMelodySound = PRODUCER_SOUND;
+        getOrCreateMelodySynth();
+        producerPanel.style.display = 'flex';
+      };
+      // First, not last: the bar scrolls horizontally and nobody finds the
+      // far right of it on a phone.
+      soundBar.insertBefore(pBtn, soundBar.firstChild);
+
+      // Selecting any stock sound hides the panel again.
+      soundBar.querySelectorAll('.sound-btn:not(.sound-btn-producer)').forEach(function (b) {
+        var prev = b.onclick;
+        b.onclick = function (e) { prev.call(b, e); producerPanel.style.display = 'none'; };
+      });
+    }
+
     wrapper.appendChild(soundBar);
+    if (inst === 'melody') {
+      producerPanel = buildProducerPanel();
+      producerPanel.style.display = currentMelodySound === PRODUCER_SOUND ? 'flex' : 'none';
+      wrapper.appendChild(producerPanel);
+    }
 
     var rollContainer = document.createElement('div');
     rollContainer.className = 'piano-roll';
@@ -2174,7 +2357,7 @@
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
-      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true);
+      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true, sub.patch);
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
@@ -2361,6 +2544,7 @@
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'melody') {
         currentMelodySound = sub.sound || 'Piano';
+        if (sub.patch) melodyPatch = normalisePatch(sub.patch);
         getOrCreateMelodySynth();
         var mnotes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
@@ -2581,6 +2765,7 @@
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
       currentMelodySound = sub.sound || 'Piano';
+      if (sub.patch) melodyPatch = normalisePatch(sub.patch);
       getOrCreateMelodySynth();
       seqs.push(new Tone.Sequence(function (time, s) {
         sub.data.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
