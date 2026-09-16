@@ -126,6 +126,14 @@
   ];
 
   const COLOR_SCHEMES = {
+    // Paper skin. `skin` switches shape/texture rules in CSS, not just hues —
+    // the other schemes are colour-only and leave the default flat look alone.
+    notebook: { label: 'Notebook', color: '#f6eeda', skin: 'notebook',
+      bg:'#f6eeda', surface:'#fffbf0', surface2:'#f3ead6', surface3:'#ebe0c8', border:'#23324f',
+      text:'#23324f', textMuted:'#7a6a55', textDim:'#9aa6b8',
+      accent:'#23324f', accentSoft:'#41568a',
+      grid:'#fffbf0', gridBeat:'#f1ead8', gridAlt:'#fdf8ec', gridAltBeat:'#efe7d3', gridBorder:'rgba(35,50,79,0.18)',
+      pianoRollBg:'#fffbf0', note:'#e8a33c', noteBorder:'#23324f' },
     purple: { label: 'Purple', color: '#b89cff',
       bg:'#1a1528', surface:'#241e38', surface2:'#2d2648', surface3:'#362f54', border:'#43396a',
       text:'#e4ddf5', textMuted:'#9b8fc0', textDim:'#6e6194',
@@ -980,13 +988,15 @@
     r.setProperty('--piano-roll-bg', s.pianoRollBg);
     r.setProperty('--note-color', s.note);
     r.setProperty('--note-border', s.noteBorder);
+    if (s.skin) document.documentElement.setAttribute('data-skin', s.skin);
+    else document.documentElement.removeAttribute('data-skin');
     localStorage.setItem('st-theme', name);
   }
 
   function initThemePicker() {
     var container = document.getElementById('theme-picker');
     if (!container) return;
-    var saved = localStorage.getItem('st-theme') || 'purple';
+    var saved = localStorage.getItem('st-theme') || 'notebook';
     Object.keys(COLOR_SCHEMES).forEach(function (key) {
       var s = COLOR_SCHEMES[key];
       var dot = document.createElement('button');
