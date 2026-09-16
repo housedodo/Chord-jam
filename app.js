@@ -779,6 +779,10 @@
   }
 
   function createDrumSynth() {
+    return withSampledPads('drums', DRUM_NAMES, createSynthDrumKit());
+  }
+
+  function createSynthDrumKit() {
     var vol = makeBus('drums');
     var kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }).connect(vol);
     var snare = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(vol);
@@ -812,6 +816,10 @@
   }
 
   function createSfxSynth() {
+    return withSampledPads('sfx', SFX_NAMES, createSynthSfxKit());
+  }
+
+  function createSynthSfxKit() {
     var vol = makeBus('sfx');
     var siren = new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.2 } }).connect(vol);
     var laser = new Tone.FMSynth({ harmonicity: 5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }).connect(vol);
@@ -839,7 +847,10 @@
   }
 
   function createChordSynth(presetName) {
-    var preset = CHORD_SOUNDS[presetName || currentChordSound] || CHORD_SOUNDS['Piano Chords'];
+    var name = presetName || currentChordSound;
+    var sampled = packEntry('chords', name);
+    if (sampled) return createSampledInstrument(sampled, 'chords');
+    var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS['Piano Chords'];
     var bus = makeBus('chords');
     var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).connect(bus);
     var poly = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
@@ -870,15 +881,111 @@
     };
   }
 
+  // ── Sample pack ──
+  // Optional. Drop a manifest at samples/pack.json to replace any built-in
+  // sound with real recordings. Anything the pack does not name keeps its
+  // synth, so a partial pack is fine and a missing one changes nothing.
+  var samplePack = null;
+
+  function loadSamplePack() {
+    return fetch('samples/pack.json')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (p) { samplePack = p; })
+      .catch(function () { samplePack = null; });
+  }
+
+  function packEntry(group, name) {
+    return (samplePack && samplePack[group] && samplePack[group][name]) || null;
+  }
+
+  function packBase(sub) {
+    return (samplePack && samplePack.baseUrl ? samplePack.baseUrl : 'samples/') + (sub || '');
+  }
+
+  // A failed decode must not leave the Transport waiting forever.
+  function loadGuard(promise) {
+    return Promise.race([
+      promise,
+      new Promise(function (res) { setTimeout(res, 8000); })
+    ]);
+  }
+
+  function createSampledInstrument(def, inst) {
+    var bus = makeBus(inst);
+    var sampler;
+    var loaded = new Promise(function (resolve) {
+      sampler = new Tone.Sampler({
+        urls: def.urls,
+        baseUrl: packBase(def.baseUrl),
+        release: def.release != null ? def.release : 1,
+        volume: def.gain || 0,
+        onload: resolve,
+        onerror: resolve
+      }).connect(bus);
+    });
+    pendingAudioLoads.push(loadGuard(loaded));
+    return {
+      play: function (note, dur, time) {
+        if (!sampler.loaded) return;
+        sampler.triggerAttackRelease(note, dur, time);
+      },
+      dispose: function () { sampler.dispose(); bus.dispose(); }
+    };
+  }
+
+  // One-shot kits (drums, sfx) fall back per pad, so a pack can replace just
+  // the kick and leave the rest synthesised.
+  function withSampledPads(group, names, fallback) {
+    var map = samplePack && samplePack[group];
+    if (!map) return fallback;
+    var bus = makeBus(group);
+    var players = {};
+    var pending = [];
+    names.forEach(function (name) {
+      var src = map[name];
+      if (!src) return;
+      pending.push(loadGuard(new Promise(function (resolve) {
+        players[name] = new Tone.Player({
+          url: packBase(typeof src === 'string' ? src : src.url),
+          volume: (typeof src === 'object' && src.gain) || 0,
+          onload: resolve,
+          onerror: resolve
+        }).connect(bus);
+      })));
+    });
+    if (!pending.length) { bus.dispose(); return fallback; }
+    pendingAudioLoads.push(Promise.all(pending));
+    return {
+      trigger: function (name, time) {
+        var pl = players[name];
+        if (pl && pl.loaded) { pl.start(time); return; }
+        fallback.trigger(name, time);
+      },
+      dispose: function () {
+        Object.keys(players).forEach(function (k) { players[k].dispose(); });
+        bus.dispose();
+        fallback.dispose();
+      }
+    };
+  }
+
+  function createInstrument(group, soundName, poly) {
+    var def = packEntry(group, soundName);
+    if (def) return createSampledInstrument(def, group);
+    var bank = group === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
+    var preset = bank[soundName] || bank[Object.keys(bank)[0]];
+    return createSynthFromPreset(preset, poly, group);
+  }
+
   function getOrCreateBassSynth() {
     if (synths.bass) synths.bass.dispose();
-    synths.bass = createSynthFromPreset(BASS_SOUNDS[currentBassSound], false);
+    synths.bass = createInstrument('bass', currentBassSound, false);
     return synths.bass;
   }
 
   function getOrCreateMelodySynth() {
     if (synths.melody) synths.melody.dispose();
-    synths.melody = createSynthFromPreset(MELODY_SOUNDS[currentMelodySound], true);
+    synths.melody = createInstrument('melody', currentMelodySound, true);
     return synths.melody;
   }
 
@@ -2061,13 +2168,13 @@
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
-      if (!synths.bgBass) synths.bgBass = createSynthFromPreset(BASS_SOUNDS[sub.sound || 'Analog Bass'], false);
+      if (!synths.bgBass) synths.bgBass = createInstrument('bass', sub.sound || 'Analog Bass', false);
       var bnotes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
-      if (!synths.bgMelody) synths.bgMelody = createSynthFromPreset(MELODY_SOUNDS[sub.sound || 'Piano'], true);
+      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true);
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
@@ -2807,6 +2914,7 @@
     strip.appendChild(canvas);
   }
 
+  loadSamplePack();
   initThemePicker();
   initHome();
 })();

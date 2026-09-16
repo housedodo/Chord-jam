@@ -1,0 +1,39 @@
+{
+  "name": "Example pack",
+  "baseUrl": "samples/",
+
+  "melody": {
+    "Piano": {
+      "baseUrl": "piano/",
+      "urls": { "C4": "C4.mp3", "F#4": "Fs4.mp3", "C5": "C5.mp3", "F#5": "Fs5.mp3" },
+      "release": 1,
+      "gain": -3
+    }
+  },
+
+  "bass": {
+    "Analog Bass": {
+      "baseUrl": "bass/",
+      "urls": { "C2": "C2.mp3", "G2": "G2.mp3", "C3": "C3.mp3" },
+      "gain": -2
+    }
+  },
+
+  "chords": {
+    "Piano Chords": {
+      "baseUrl": "piano/",
+      "urls": { "C4": "C4.mp3", "F#4": "Fs4.mp3", "C5": "C5.mp3" },
+      "release": 1.5
+    }
+  },
+
+  "drums": {
+    "Kick": "drums/kick.wav",
+    "Snare": "drums/snare.wav",
+    "HiHat": { "url": "drums/hihat.wav", "gain": -4 }
+  },
+
+  "sfx": {
+    "Boom": "sfx/boom.wav"
+  }
+}
