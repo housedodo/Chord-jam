@@ -1498,6 +1498,30 @@
     });
   }
 
+  // Furthest left a block can be dragged before it would run into the block
+  // in front of it. `laneNote` limits the check to one pitch row; pass null
+  // when any block blocks (monophonic bass, and the single chord lane).
+  function leftBoundFor(notes, idx, anchorEnd, laneNote) {
+    var limit = 0;
+    for (var i = 0; i < notes.length; i++) {
+      if (i === idx) continue;
+      var n = notes[i];
+      if (laneNote !== null && n.note !== laneNote) continue;
+      var nEnd = n.start + n.length;
+      if (nEnd <= anchorEnd && nEnd > limit) limit = nEnd;
+    }
+    return limit;
+  }
+
+  // Which edge of a block the pointer landed on, or null for its middle.
+  function grabbedEdge(rect, clientX) {
+    var x = clientX - rect.left;
+    var grip = Math.min(12, rect.width / 3);
+    if (x < grip) return 'left';
+    if (x > rect.width - grip) return 'right';
+    return null;
+  }
+
   // ── Piano Roll (bass/melody with edge-drag) ──
   function initPianoRoll(inst, noteNames, polyphonic) {
     var grid = document.getElementById(inst + '-grid');
@@ -1584,10 +1608,10 @@
       var block = e.target.closest('.pr-note-block');
       if (block) {
         var idx = +block.dataset.index;
-        var rect = block.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        if (x > rect.width - 12) {
-          resizing = { noteIdx: idx };
+        var edge = grabbedEdge(block.getBoundingClientRect(), e.clientX);
+        var grabbed = pianoRollNotes[idx];
+        if (edge && grabbed) {
+          resizing = { noteIdx: idx, edge: edge, anchorEnd: grabbed.start + grabbed.length };
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
         } else {
@@ -1620,7 +1644,7 @@
       pianoRollNotes.push({ note: noteName, start: step, length: 1 });
       renderPR(inst, reversed, cellH);
 
-      resizing = { noteIdx: pianoRollNotes.length - 1 };
+      resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
       canvas.setPointerCapture(e.pointerId);
 
       ensureAudio().then(function () {
@@ -1636,6 +1660,20 @@
       var step = Math.floor((x - LABEL_W) / CELL_W);
       var note = pianoRollNotes[resizing.noteIdx];
       if (!note) return;
+
+      if (resizing.edge === 'left') {
+        // The right edge stays put; the start slides and the length follows.
+        var end = resizing.anchorEnd;
+        var floor = leftBoundFor(pianoRollNotes, resizing.noteIdx, end, polyphonic ? note.note : null);
+        var newStart = Math.max(floor, Math.min(end - 1, step));
+        if (newStart !== note.start) {
+          note.start = newStart;
+          note.length = end - newStart;
+          renderPR(inst, reversed, cellH);
+        }
+        return;
+      }
+
       var newLen = Math.max(1, Math.min(STEPS - note.start, step - note.start + 1));
       if (!polyphonic) {
         var next = pianoRollNotes.find(function (n) { return n !== note && n.note === note.note && n.start > note.start; });
@@ -1825,10 +1863,10 @@
       var block = e.target.closest('.ct-note-block');
       if (block) {
         var idx = +block.dataset.index;
-        var rect = block.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        if (x > rect.width - 12) {
-          resizing = { noteIdx: idx };
+        var edge = grabbedEdge(block.getBoundingClientRect(), e.clientX);
+        var grabbed = pianoRollNotes[idx];
+        if (edge && grabbed) {
+          resizing = { noteIdx: idx, edge: edge, anchorEnd: grabbed.start + grabbed.length };
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
         } else {
@@ -1854,7 +1892,7 @@
       pianoRollNotes.push({ note: selectedChord, start: step, length: 1 });
       renderCT(cellH);
 
-      resizing = { noteIdx: pianoRollNotes.length - 1 };
+      resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
       canvas.setPointerCapture(e.pointerId);
 
       ensureAudio().then(function () {
@@ -1871,6 +1909,20 @@
       var step = Math.floor(x / CELL_W);
       var note = pianoRollNotes[resizing.noteIdx];
       if (!note) return;
+
+      if (resizing.edge === 'left') {
+        // Chords share one lane, so any other block bounds the drag.
+        var end = resizing.anchorEnd;
+        var floor = leftBoundFor(pianoRollNotes, resizing.noteIdx, end, null);
+        var newStart = Math.max(floor, Math.min(end - 1, step));
+        if (newStart !== note.start) {
+          note.start = newStart;
+          note.length = end - newStart;
+          renderCT(cellH);
+        }
+        return;
+      }
+
       var newLen = Math.max(1, Math.min(STEPS - note.start, step - note.start + 1));
       var nextChord = pianoRollNotes
         .filter(function (n, i) { return i !== resizing.noteIdx && n.start > note.start; })
