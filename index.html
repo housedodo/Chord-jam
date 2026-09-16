@@ -71,7 +71,6 @@
           <div class="option-toggles" id="lobby-features">
             <label class="option-toggle"><input type="checkbox" id="opt-sfx"> <span>Sound FX Layer</span></label>
             <label class="option-toggle"><input type="checkbox" id="opt-buildup"> <span>Layered Reveal</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-arp"> <span>Arpeggiator</span></label>
             <label class="option-toggle"><input type="checkbox" id="opt-vocal"> <span>Vocal Layer</span></label>
           </div>
         </div>
@@ -107,7 +106,6 @@
           <div class="option-toggles" id="solo-features">
             <label class="option-toggle"><input type="checkbox" id="solo-opt-sfx"> <span>Sound FX Layer</span></label>
             <label class="option-toggle"><input type="checkbox" id="solo-opt-buildup"> <span>Layered Reveal</span></label>
-            <label class="option-toggle"><input type="checkbox" id="solo-opt-arp"> <span>Arpeggiator</span></label>
             <label class="option-toggle"><input type="checkbox" id="solo-opt-vocal"> <span>Vocal Layer</span></label>
           </div>
         </div>
@@ -252,24 +250,6 @@
         <div id="vocal-timeline" class="vocal-timeline"></div>
       </div>
 
-      <!-- Arpeggiator controls (shown alongside chords when enabled) -->
-      <div id="arp-controls" class="arp-controls" style="display:none">
-        <label class="arp-label">Arpeggiator</label>
-        <div class="arp-options">
-          <select id="arp-pattern" class="arp-select">
-            <option value="up">Up</option>
-            <option value="down">Down</option>
-            <option value="updown">Up-Down</option>
-            <option value="random">Random</option>
-          </select>
-          <select id="arp-speed" class="arp-select">
-            <option value="8n">1/8</option>
-            <option value="16n" selected>1/16</option>
-            <option value="32n">1/32</option>
-          </select>
-          <button id="btn-arp-preview" class="btn-secondary btn-sm">Preview Arp</button>
-        </div>
-      </div>
 
       <button id="btn-listen-existing" class="btn-secondary btn-listen-existing" style="display:none">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>

@@ -1716,39 +1716,6 @@ body {
   50% { opacity: 0.6; transform: scale(1.1); }
 }
 
-/* Arpeggiator controls */
-.arp-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.arp-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-.arp-options {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.arp-select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  font-family: inherit;
-}
 .btn-sm {
   font-size: 0.75rem;
   padding: 6px 12px;
@@ -1835,7 +1802,6 @@ body {
 :root[data-skin="notebook"] .layer-card,
 :root[data-skin="notebook"] .guess-row,
 :root[data-skin="notebook"] .player-chip,
-:root[data-skin="notebook"] .arp-controls,
 :root[data-skin="notebook"] .vocal-timeline,
 :root[data-skin="notebook"] .option-toggle,
 :root[data-skin="notebook"] .song-input,
@@ -2129,7 +2095,6 @@ body {
 :root[data-skin="riso"] .game-options,
 :root[data-skin="riso"] .layer-card,
 :root[data-skin="riso"] .guess-row,
-:root[data-skin="riso"] .arp-controls,
 :root[data-skin="riso"] .vocal-timeline,
 :root[data-skin="riso"] .option-toggle,
 :root[data-skin="riso"] .song-input,

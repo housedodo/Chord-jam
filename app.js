@@ -174,7 +174,6 @@
     buildup: false,
     genrelock: false,
     remix: false,
-    arp: false,
     vocal: false
   };
   let votes = {};
@@ -197,7 +196,6 @@
     gameSettings.buildup = !!(document.getElementById(p + 'opt-buildup') && document.getElementById(p + 'opt-buildup').checked);
     gameSettings.genrelock = !!(document.getElementById(p + 'opt-genrelock') && document.getElementById(p + 'opt-genrelock').checked);
     gameSettings.remix = !!(document.getElementById(p + 'opt-remix') && document.getElementById(p + 'opt-remix').checked);
-    gameSettings.arp = !!(document.getElementById(p + 'opt-arp') && document.getElementById(p + 'opt-arp').checked);
     gameSettings.vocal = !!(document.getElementById(p + 'opt-vocal') && document.getElementById(p + 'opt-vocal').checked);
     INSTRUMENTS = getActiveInstruments();
   }
@@ -1564,9 +1562,6 @@
         ? { dataUrl: vocalClip.dataUrl, start: vocalClip.start, steps: vocalClip.steps }
         : { dataUrl: null };
     }
-    if (instrument === 'chords' && gameSettings.arp) {
-      return applyArpToChords(pianoRollNotes.slice());
-    }
     return pianoRollNotes.slice();
   }
 
@@ -1580,36 +1575,7 @@
     else if (instrument === 'sfx') initSfxGrid();
     else if (instrument === 'vocal') {
       initVocalRecorder();
-      var arpElV = document.getElementById('arp-controls');
-      if (arpElV) arpElV.style.display = 'none';
       return;
-    }
-
-    // Show arp controls when building chords with arp enabled
-    var arpEl = document.getElementById('arp-controls');
-    if (arpEl) {
-      arpEl.style.display = (instrument === 'chords' && gameSettings.arp) ? 'flex' : 'none';
-      var arpPreviewBtn = document.getElementById('btn-arp-preview');
-      if (arpPreviewBtn) {
-        arpPreviewBtn.onclick = function () {
-          if (pianoRollNotes.length === 0) { toast('Place some chords first'); return; }
-          var arpData = applyArpToChords(pianoRollNotes);
-          ensureAudio().then(function () {
-            if (!synths.chords) synths.chords = createChordSynth();
-            var i = 0;
-            var speed = document.getElementById('arp-speed') ? document.getElementById('arp-speed').value : '16n';
-            var interval = Tone.Time(speed).toMilliseconds();
-            function playNext() {
-              if (i >= arpData.length) return;
-              var n = arpData[i];
-              if (n.isArp) synths.chords.play([n.note], 0.1);
-              i++;
-              setTimeout(playNext, interval);
-            }
-            playNext();
-          });
-        };
-      }
     }
 
     var playBtn = document.getElementById(instrument + '-play');
@@ -2863,38 +2829,6 @@
     return data;
   }
 
-  // ── Arpeggiator ──
-  function arpeggiate(chordNotes, pattern, steps) {
-    if (!chordNotes || chordNotes.length === 0) return [];
-    var seq = [];
-    var notes = chordNotes.slice();
-    if (pattern === 'down') notes.reverse();
-    else if (pattern === 'updown') {
-      var up = notes.slice();
-      var down = notes.slice().reverse().slice(1, -1);
-      notes = up.concat(down);
-    }
-    for (var i = 0; i < steps; i++) {
-      var idx = pattern === 'random' ? Math.floor(Math.random() * chordNotes.length) : i % notes.length;
-      seq.push(notes[idx] || chordNotes[0]);
-    }
-    return seq;
-  }
-
-  function applyArpToChords(chordData) {
-    if (!gameSettings.arp) return chordData;
-    var pattern = document.getElementById('arp-pattern') ? document.getElementById('arp-pattern').value : 'up';
-    var result = [];
-    chordData.forEach(function (n) {
-      var cn = lookupChordNotes(n.note);
-      if (!cn) { result.push(n); return; }
-      var arpNotes = arpeggiate(cn, pattern, n.length);
-      for (var i = 0; i < arpNotes.length; i++) {
-        result.push({ note: arpNotes[i], start: n.start + i, length: 1, isArp: true });
-      }
-    });
-    return result;
-  }
 
   // ── Vocal Recording ──
   // The clip is a block on the 32-step grid like a chord: { dataUrl, start, steps }
