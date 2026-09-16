@@ -1,4 +1,25 @@
 {
-  "name": "No sample pack yet",
-  "baseUrl": "samples/"
+  "name": "Draga bass pack",
+  "baseUrl": "samples/",
+
+  "bass": {
+    "Moog": {
+      "baseUrl": "bass/",
+      "urls": { "C1": "moog.mp3" },
+      "release": 0.3,
+      "gain": -10
+    },
+    "Juno": {
+      "baseUrl": "bass/",
+      "urls": { "C1": "juno.mp3" },
+      "release": 0.3,
+      "gain": -12
+    },
+    "Synthwave": {
+      "baseUrl": "bass/",
+      "urls": { "C2": "synthwave.mp3" },
+      "release": 0.4,
+      "gain": -9
+    }
+  }
 }

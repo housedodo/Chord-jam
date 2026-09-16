@@ -1021,6 +1021,16 @@
     };
   }
 
+  // Built-in sounds plus any the pack adds, so a pack can extend the picker
+  // rather than only replacing what is already there.
+  function soundNamesFor(group) {
+    var bank = group === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
+    var names = Object.keys(bank);
+    var fromPack = (samplePack && samplePack[group]) ? Object.keys(samplePack[group]) : [];
+    fromPack.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+    return names;
+  }
+
   function createInstrument(group, soundName, poly, patch) {
     if (soundName === PRODUCER_SOUND) return createProducerSynth(patch, group);
     var def = packEntry(group, soundName);
@@ -1793,9 +1803,8 @@
     // Sound selector
     var soundBar = document.createElement('div');
     soundBar.className = 'sound-selector';
-    var sounds = inst === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
     var curSound = inst === 'bass' ? currentBassSound : currentMelodySound;
-    Object.keys(sounds).forEach(function (name) {
+    soundNamesFor(inst).forEach(function (name) {
       var btn = document.createElement('button');
       btn.className = 'sound-btn' + (name === curSound ? ' active' : '');
       btn.textContent = name;
