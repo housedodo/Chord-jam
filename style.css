@@ -617,6 +617,18 @@ body {
 }
 .note-grid::-webkit-scrollbar { display: none; }
 
+/* A grid holding a piano roll scrolls inside the roll rather than as a whole,
+   so the sound picker and the chord bar stay put while the notes scroll under
+   them. Without this the grid takes its content's full height and the panels
+   above the roll scroll off the top. */
+.note-grid.note-grid-roll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.note-grid.note-grid-roll .piano-roll-wrapper { min-height: 0; }
+.note-grid.note-grid-roll .piano-roll { min-height: 0; overflow: auto; }
+
 .note-grid-inner {
   display: grid;
   gap: 2px;

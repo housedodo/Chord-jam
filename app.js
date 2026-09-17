@@ -25,9 +25,18 @@
     }
     return out;
   }
-  const NOTE_NAMES_BASS = buildRange('C', 2, 'G', 3);
-  const NOTE_NAMES_MELODY = buildRange('C', 4, 'C', 6);
-  const NOTE_NAMES_CHORDS = buildRange('C', 3, 'C', 5);
+  // One range for every melodic layer: C2 to C6, 49 rows. The roll scrolls, and
+  // each layer opens at the register it is usually written in rather than at
+  // the top of the range.
+  const ROLL_LOW = ['C', 2];
+  const ROLL_HIGH = ['C', 6];
+  const ROLL_RANGE = buildRange(ROLL_LOW[0], ROLL_LOW[1], ROLL_HIGH[0], ROLL_HIGH[1]);
+  const NOTE_NAMES_BASS = ROLL_RANGE;
+  const NOTE_NAMES_MELODY = ROLL_RANGE;
+  const NOTE_NAMES_CHORDS = ROLL_RANGE;
+  // Where each layer opens: the note parked near the bottom of the view, so
+  // the room to draw is above it.
+  const ROLL_HOME = { bass: 'C2', chords: 'C3', melody: 'C4' };
   function isSharp(noteName) { return noteName.indexOf('#') !== -1; }
   const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const CHORD_QUALITIES = [
@@ -2178,6 +2187,7 @@
     // than in initPianoRoll means a resize, which rebuilds the roll, does not
     // wipe out what the player has dialled in.
     if (SHAPED_LAYERS[instrument]) reseedShape(instrument);
+    rollScrollTop = null;
     var game = games[currentGameIdx];
     var playerIdx = (netMode !== 'local') ? myPlayerIndex : currentTurnPlayer;
     var isOwn = game.enteredBy === playerIdx;
@@ -2944,6 +2954,7 @@
     rollRebuild = function () { initPianoRoll(inst, noteNames, polyphonic, chordMode); };
     var grid = document.getElementById(inst + '-grid');
     grid.innerHTML = '';
+    grid.classList.add('note-grid-roll');
     pianoRollNotes = [];
 
     var wrapper = document.createElement('div');
@@ -3002,6 +3013,25 @@
 
     rollContainer.appendChild(canvas);
     wrapper.appendChild(rollContainer);
+
+    // 49 rows fit on no screen, and the top of the range is the least useful
+    // place to land, so open with the layer's home note near the bottom of the
+    // view and the room to draw above it. A rebuild (a rotation) keeps
+    // whatever the player had scrolled to instead.
+    function restoreScroll(tries) {
+      if (rollContainer.scrollHeight - rollContainer.clientHeight <= 0) {
+        // The flex column has not settled on the frame the screen appears, so
+        // there is nothing to scroll yet and the position would come out zero.
+        if (tries > 0) setTimeout(function () { restoreScroll(tries - 1); }, 50);
+        return;
+      }
+      if (rollScrollTop != null) { rollContainer.scrollTop = rollScrollTop; return; }
+      var homeRow = reversed.indexOf(ROLL_HOME[inst] || 'C3');
+      if (homeRow < 0) return;
+      rollContainer.scrollTop = Math.max(0, (homeRow + 1) * cellH - rollContainer.clientHeight * 0.82);
+    }
+    requestAnimationFrame(function () { restoreScroll(10); });
+    rollContainer.addEventListener('scroll', function () { rollScrollTop = rollContainer.scrollTop; });
     grid.appendChild(wrapper);
 
     // Interaction: edge-drag resize
@@ -3126,6 +3156,9 @@
   // carried across by hand.
   let rollRebuild = null;
   let rollRedraw = null;
+  // Where the roll is scrolled to, kept across a rebuild and cleared when a
+  // new round opens a fresh layer.
+  let rollScrollTop = null;
   let lastPhoneLayout = isPhoneLayout();
 
   window.addEventListener('resize', function () {
