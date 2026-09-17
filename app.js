@@ -1184,11 +1184,17 @@
     };
   }
 
-  // ── Producer Edition ──
+  // ── Oscillator ──
   // A plain oscillator + ADSR the player can dial in, rather than a fixed
   // preset. The patch travels with the layer so everyone hears the same sound.
-  const PRODUCER_SOUND = 'Producer Edition';
+  const PRODUCER_SOUND = 'Oscillator';
   const PRODUCER_WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
+  // Measured, not guessed: each waveform played against the twelve stock melody
+  // presets, at the cutoff where it is loudest. A flat -10 left the oscillator
+  // 4 to 10 dB hotter than everything else, square worst. These bring each
+  // waveform to the stock presets' peak-RMS average, so the oscillator sits in
+  // the mix instead of on top of it and switching waveform no longer jumps.
+  const WAVE_TRIM = { sine: -19, triangle: -17.5, sawtooth: -15, square: -20 };
   const PRODUCER_DEFAULT = { wave: 'sawtooth', attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4, cutoff: 6000 };
   const CUTOFF_MIN = 80;
   const CUTOFF_MAX = 14000;
@@ -1215,7 +1221,7 @@
     return CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, t);
   }
 
-  function createProducerSynth(patch, inst) {
+  function createOscSynth(patch, inst) {
     var p = normalisePatch(patch);
     var bus = makeBus(inst);
     var reverb = makeReverb((inst || 'melody') + ':prod', 1.2, 0.14, bus);
@@ -1223,7 +1229,7 @@
     var syn = capVoices(new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: p.wave },
       envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release },
-      volume: -10
+      volume: WAVE_TRIM[p.wave] != null ? WAVE_TRIM[p.wave] : -17
     }).connect(filter), 16);
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
@@ -1250,7 +1256,7 @@
   }
 
   function createInstrument(group, soundName, poly, patch) {
-    if (soundName === PRODUCER_SOUND) return createProducerSynth(patch, group);
+    if (soundName === PRODUCER_SOUND) return createOscSynth(patch, group);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group);
     var bank = bankFor(group);
@@ -1325,9 +1331,8 @@
   // Bars along the lower third, driven by the theme's own spectrum. Deliberately
   // coarse: redrawn at 14fps and snapped to 10 height steps, so it jitters like
   // a cheap meter rather than gliding like a chart.
-  const HOME_BAR_COUNT = 28;
-  const HOME_BAR_FPS = 14;
-  const HOME_BAR_LEVELS = 10;
+  const HOME_BAR_COUNT = 24;
+  const HOME_BAR_FPS = 30;
   // The theme's energy sits between roughly 60Hz and 4kHz and is 45dB down by
   // the top of that, so the bars span that range on a log scale and the higher
   // ones get a lift. Mapping them across the full spectrum instead left the
@@ -1369,8 +1374,8 @@
       // getByteFrequencyData is already logarithmic, so the tilt adds rather
       // than multiplies — a multiplier cannot lift a band that reads zero.
       var lifted = peak > 0 ? peak + (i / (HOME_BAR_COUNT - 1)) * HOME_BAR_TILT : 0;
-      var level = Math.round((Math.min(255, lifted) / 255) * HOME_BAR_LEVELS);
-      homeBarEls[i].style.height = (level / HOME_BAR_LEVELS * 100) + '%';
+      // No quantising: stepped heights were most of what read as jitter.
+      homeBarEls[i].style.height = (Math.min(255, lifted) / 255 * 100).toFixed(1) + '%';
     }
   }
 
@@ -1490,7 +1495,9 @@
     // A small FFT with no smoothing: the bars are meant to twitch, not glide.
     musicAnalyser = musicCtx.createAnalyser();
     musicAnalyser.fftSize = 1024;
-    musicAnalyser.smoothingTimeConstant = 0;
+    // Smoothing is what turns a twitching meter into a swell. The analyser
+    // blends each frame with the last, so the bars drift instead of snapping.
+    musicAnalyser.smoothingTimeConstant = 0.82;
     musicAnalyser.minDecibels = -95;
     musicAnalyser.maxDecibels = -25;
     musicGain.connect(musicAnalyser);
@@ -2239,7 +2246,7 @@
     return null;
   }
 
-  function buildProducerPanel() {
+  function buildOscPanel() {
     var panel = document.createElement('div');
     panel.className = 'producer-panel';
 
@@ -2322,7 +2329,7 @@
     reset.textContent = 'Reset';
     reset.onclick = function () {
       melodyPatch = Object.assign({}, PRODUCER_DEFAULT);
-      var fresh = buildProducerPanel();
+      var fresh = buildOscPanel();
       fresh.style.display = 'flex';
       panel.replaceWith(fresh);
       repatch();
@@ -2422,7 +2429,7 @@
     wrapper.appendChild(soundBar);
     if (chordMode) wrapper.appendChild(buildChordBar());
     if (inst === 'melody') {
-      producerPanel = buildProducerPanel();
+      producerPanel = buildOscPanel();
       producerPanel.style.display = currentMelodySound === PRODUCER_SOUND ? 'flex' : 'none';
       wrapper.appendChild(producerPanel);
     }

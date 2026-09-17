@@ -1780,7 +1780,7 @@ body {
 .pr-note-block::after,
 .ct-note-block::after { right: 3px; }
 
-/* Producer Edition panel */
+/* Oscillator panel */
 .sound-btn-producer {
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -2756,8 +2756,8 @@ body {
   height: 33vh;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  padding: 0 2px;
+  gap: 7px;
+  padding: 0 7px;
   pointer-events: none;
   z-index: 0;
   opacity: 0.22;
@@ -2772,6 +2772,9 @@ body {
   display: block;
   height: 0;
   background: var(--accent);
+  /* The analyser is smoothed and the bars are redrawn 30 times a second, so
+     a short ease on top is enough to make the movement read as a swell. */
+  transition: height 0.14s ease-out;
 }
 :root[data-skin="phosphor"] .home-bars i {
   background: linear-gradient(to top, var(--ph-green), var(--ph-bright));
@@ -2779,7 +2782,12 @@ body {
 }
 .home-container { position: relative; z-index: 1; }
 
+@media (max-width: 600px) {
+  .home-bars { gap: 4px; padding: 0 4px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .home-bars i { transition: none; }
   .wait-cell.on { animation: none; background: var(--wait-color); border-color: var(--wait-color); }
   .wait-head { display: none; }
   .home-bars { display: none; }
