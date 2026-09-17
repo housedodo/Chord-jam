@@ -1277,7 +1277,8 @@
   // a replacement track is handled automatically.
   const MENU_SCREENS = { home: 1, lobby: 1, solo: 1 };
   const MUSIC_VOLUME = 0.3;
-  const MUSIC_FADE = 0.45;        // seconds
+  const MUSIC_FADE = 0.45;        // seconds, fading out
+  const MUSIC_ATTACK = 1.6;       // seconds, fading in
   const MUSIC_SILENCE = 0.0032;   // about -50 dBFS
 
   var musicCtx = null;
@@ -1309,12 +1310,26 @@
 
   function musicNow() { return musicCtx ? musicCtx.currentTime : 0; }
 
-  function fadeMusicTo(value) {
+  // The track opens on a hard transient — it goes from -27 dB to -7 dB inside
+  // 50ms — so coming in on a longer ramp is what keeps it from barking at you.
+  // Rising exponentially rather than linearly makes that ramp even in decibels,
+  // which is what the ear reads as a smooth swell.
+  function fadeMusicTo(value, seconds) {
     if (!musicGain) return;
     var g = musicGain.gain;
-    g.cancelScheduledValues(musicNow());
-    g.setValueAtTime(g.value, musicNow());
-    g.linearRampToValueAtTime(value, musicNow() + MUSIC_FADE);
+    var t0 = musicNow();
+    var dur = seconds != null ? seconds : MUSIC_FADE;
+    g.cancelScheduledValues(t0);
+    if (value > 0) {
+      // exponentialRampToValueAtTime cannot start from zero, and starting from
+      // a hair above it would waste the ramp climbing out of inaudibility.
+      var floor = Math.max(g.value, value * 0.01);
+      g.setValueAtTime(floor, t0);
+      g.exponentialRampToValueAtTime(value, t0 + dur);
+    } else {
+      g.setValueAtTime(g.value, t0);
+      g.linearRampToValueAtTime(0, t0 + dur);
+    }
   }
 
   function startMusicSource() {
@@ -1347,7 +1362,7 @@
         if (musicCtx.state !== 'running') return;
         events.forEach(function (e) { document.removeEventListener(e, go, true); });
         musicArmed = false;
-        if (musicWanted && musicOn) { startMusicSource(); fadeMusicTo(MUSIC_VOLUME); }
+        if (musicWanted && musicOn) { startMusicSource(); fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK); }
       }).catch(function () {});
     }
     events.forEach(function (e) { document.addEventListener(e, go, true); });
@@ -1362,7 +1377,7 @@
     if (musicWanted && musicOn) {
       if (musicCtx.state === 'running') {
         startMusicSource();
-        fadeMusicTo(MUSIC_VOLUME);
+        fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
       } else {
         // Arm the gesture listeners first and unconditionally. A resume() with
         // no user activation behind it does not reject — Chrome leaves the
@@ -1373,7 +1388,7 @@
         musicCtx.resume().then(function () {
           if (musicCtx.state === 'running' && musicWanted && musicOn) {
             startMusicSource();
-            fadeMusicTo(MUSIC_VOLUME);
+            fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
           }
         }).catch(function () {});
       }
