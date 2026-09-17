@@ -68,5 +68,15 @@
       "release": 0.5,
       "gain": -10.8
     }
+  },
+  "melody": {
+    "Piano": {
+      "baseUrl": "chords/",
+      "urls": {
+        "C4": "piano.mp3"
+      },
+      "release": 0.8,
+      "gain": -2.9
+    }
   }
 }
