@@ -1266,81 +1266,156 @@
   }
 
   // ── Menu music ──
-  // Optional: drop an mp3 at music/theme.mp3 and it plays on the title and
-  // setup screens only. A plain Audio element rather than Tone, so it never
-  // shares a context with the sequencer and cannot disturb its timing.
+  // Optional: drop an mp3 at music/theme.mp3 and it plays on the title, lobby
+  // and setup screens.
+  //
+  // Played through Web Audio rather than an <audio> element. An mp3 carries
+  // encoder padding that a plain loop cannot skip, which is the half-second
+  // gap you hear on every repeat; an AudioBufferSourceNode loops on exact
+  // sample positions, so the seam is silent. Those positions are measured
+  // from the decoded audio, so trimming the file by hand is never needed and
+  // a replacement track is handled automatically.
   const MENU_SCREENS = { home: 1, lobby: 1, solo: 1 };
   const MUSIC_VOLUME = 0.3;
-  var menuMusic = null;
-  var musicOn = true;
-  var musicFade = null;
-  var musicWanted = false;
+  const MUSIC_FADE = 0.45;        // seconds
+  const MUSIC_SILENCE = 0.0032;   // about -50 dBFS
 
-  function fadeMusic(to, done) {
-    if (!menuMusic) return;
-    clearInterval(musicFade);
-    var step = (to - menuMusic.volume) / 12;
-    musicFade = setInterval(function () {
-      if (!menuMusic) { clearInterval(musicFade); return; }
-      var v = menuMusic.volume + step;
-      if ((step > 0 && v >= to) || (step < 0 && v <= to) || step === 0) {
-        menuMusic.volume = to;
-        clearInterval(musicFade);
-        if (done) done();
-        return;
-      }
-      menuMusic.volume = Math.min(1, Math.max(0, v));
-    }, 40);
+  var musicCtx = null;
+  var musicGain = null;
+  var musicBuffer = null;
+  var musicSource = null;
+  var musicLoop = { start: 0, end: 0 };
+  var musicOn = true;
+  var musicWanted = false;
+  var musicArmed = false;
+
+  // Silence at either end pushes the seam out of time. Find the real first
+  // and last audible samples and loop between those instead.
+  function findLoopPoints(buf) {
+    var n = buf.length, ch = buf.numberOfChannels, data = [], c;
+    for (c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+    function loud(i) {
+      for (var k = 0; k < ch; k++) if (Math.abs(data[k][i]) > MUSIC_SILENCE) return true;
+      return false;
+    }
+    var first = 0;
+    while (first < n - 1 && !loud(first)) first++;
+    var last = n - 1;
+    while (last > first && !loud(last)) last--;
+    // A few ms of tail so a decaying note is not clipped mid-sample.
+    last = Math.min(n - 1, last + Math.round(buf.sampleRate * 0.005));
+    return { start: first / buf.sampleRate, end: (last + 1) / buf.sampleRate };
   }
 
-  function playMenuMusic() {
-    if (!menuMusic || !musicOn) return;
-    var p = menuMusic.play();
-    if (p && p.catch) {
-      // Autoplay is blocked until the page has been interacted with; retry
-      // on the first gesture rather than giving up.
-      p.catch(function () {
-        document.addEventListener('pointerdown', function retry() {
-          document.removeEventListener('pointerdown', retry);
-          if (musicWanted && musicOn && menuMusic) menuMusic.play().catch(function () {});
-        }, { once: true });
-      });
+  function musicNow() { return musicCtx ? musicCtx.currentTime : 0; }
+
+  function fadeMusicTo(value) {
+    if (!musicGain) return;
+    var g = musicGain.gain;
+    g.cancelScheduledValues(musicNow());
+    g.setValueAtTime(g.value, musicNow());
+    g.linearRampToValueAtTime(value, musicNow() + MUSIC_FADE);
+  }
+
+  function startMusicSource() {
+    if (!musicBuffer || musicSource) return;
+    musicSource = musicCtx.createBufferSource();
+    musicSource.buffer = musicBuffer;
+    musicSource.loop = true;
+    musicSource.loopStart = musicLoop.start;
+    musicSource.loopEnd = musicLoop.end;
+    musicSource.connect(musicGain);
+    musicSource.start(0, musicLoop.start);
+  }
+
+  function stopMusicSource() {
+    if (!musicSource) return;
+    try { musicSource.stop(); } catch (e) {}
+    musicSource.disconnect();
+    musicSource = null;
+  }
+
+  // Autoplay stays blocked until the page has been interacted with. Arm every
+  // gesture type, in the capture phase so it lands before a button handler
+  // navigates away, and keep the listeners until playback actually starts.
+  function armMusicGesture() {
+    if (musicArmed) return;
+    musicArmed = true;
+    var events = ['pointerdown', 'touchstart', 'keydown'];
+    function go() {
+      musicCtx.resume().then(function () {
+        if (musicCtx.state !== 'running') return;
+        events.forEach(function (e) { document.removeEventListener(e, go, true); });
+        musicArmed = false;
+        if (musicWanted && musicOn) { startMusicSource(); fadeMusicTo(MUSIC_VOLUME); }
+      }).catch(function () {});
     }
+    events.forEach(function (e) { document.addEventListener(e, go, true); });
   }
 
   function updateMenuMusic(screenId) {
     musicWanted = !!MENU_SCREENS[screenId];
     var btn = document.getElementById('btn-music');
-    if (btn) btn.style.display = musicWanted && menuMusic ? 'flex' : 'none';
-    if (!menuMusic) return;
+    if (btn) btn.style.display = musicWanted && musicBuffer ? 'flex' : 'none';
+    if (!musicBuffer) return;
+
     if (musicWanted && musicOn) {
-      if (menuMusic.paused) { menuMusic.volume = 0; playMenuMusic(); }
-      fadeMusic(MUSIC_VOLUME);
-    } else if (!menuMusic.paused) {
-      // Pause once silent whatever the reason — muted, or off a menu screen —
-      // so a muted track is not left decoding in the background.
-      fadeMusic(0, function () {
-        if (menuMusic && (!musicWanted || !musicOn)) menuMusic.pause();
-      });
+      if (musicCtx.state === 'running') {
+        startMusicSource();
+        fadeMusicTo(MUSIC_VOLUME);
+      } else {
+        // Arm the gesture listeners first and unconditionally. A resume() with
+        // no user activation behind it does not reject — Chrome leaves the
+        // promise pending until a gesture arrives — so waiting on it to fail
+        // meant the fallback was never set up and the title screen stayed
+        // silent until something else happened to start the context.
+        armMusicGesture();
+        musicCtx.resume().then(function () {
+          if (musicCtx.state === 'running' && musicWanted && musicOn) {
+            startMusicSource();
+            fadeMusicTo(MUSIC_VOLUME);
+          }
+        }).catch(function () {});
+      }
+    } else if (musicSource) {
+      fadeMusicTo(0);
+      // Tear the source down once silent, not before, or the fade is cut off.
+      setTimeout(function () {
+        if (!musicWanted || !musicOn) stopMusicSource();
+      }, MUSIC_FADE * 1000 + 60);
     }
   }
 
   function initMenuMusic() {
     var btn = document.getElementById('btn-music');
     musicOn = localStorage.getItem('st-music') !== 'off';
-    var audio = new Audio('music/theme.mp3');
-    audio.loop = true;
-    audio.preload = 'auto';
-    audio.volume = 0;
-    // No file, or an unplayable one: stay silent and keep the button hidden.
-    audio.addEventListener('error', function () {
-      menuMusic = null;
-      if (btn) btn.style.display = 'none';
-    });
-    audio.addEventListener('canplaythrough', function () {
-      menuMusic = audio;
-      updateMenuMusic(document.querySelector('.screen.active').id.replace('screen-', ''));
-    }, { once: true });
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    musicCtx = new Ctx();
+    musicGain = musicCtx.createGain();
+    musicGain.gain.value = 0;
+    musicGain.connect(musicCtx.destination);
+
+    fetch('music/theme.mp3')
+      .then(function (r) { return r.ok ? r.arrayBuffer() : Promise.reject(new Error('no track')); })
+      .then(function (ab) {
+        return new Promise(function (resolve, reject) {
+          // Callback form as well as the promise: older Safari only has that.
+          var ret = musicCtx.decodeAudioData(ab, resolve, reject);
+          if (ret && ret.then) ret.then(resolve, reject);
+        });
+      })
+      .then(function (buf) {
+        musicBuffer = buf;
+        musicLoop = findLoopPoints(buf);
+        var active = document.querySelector('.screen.active');
+        updateMenuMusic(active ? active.id.replace('screen-', '') : 'home');
+      })
+      // No file, or an unplayable one: stay silent and keep the button hidden.
+      .catch(function () {
+        musicBuffer = null;
+        if (btn) btn.style.display = 'none';
+      });
 
     if (!btn) return;
     btn.setAttribute('aria-pressed', String(!musicOn));
@@ -1350,7 +1425,8 @@
       localStorage.setItem('st-music', musicOn ? 'on' : 'off');
       btn.setAttribute('aria-pressed', String(!musicOn));
       btn.classList.toggle('muted', !musicOn);
-      updateMenuMusic(document.querySelector('.screen.active').id.replace('screen-', ''));
+      var active = document.querySelector('.screen.active');
+      updateMenuMusic(active ? active.id.replace('screen-', '') : 'home');
     };
   }
 
