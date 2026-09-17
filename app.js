@@ -7,6 +7,8 @@
   let INSTRUMENTS = BASE_INSTRUMENTS.slice();
   const STEPS = 32;
   const BUILD_TIME = 120;
+  const ROUND_MIN = 120;
+  const ROUND_MAX = 300;
   const SPEED_TIME = 60;
   const SFX_NAMES = ['Siren', 'Laser', 'Boom', 'Sweep', 'Zap', 'Whoosh', 'Glitch', 'Drop'];
   const DRUM_NAMES = ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Tom', 'Rim', 'Crash', 'Cowbell', 'Shaker', 'Conga'];
@@ -128,7 +130,29 @@
     { genre: 'Disco', bpm: [110,130], icon: '🪩', examples: ['Stayin\' Alive','I Will Survive','Don\'t Stop \'Til You Get Enough','Le Freak','Funkytown','Night Fever','Boogie Wonderland','Hot Stuff'] },
     { genre: 'Lo-Fi', bpm: [70,90], icon: '☕', examples: ['Snowman','Coffee','Afternoon','Daydream','Rainy Days','Sunflower','Moonlight','Chillwave'] },
     { genre: 'Punk', bpm: [140,180], icon: '⚡', examples: ['Basket Case','Blitzkrieg Bop','American Idiot','Dammit','All the Small Things','Anarchy in the U.K.','London Calling','I Wanna Be Sedated'] },
-    { genre: 'Latin', bpm: [90,110], icon: '💃', examples: ['Livin\' La Vida Loca','Bailando','Hips Don\'t Lie','Waka Waka','La Bamba','Conga','Vivir Mi Vida','Mas Que Nada'] }
+    { genre: 'Latin', bpm: [90,110], icon: '💃', examples: ['Livin\' La Vida Loca','Bailando','Hips Don\'t Lie','Waka Waka','La Bamba','Conga','Vivir Mi Vida','Mas Que Nada'] },
+    { genre: 'Techno', bpm: [125,140], icon: '🕳️', examples: ['Spastik','Hey Hey','The Bells','Strings of Life','Age of Love','Rej','Higher State of Consciousness','Windowlicker'] },
+    { genre: 'Dubstep', bpm: [138,145], icon: '🔊', examples: ['Scary Monsters and Nice Sprites','Bangarang','Cinema','In For the Kill','Midnight Request Line','I Need Air','Promises','Centipede'] },
+    { genre: 'Hardstyle', bpm: [148,160], icon: '⚡', examples: ['Project One','Dragonborn','Year of Summer','Imaginary','Lion','Words Too Pure','Tyrant','Endymion'] },
+    { genre: 'Ska', bpm: [150,180], icon: '🎺', examples: ['A Message to You Rudy','The Impression That I Get','Sell Out','Enjoy Yourself','One Step Beyond','Monkey Man','Ghost Town','Rudie Can\'t Fail'] },
+    { genre: 'Trance', bpm: [132,142], icon: '🌌', examples: ['Adagio for Strings','For an Angel','Silence','Children','Out of the Blue','Communication','Airport','Everybody\'s Free'] },
+    { genre: 'Trap', bpm: [135,150], icon: '💥', examples: ['Mask Off','Bad and Boujee','Panda','Goosebumps','XO Tour Llif3','Rockstar','Antidote','Black Beatles'] },
+    { genre: 'Drill', bpm: [138,145], icon: '🧊', examples: ['Body','Dior','Welcome to the Party','Gatti','Own It','Bad Habits','Sticky','Mad About Bars'] },
+    { genre: 'Afrobeats', bpm: [100,115], icon: '🥁', examples: ['Essence','Last Last','Ye','Calm Down','Peru','Love Nwantiti','Ojuelegba','Fall'] },
+    { genre: 'K-Pop', bpm: [100,132], icon: '🌟', examples: ['Dynamite','Gangnam Style','How You Like That','Fancy','Butter','Next Level','Kill This Love','Boy With Luv'] },
+    { genre: 'Synthwave', bpm: [80,110], icon: '🕶️', examples: ['Nightcall','Turbo Killer','Sunset','Resonance','A Real Hero','Tech Noir','Miami Nights','Outrun'] },
+    { genre: 'Grunge', bpm: [100,130], icon: '🪓', examples: ['Smells Like Teen Spirit','Black Hole Sun','Alive','Man in the Box','Come as You Are','Even Flow','Heart-Shaped Box','Would?'] },
+    { genre: 'Blues', bpm: [60,100], icon: '🎸', examples: ['The Thrill Is Gone','Sweet Home Chicago','Pride and Joy','Crossroads','Hoochie Coochie Man','Born Under a Bad Sign','Stormy Monday','Red House'] },
+    { genre: 'Reggae', bpm: [60,90], icon: '🌿', examples: ['No Woman No Cry','Three Little Birds','Is This Love','Buffalo Soldier','Redemption Song','Could You Be Loved','Jamming','One Love'] },
+    { genre: 'Gospel', bpm: [70,100], icon: '🙌', examples: ['Oh Happy Day','Total Praise','Amazing Grace','Take Me to the King','Break Every Chain','I Smile','Optimistic','His Eye Is on the Sparrow'] },
+    { genre: 'Salsa', bpm: [180,200], icon: '🍅', examples: ['La Vida Es Un Carnaval','Idilio','Pedro Navaja','El Cantante','Vivir Mi Vida','Aguanile','Quimbara','Llorarás'] },
+    { genre: 'Bossa Nova', bpm: [120,140], icon: '🏖️', examples: ['The Girl from Ipanema','Corcovado','Desafinado','Wave','Mas Que Nada','Águas de Março','Chega de Saudade','One Note Samba'] },
+    { genre: 'Swing', bpm: [120,180], icon: '🎷', examples: ['Sing Sing Sing','In the Mood','Take the A Train','Jumpin\' at the Woodside','Caravan','It Don\'t Mean a Thing','Moonlight Serenade','Zoot Suit Riot'] },
+    { genre: 'Ambient', bpm: [60,90], icon: '🌁', examples: ['Music for Airports','Weightless','An Ending','Avril 14th','Rhubarb','Teardrop','Xtal','Hoppipolla'] },
+    { genre: 'UK Garage', bpm: [130,140], icon: '👟', examples: ['Re-Rewind','Flowers','Sweet Like Chocolate','Do You Really Like It','Little Man','Baby Cakes','Gotta Get Thru This','Ripgroove'] },
+    { genre: 'Psytrance', bpm: [140,150], icon: '🍄', examples: ['Kalifornia','Spirit of the Forest','Dark Whisper','Barbapapa','Hypnotic','Doses','Astral Projection','Becoming Insane'] },
+    { genre: 'Phonk', bpm: [130,150], icon: '🚗', examples: ['Murder in My Mind','Why Not','Sahara','Montagem','Gigachad','Metamorphosis','Close Eyes','Shadow'] },
+    { genre: 'Folk', bpm: [90,120], icon: '🪕', examples: ['The Sound of Silence','Blowin\' in the Wind','Landslide','Big Yellow Taxi','Fast Car','Wagon Wheel','Little Lion Man','Ho Hey'] }
   ];
 
   // Two skins, both paper-based. `skin` drives shape/texture rules in CSS;
@@ -175,10 +199,10 @@
     sfx: false,
     blind: false,
     speed: false,
+    roundSeconds: BUILD_TIME,
     switcheroo: false,
     voting: false,
     buildup: false,
-    genrelock: false,
     remix: false,
     vocal: false
   };
@@ -199,15 +223,34 @@
     gameSettings.speed = !!(document.getElementById(p + 'opt-speed') && document.getElementById(p + 'opt-speed').checked);
     gameSettings.switcheroo = !!(document.getElementById(p + 'opt-switcheroo') && document.getElementById(p + 'opt-switcheroo').checked);
     gameSettings.voting = !soloMode;
+    var rs = document.getElementById(p + 'round-len');
+    if (rs) gameSettings.roundSeconds = Math.max(ROUND_MIN, Math.min(ROUND_MAX, +rs.value || BUILD_TIME));
     gameSettings.buildup = !!(document.getElementById(p + 'opt-buildup') && document.getElementById(p + 'opt-buildup').checked);
-    gameSettings.genrelock = !!(document.getElementById(p + 'opt-genrelock') && document.getElementById(p + 'opt-genrelock').checked);
     gameSettings.remix = !!(document.getElementById(p + 'opt-remix') && document.getElementById(p + 'opt-remix').checked);
     gameSettings.vocal = !!(document.getElementById(p + 'opt-vocal') && document.getElementById(p + 'opt-vocal').checked);
     INSTRUMENTS = getActiveInstruments();
   }
 
   function getBuildTime() {
-    return gameSettings.speed ? SPEED_TIME : BUILD_TIME;
+    if (gameSettings.speed) return SPEED_TIME;
+    return Math.max(ROUND_MIN, Math.min(ROUND_MAX, gameSettings.roundSeconds || BUILD_TIME));
+  }
+
+  // The settings a guest needs so its timers and layer list match the host's.
+  function sharedSettings() {
+    return {
+      sfx: gameSettings.sfx, vocal: gameSettings.vocal, blind: gameSettings.blind,
+      speed: gameSettings.speed, switcheroo: gameSettings.switcheroo,
+      voting: gameSettings.voting, buildup: gameSettings.buildup,
+      remix: gameSettings.remix, roundSeconds: gameSettings.roundSeconds
+    };
+  }
+
+  function applySharedSettings(cfg) {
+    if (!cfg) return;
+    Object.keys(cfg).forEach(function (k) { gameSettings[k] = cfg[k]; });
+    gameSettings.roundSeconds = Math.max(ROUND_MIN, Math.min(ROUND_MAX, +cfg.roundSeconds || BUILD_TIME));
+    INSTRUMENTS = getActiveInstruments();
   }
 
   function buildSwitcherooMap(numPlayers, numRounds) {
@@ -500,6 +543,7 @@
       case 'game_start':
         games = [];
         gameBpm = msg.bpm;
+        applySharedSettings(msg.settings);
         songEntryIdx = 0;
         if (msg.firstEntry === myPlayerIndex) {
           showSongEntryOnline();
@@ -508,6 +552,19 @@
         }
         break;
     }
+  }
+
+  function initRoundLengthSlider() {
+    var el = document.getElementById('round-len');
+    var out = document.getElementById('round-len-val');
+    if (!el || !out) return;
+    var show = function () {
+      var v = +el.value;
+      out.textContent = Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0');
+    };
+    el.value = gameSettings.roundSeconds || BUILD_TIME;
+    show();
+    el.oninput = function () { gameSettings.roundSeconds = +el.value; show(); };
   }
 
   // ── Online lobby ──
@@ -533,12 +590,13 @@
       ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
       var lgc = document.getElementById('lobby-genres');
       if (lgc) renderGenreRoller(lgc, ts, tv);
+      initRoundLengthSlider();
 
       document.getElementById('btn-start').onclick = function () {
         if (players.length < 2) { toast('Need at least 2 players'); return; }
         games = [];
         songEntryIdx = 0;
-        netBroadcast({ type: 'game_start', bpm: gameBpm, firstEntry: 0 });
+        netBroadcast({ type: 'game_start', bpm: gameBpm, firstEntry: 0, settings: sharedSettings() });
         showSongEntryOnline();
       };
     }
@@ -649,7 +707,7 @@
     // Host round timer: auto-advance when BUILD_TIME expires
     roundTimer = setTimeout(function () {
       advanceRound(round + 1);
-    }, (BUILD_TIME * 1000) + 2000);
+    }, (getBuildTime() * 1000) + 2000);
 
     currentTurnPlayer = 0;
     currentGameIdx = getGameIdx(0, round);
@@ -688,7 +746,7 @@
       var nr = nextRound + 1;
       roundTimer = setTimeout(function () {
         advanceRound(nr);
-      }, (BUILD_TIME * 1000) + extraDelay + 2000);
+      }, (getBuildTime() * 1000) + extraDelay + 2000);
 
       // Host builds
       currentTurnPlayer = 0;
@@ -1243,8 +1301,6 @@
       readGameOptions('solo-');
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
       // Capture genre for genre lock
-      var genreEl = document.querySelector('#solo-genres .genre-result-genre');
-      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
       soloInstIdx = 0;
       games = [{ songName: sn, enteredBy: 0, submissions: {}, guesses: [] }];
       currentGameIdx = 0;
@@ -1282,13 +1338,12 @@
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
     var lgc = document.getElementById('lobby-genres');
     if (lgc) renderGenreRoller(lgc, ts, tv);
+    initRoundLengthSlider();
 
     var startBtn = document.getElementById('btn-start');
     startBtn.onclick = function () {
       if (players.length < 2) { toast('Need at least 2 players'); return; }
       readGameOptions('');
-      var genreEl = document.querySelector('#lobby-genres .genre-result-genre');
-      currentGenreLock = (genreEl && genreEl.textContent) ? genreEl.textContent.replace(/^.\s*/, '').trim() : null;
       if (gameSettings.switcheroo) buildSwitcherooMap(players.length, INSTRUMENTS.length);
       startSongEntry();
     };
@@ -1674,37 +1729,9 @@
   let chordPlaceMode = 'chord';
   let chordGroupSeq = 0;
 
-  // With Genre Lock on, only roots that the genre actually uses are placeable.
-  function lockedRootSet() {
-    var locked = getLockedChords();
-    if (!locked) return null;
-    var set = {};
-    locked.forEach(function (name) {
-      var sorted = CHORD_ROOTS.slice().sort(function (a, b) { return b.length - a.length; });
-      for (var i = 0; i < sorted.length; i++) {
-        if (name.indexOf(sorted[i]) === 0) { set[sorted[i]] = true; return; }
-      }
-    });
-    return set;
-  }
-
-  function chordRootAllowed(noteName) {
-    var set = lockedRootSet();
-    if (!set) return true;
-    return !!set[noteName.replace(/-?\d+$/, '')];
-  }
-
   function buildChordBar() {
     var bar = document.createElement('div');
     bar.className = 'chord-bar';
-
-    var lock = lockedRootSet();
-    if (lock) {
-      var tag = document.createElement('span');
-      tag.className = 'genre-lock-label';
-      tag.textContent = 'Genre: ' + (currentGenreLock || 'Locked');
-      bar.appendChild(tag);
-    }
 
     var qLabel = document.createElement('span');
     qLabel.className = 'chord-bar-label';
@@ -2034,7 +2061,6 @@
 
       var placed;
       if (chordMode && chordPlaceMode === 'chord') {
-        if (!chordRootAllowed(noteName)) { toast('Not in this genre'); return; }
         var gid = 'g' + (++chordGroupSeq);
         placed = chordFromPitch(noteName, selectedQuality, noteToMidi(noteNames[noteNames.length - 1]))
           .map(function (n) { return { note: n, start: step, length: 1, chord: gid }; });
@@ -2681,25 +2707,6 @@
     seqs.length = 0;
   }
 
-  // ── Genre Lock ──
-  var GENRE_CHORDS = {
-    'Pop': ['C','G','Am','F','Dm','Em'],
-    'Rock': ['E','A','D','G','B','Em','Am'],
-    'Jazz': ['Cmaj7','Dm7','Em7','Fmaj7','G7','Am7','Bm7','Cm7'],
-    'Blues': ['C7','F7','G7','A7','D7','E7'],
-    'EDM': ['Am','Cm','Fm','Gm','Em','Dm'],
-    'Country': ['G','C','D','Em','Am','A'],
-    'R&B': ['Dm7','Gm7','Am7','Cmaj7','Fmaj7','Em7'],
-    'Reggae': ['G','C','D','Em','Am','Bm'],
-    'Latin': ['Am','Dm','E7','G','C','F'],
-    'Classical': ['C','F','G','Am','Dm','G7','Cmaj7']
-  };
-  var currentGenreLock = null;
-
-  function getLockedChords() {
-    if (!gameSettings.genrelock || !currentGenreLock) return null;
-    return GENRE_CHORDS[currentGenreLock] || null;
-  }
 
   // ── Remix Mode ──
   function remixLayerData(instrument, data) {

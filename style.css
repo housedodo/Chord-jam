@@ -2585,3 +2585,29 @@ body {
   color: var(--riso-ink);
   box-shadow: 3px 3px 0 var(--riso-blue);
 }
+
+/* Option help text: explained in place rather than behind a tooltip */
+.opt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.opt-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.opt-help {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--text-dim);
+  font-weight: 400;
+  white-space: normal;
+}
+.option-toggle {
+  align-items: flex-start;
+}
+.option-toggle input[type="checkbox"] { margin-top: 2px; }
+
+:root[data-skin="notebook"] .opt-help { font-family: 'Caveat', cursive; font-size: 0.92rem; }
+:root[data-skin="riso"] .opt-help { font-size: 0.66rem; letter-spacing: 0.01em; }

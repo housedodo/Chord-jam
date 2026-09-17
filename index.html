@@ -56,22 +56,28 @@
             <span id="lobby-tempo-val" class="tempo-display">120</span>
           </div>
         </div>
+        <div class="lobby-tempo">
+          <label>Round length</label>
+          <div class="tempo-control">
+            <input type="range" id="round-len" min="120" max="300" step="30" value="120">
+            <span id="round-len-val" class="tempo-display">2:00</span>
+          </div>
+        </div>
         <div class="game-options">
           <label class="game-options-label">Game Modes</label>
           <div class="option-toggles" id="lobby-modes">
-            <label class="option-toggle"><input type="checkbox" id="opt-blind"> <span>Blind Round</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-speed"> <span>Speed Round (60s)</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-switcheroo"> <span>Switcheroo</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-genrelock"> <span>Genre Lock</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-remix"> <span>Remix Mode</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-blind"> <span class="opt-text"><span class="opt-name">Blind Round</span><small class="opt-help">Nobody sees the song name — build from what you hear alone.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-speed"> <span class="opt-text"><span class="opt-name">Speed Round (60s)</span><small class="opt-help">Every round is 60 seconds instead of the round length above.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-switcheroo"> <span class="opt-text"><span class="opt-name">Switcheroo</span><small class="opt-help">Players get shuffled onto different songs each round.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-remix"> <span class="opt-text"><span class="opt-name">Remix Mode</span><small class="opt-help">Earlier layers come back shifted in time while you build.</small></span></label>
           </div>
         </div>
         <div class="game-options">
           <label class="game-options-label">Features</label>
           <div class="option-toggles" id="lobby-features">
-            <label class="option-toggle"><input type="checkbox" id="opt-sfx"> <span>Sound FX Layer</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-buildup"> <span>Layered Reveal</span></label>
-            <label class="option-toggle"><input type="checkbox" id="opt-vocal"> <span>Vocal Layer</span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-sfx"> <span class="opt-text"><span class="opt-name">Sound FX Layer</span><small class="opt-help">Adds a sound-effects layer: sirens, lasers, booms.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-buildup"> <span class="opt-text"><span class="opt-name">Layered Reveal</span><small class="opt-help">The reveal adds one layer at a time instead of all at once.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="opt-vocal"> <span class="opt-text"><span class="opt-name">Vocal Layer</span><small class="opt-help">Adds a round where you record a short clip with your mic.</small></span></label>
           </div>
         </div>
         <button id="btn-start" class="btn-primary" disabled>Start Game</button>
@@ -104,9 +110,9 @@
         <div class="game-options">
           <label class="game-options-label">Features</label>
           <div class="option-toggles" id="solo-features">
-            <label class="option-toggle"><input type="checkbox" id="solo-opt-sfx"> <span>Sound FX Layer</span></label>
-            <label class="option-toggle"><input type="checkbox" id="solo-opt-buildup"> <span>Layered Reveal</span></label>
-            <label class="option-toggle"><input type="checkbox" id="solo-opt-vocal"> <span>Vocal Layer</span></label>
+            <label class="option-toggle"><input type="checkbox" id="solo-opt-sfx"> <span class="opt-text"><span class="opt-name">Sound FX Layer</span><small class="opt-help">Adds a sound-effects layer: sirens, lasers, booms.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="solo-opt-buildup"> <span class="opt-text"><span class="opt-name">Layered Reveal</span><small class="opt-help">The reveal adds one layer at a time instead of all at once.</small></span></label>
+            <label class="option-toggle"><input type="checkbox" id="solo-opt-vocal"> <span class="opt-text"><span class="opt-name">Vocal Layer</span><small class="opt-help">Adds a round where you record a short clip with your mic.</small></span></label>
           </div>
         </div>
         <button id="btn-solo-start" class="btn-primary">Start Building</button>
