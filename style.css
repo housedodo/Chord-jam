@@ -543,7 +543,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 0 16px;
   overflow-y: auto;
+  justify-content: center;
   scrollbar-width: none;
 }
 .drum-grid::-webkit-scrollbar { display: none; }
@@ -637,6 +639,7 @@ body {
 .piano-roll {
   flex: 1;
   overflow: auto;
+  padding: 0 16px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   border: 1px solid var(--border);
@@ -723,14 +726,12 @@ body {
 
 /* Sound selector */
 .sound-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
   flex-shrink: 0;
   padding: 2px 0;
 }
-.sound-selector::-webkit-scrollbar { display: none; }
 
 .sound-btn {
   background: var(--surface);
@@ -744,7 +745,12 @@ body {
   white-space: nowrap;
   transition: all 0.12s;
   font-family: inherit;
-  flex-shrink: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sound-btn:active { transform: scale(0.94); }
 .sound-btn.active {
@@ -1360,6 +1366,8 @@ body {
   .handoff-container { max-width: 400px; }
   .reveal-container { max-width: 400px; }
   .drum-cell { max-width: 36px; }
+  .sound-selector { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); }
+  .piano-roll, .drum-grid { padding: 0 8px; }
   .drum-label { width: 44px; font-size: 0.65rem; }
   .note-cell { height: 28px; }
   .note-label { height: 28px; }
