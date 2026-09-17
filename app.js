@@ -2712,9 +2712,11 @@
   function showPlayhead(inst, step) {
     var ph = document.getElementById(inst + '-playhead');
     if (!ph) return;
-    var offset = inst === 'chords' ? 0 : LABEL_W;
+    // Every roll has the note-name gutter, chords included since they moved off
+    // the old block timeline. Skipping it there put the line a step and a half
+    // to the left of the note it was meant to be on.
     ph.style.display = 'block';
-    ph.style.left = (offset + step * CELL_W) + 'px';
+    ph.style.left = (LABEL_W + step * CELL_W) + 'px';
   }
 
   // ── Reveal ──
