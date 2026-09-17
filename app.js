@@ -1699,10 +1699,63 @@
     return row;
   }
 
+  // Quick fill works off an anchor: the last step you switched on. A fill
+  // then rewrites that one lane with a hit on the anchor and every Nth step
+  // after it. Rewriting rather than adding keeps the buttons switchable —
+  // pressing Quarter after Eighth leaves you with quarters, not both.
+  var fillAnchor = null;
+
+  function setFillAnchor(name, step) {
+    fillAnchor = { name: name, step: step };
+    updateFillBar();
+  }
+
+  function clearFillActive() {
+    document.querySelectorAll('.fill-btn.active').forEach(function (b) {
+      b.classList.remove('active');
+    });
+  }
+
+  function updateFillBar() {
+    var hint = document.getElementById('fill-hint');
+    var btns = document.querySelectorAll('.fill-btn');
+    if (!btns.length) return;
+    btns.forEach(function (b) { b.disabled = !fillAnchor; });
+    if (!hint) return;
+    hint.textContent = fillAnchor
+      ? 'Filling ' + fillAnchor.name + ' from step ' + (fillAnchor.step + 1)
+      : 'Tap a step, then a fill — it repeats from there';
+  }
+
+  function fillDrumLane(every) {
+    if (!fillAnchor) return;
+    var start = fillAnchor.step;
+    for (var s = 0; s < STEPS; s++) {
+      var cell = document.querySelector(
+        '#drum-grid .drum-cell[data-name="' + fillAnchor.name + '"][data-step="' + s + '"]');
+      if (!cell) continue;
+      cell.classList.toggle('on', s >= start && (s - start) % every === 0);
+    }
+  }
+
+  function initFillBar() {
+    document.querySelectorAll('.fill-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        if (!fillAnchor) return;
+        fillDrumLane(+btn.dataset.every);
+        clearFillActive();
+        btn.classList.add('active');
+      };
+    });
+    updateFillBar();
+  }
+
   function initDrumGrid() {
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
     grid.appendChild(buildStepRuler());
+    fillAnchor = null;
+    clearFillActive();
     DRUM_NAMES.forEach(function (name) {
       var row = document.createElement('div');
       row.className = 'drum-row';
@@ -1712,11 +1765,22 @@
         cell.className = 'drum-cell' + (s % 4 === 0 ? ' beat' : '');
         cell.dataset.name = name;
         cell.dataset.step = s;
-        cell.addEventListener('pointerdown', (function (c) { return function () { c.classList.toggle('on'); }; })(cell));
+        cell.addEventListener('pointerdown', (function (c) {
+          return function () {
+            c.classList.toggle('on');
+            // The anchor is the last step you touched, on or off. Only moving
+            // it on an on-tap left the hint naming a lane you had since left.
+            // A hand-placed step also means the lane no longer matches
+            // whichever fill produced it.
+            clearFillActive();
+            setFillAnchor(c.dataset.name, +c.dataset.step);
+          };
+        })(cell));
         row.appendChild(cell);
       }
       grid.appendChild(row);
     });
+    initFillBar();
   }
 
   function initSfxGrid() {

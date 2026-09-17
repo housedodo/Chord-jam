@@ -1965,6 +1965,52 @@ body {
   .producer-knobs { grid-template-columns: 1fr; }
 }
 
+/* Quick fill (drums only) */
+.fill-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.fill-bar-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.fill-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.fill-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 34px;
+}
+.fill-btn:disabled { opacity: 0.4; cursor: default; }
+.fill-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.fill-bar-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
 /* Chord roll controls */
 .chord-bar {
   display: flex;
@@ -2293,6 +2339,7 @@ body {
 :root[data-skin="phosphor"] .chord-pick,
 :root[data-skin="phosphor"] .chord-select,
 :root[data-skin="phosphor"] .mode-btn,
+:root[data-skin="phosphor"] .fill-btn,
 :root[data-skin="phosphor"] .wave-btn {
   font-family: 'VT323', monospace;
   font-weight: 400;
@@ -2307,6 +2354,7 @@ body {
 :root[data-skin="phosphor"] .sound-btn.active,
 :root[data-skin="phosphor"] .chord-pick.active,
 :root[data-skin="phosphor"] .mode-btn.active,
+:root[data-skin="phosphor"] .fill-btn.active,
 :root[data-skin="phosphor"] .wave-btn.active {
   background: rgba(108, 240, 138, 0.16);
   border-color: var(--ph-green);
@@ -2321,6 +2369,8 @@ body {
 :root[data-skin="phosphor"] .vocal-status,
 :root[data-skin="phosphor"] .chord-bar-label,
 :root[data-skin="phosphor"] .chord-bar-hint,
+:root[data-skin="phosphor"] .fill-bar-label,
+:root[data-skin="phosphor"] .fill-bar-hint,
 :root[data-skin="phosphor"] .knob-label,
 :root[data-skin="phosphor"] .knob-value {
   font-family: 'VT323', monospace;
@@ -2432,7 +2482,14 @@ body {
 
   .chord-bar { gap: 8px; }
   .chord-bar-hint { width: 100%; }
-  .mode-btn, .chord-select, .chord-pick { min-height: 40px; }
+  .mode-btn, .chord-select, .chord-pick, .fill-btn { min-height: 40px; }
+  .fill-bar { gap: 6px; }
+  /* The hint line already says what these do, so the label can go and give
+     the four buttons the width "Sixteenth" needs. */
+  .fill-bar-label { display: none; }
+  .fill-bar-hint { width: 100%; }
+  .fill-buttons { flex: 1; gap: 5px; }
+  .fill-btn { flex: 1; padding: 7px 4px; font-size: 0.74rem; }
 }
 
 /* All three skins draw a border on .game-options, but the base panel has no
@@ -2467,6 +2524,7 @@ body {
 :root[data-skin="phosphor"] .sound-btn,
 :root[data-skin="phosphor"] .chord-pick,
 :root[data-skin="phosphor"] .mode-btn,
+:root[data-skin="phosphor"] .fill-btn,
 :root[data-skin="phosphor"] .wave-btn,
 :root[data-skin="phosphor"] .btn-primary,
 :root[data-skin="phosphor"] .btn-secondary,
@@ -2497,6 +2555,7 @@ body {
 :root[data-skin="phosphor"] .sound-btn:active,
 :root[data-skin="phosphor"] .chord-pick:active,
 :root[data-skin="phosphor"] .mode-btn:active,
+:root[data-skin="phosphor"] .fill-btn:active,
 :root[data-skin="phosphor"] .wave-btn:active,
 :root[data-skin="phosphor"] .btn-primary:active,
 :root[data-skin="phosphor"] .btn-secondary:active,
@@ -2509,6 +2568,7 @@ body {
   :root[data-skin="phosphor"] .sound-btn:hover:not(.active),
   :root[data-skin="phosphor"] .chord-pick:hover:not(.active),
   :root[data-skin="phosphor"] .mode-btn:hover:not(.active),
+  :root[data-skin="phosphor"] .fill-btn:hover:not(.active):not(:disabled),
   :root[data-skin="phosphor"] .wave-btn:hover:not(.active) {
     transform: scale(1.04);
     background: rgba(108, 240, 138, 0.08);
