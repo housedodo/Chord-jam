@@ -179,8 +179,21 @@
       grid:'#0a1a10', gridBeat:'#102a18', gridAlt:'#081409', gridAltBeat:'#0e2415', gridBorder:'#1f5c39',
       pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' }
   };
-  const CELL_W = 34;
-  const LABEL_W = 54;
+  // Grid metrics. Phones get a denser roll so more than five steps fit on
+  // screen at once; updateGridMetrics() is called whenever a grid is built,
+  // so a roll is always drawn and hit-tested with the same numbers.
+  let CELL_W = 34;
+  let LABEL_W = 54;
+  let CELL_H = 32;
+
+  function isPhoneLayout() { return window.innerWidth <= 600; }
+
+  function updateGridMetrics() {
+    var phone = isPhoneLayout();
+    CELL_W = phone ? 26 : 34;
+    LABEL_W = phone ? 40 : 54;
+    CELL_H = phone ? 28 : 32;
+  }
 
   // ── State ──
   let players = [];
@@ -1675,9 +1688,25 @@
     };
   }
 
+  // A bar ruler above the lanes. On a phone the grid scrolls sideways, so
+  // without it there is nothing to count against once step 1 is off screen.
+  function buildStepRuler() {
+    var row = document.createElement('div');
+    row.className = 'drum-row drum-ruler';
+    row.innerHTML = '<span class="drum-label"></span>';
+    for (var s = 0; s < STEPS; s++) {
+      var tick = document.createElement('div');
+      tick.className = 'drum-tick' + (s % 4 === 0 ? ' beat' : '');
+      tick.textContent = s % 4 === 0 ? String(s / 4 + 1) : '';
+      row.appendChild(tick);
+    }
+    return row;
+  }
+
   function initDrumGrid() {
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
+    grid.appendChild(buildStepRuler());
     DRUM_NAMES.forEach(function (name) {
       var row = document.createElement('div');
       row.className = 'drum-row';
@@ -1697,6 +1726,7 @@
   function initSfxGrid() {
     var grid = document.getElementById('sfx-grid');
     grid.innerHTML = '';
+    grid.appendChild(buildStepRuler());
     SFX_NAMES.forEach(function (name) {
       var row = document.createElement('div');
       row.className = 'drum-row';
@@ -1919,6 +1949,8 @@
 
   // ── Piano Roll (bass/melody with edge-drag) ──
   function initPianoRoll(inst, noteNames, polyphonic, chordMode) {
+    updateGridMetrics();
+    rollRebuild = function () { initPianoRoll(inst, noteNames, polyphonic, chordMode); };
     var grid = document.getElementById(inst + '-grid');
     grid.innerHTML = '';
     pianoRollNotes = [];
@@ -1982,7 +2014,8 @@
     canvas.className = 'piano-roll-canvas';
 
     var reversed = noteNames.slice().reverse();
-    var cellH = 32;
+    var cellH = CELL_H;
+    rollRedraw = function () { renderPR(inst, reversed, cellH); };
 
     canvas.style.width = (LABEL_W + STEPS * CELL_W) + 'px';
     canvas.style.height = (reversed.length * cellH) + 'px';
@@ -2142,6 +2175,26 @@
 
     canvas.addEventListener('pointerup', function () { resizing = null; });
   }
+
+  // Crossing the phone/desktop breakpoint (usually a rotation) needs the roll
+  // rebuilt at the new metrics. initPianoRoll clears the notes, so they are
+  // carried across by hand.
+  let rollRebuild = null;
+  let rollRedraw = null;
+  let lastPhoneLayout = isPhoneLayout();
+
+  window.addEventListener('resize', function () {
+    var phone = isPhoneLayout();
+    if (phone === lastPhoneLayout) return;
+    lastPhoneLayout = phone;
+    if (rollRebuild) {
+      var saved = pianoRollNotes.slice();
+      rollRebuild();
+      pianoRollNotes = saved;
+      if (rollRedraw) rollRedraw();
+    }
+    if (document.getElementById('vocal-timeline')) renderVocalTimeline();
+  });
 
   function renderPR(inst, noteNames, cellH) {
     var layer = document.getElementById(inst + '-notes-layer');
@@ -2923,6 +2976,7 @@
 
   // Draggable clip block on the same 32-step grid the other instruments use.
   function renderVocalTimeline() {
+    updateGridMetrics();
     var strip = document.getElementById('vocal-timeline');
     if (!strip) return;
     strip.innerHTML = '';

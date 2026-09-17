@@ -545,7 +545,13 @@ body {
   gap: 4px;
   padding: 0 16px;
   overflow-y: auto;
-  justify-content: center;
+  /* Plain `center` clips the first and last lane once the rows are taller
+     than the container — and the clipped part cannot be scrolled to. That
+     is exactly what happens on a phone held sideways. `safe center` falls
+     back to flex-start instead; the first declaration covers browsers that
+     drop the whole thing as invalid. */
+  justify-content: flex-start;
+  justify-content: safe center;
   scrollbar-width: none;
 }
 .drum-grid::-webkit-scrollbar { display: none; }
@@ -586,6 +592,20 @@ body {
 }
 
 .drum-cell.beat { background: var(--surface-2); }
+
+/* Bar ruler. Shares the cell sizing so the ticks stay over their steps. */
+.drum-ruler { margin-bottom: 2px; }
+.drum-tick {
+  flex: 1;
+  max-width: 48px;
+  height: 14px;
+  font-size: 0.6rem;
+  line-height: 14px;
+  text-align: center;
+  color: var(--text-dim);
+  user-select: none;
+}
+.drum-tick.beat { color: var(--text-muted); }
 .drum-cell.playing { box-shadow: 0 0 8px var(--accent-glow); }
 
 /* Note grid (bass/melody) */
@@ -1356,23 +1376,98 @@ body {
   .ct-cell:hover { background: var(--surface-2) !important; }
 }
 
-/* Mobile adjustments */
+/* ============================================================
+   MOBILE
+   The desktop layout assumes it can show all 32 steps and every
+   sound at once. On a phone that squeezed drum cells to ~8px and
+   pushed the grid off the bottom of the screen. Here the rule is
+   the opposite: tap targets keep their size and the content
+   scrolls sideways instead.
+   ============================================================ */
 @media (max-width: 600px) {
   .home-container { max-width: 400px; }
   .lobby-container { max-width: 440px; }
-  .build-container { max-width: 600px; padding: 16px; }
+  .build-container { max-width: 600px; padding: 12px 10px; gap: 10px; }
   .listen-container { max-width: 440px; }
   .songentry-container { max-width: 400px; }
   .handoff-container { max-width: 400px; }
   .reveal-container { max-width: 400px; }
-  .drum-cell { max-width: 36px; }
-  .sound-selector { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); }
-  .piano-roll, .drum-grid { padding: 0 8px; }
-  .drum-label { width: 44px; font-size: 0.65rem; }
-  .note-cell { height: 28px; }
-  .note-label { height: 28px; }
-  .build-song { max-width: 140px; }
-  .option-toggles { grid-template-columns: 1fr; }
+  .build-song { max-width: 120px; }
+
+  /* Drums: fixed 30px cells that swipe, rather than 32 cells crushed
+     into 390px. The label gutter stays pinned so you can always tell
+     which lane you are on. */
+  .drum-grid {
+    overflow-x: auto;
+    padding: 0;
+    scrollbar-width: none;
+    scroll-padding-left: 46px;
+    overscroll-behavior-x: contain;
+  }
+  .drum-grid::-webkit-scrollbar { display: none; }
+  .drum-row { width: max-content; }
+  .drum-grid { justify-content: flex-start; }
+  /* Taller than wide: width is the scarce axis on a phone, height is not,
+     so the lanes get easier to hit vertically for free. */
+  .drum-cell {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 36px;
+    max-width: none;
+    aspect-ratio: auto;
+  }
+  .drum-tick {
+    flex: 0 0 28px;
+    width: 28px;
+    max-width: none;
+  }
+  /* Beat starts get a keyline, so bars stay countable while scrolling */
+  .drum-cell.beat { box-shadow: inset 2px 0 0 var(--text-dim); }
+  .drum-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 46px;
+    min-width: 46px;
+    font-size: 0.65rem;
+    /* Matches the sequencer panel behind it, so cells scrolling under the
+       pinned gutter are hidden without drawing a visible band. */
+    background: var(--surface);
+    padding-right: 4px;
+  }
+
+  /* Sounds: one swipeable row. Four stacked rows of chips ate a third
+     of the screen before you could place a note. */
+  .sound-selector {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    padding: 2px 0 4px;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .sound-selector::-webkit-scrollbar { display: none; }
+  .sound-btn {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 0.75rem;
+  }
+
+  .piano-roll { padding: 0; }
+  .note-cell, .note-label { height: 28px; }
+
+  /* Thumb-sized controls */
+  .theme-dot { width: 34px; height: 34px; }
+
+  /* The submit bar is fixed at the bottom, so the toast has to clear it */
+  .toast {
+    bottom: calc(86px + var(--safe-bottom));
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 /* Game Options */
@@ -2995,4 +3090,43 @@ body {
 
 @media (max-width: 480px) {
   :root[data-skin="phosphor"] .logo { font-size: 2.5rem; padding: 8px 14px; }
+}
+
+/* ============================================================
+   MOBILE, PART TWO
+   These components are defined further down the file than the main
+   mobile block, so rules there lost on source order. Nothing here
+   overlaps a skin, so it is safe at the end.
+   ============================================================ */
+@media (max-width: 600px) {
+  /* Two columns of option cards leaves ~150px for a title plus two lines
+     of help text. One column per option instead. */
+  .option-toggles { grid-template-columns: 1fr; }
+  .option-toggle input[type="checkbox"] { width: 22px; height: 22px; }
+
+  .chord-bar { gap: 8px; }
+  .chord-bar-hint { width: 100%; }
+  .mode-btn, .chord-select, .chord-pick { min-height: 40px; }
+}
+
+/* All three skins draw a border on .game-options, but the base panel has no
+   padding, so the "Game modes" / "Features" label sat on the keyline. */
+:root[data-skin] .game-options {
+  padding: 10px 12px;
+}
+
+/* ============================================================
+   SHORT VIEWPORTS (a phone held sideways)
+   All 32 steps fit across the width here, so the win is giving the
+   grid back the vertical space the chrome would otherwise take.
+   ============================================================ */
+@media (max-height: 480px) and (orientation: landscape) {
+  .build-container { padding: 8px 12px; gap: 8px; }
+  .build-container .btn-primary { padding: 9px 24px; }
+  .seq-controls { gap: 8px; }
+  .btn-seq-play { width: 34px; height: 34px; }
+  .sound-selector { padding: 0; }
+  .sound-btn { min-height: 32px; padding: 5px 12px; }
+  .drum-ruler { display: none; }
+  .home-container, .lobby-container { gap: 16px; padding: 16px 24px; }
 }
