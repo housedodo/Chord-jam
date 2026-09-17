@@ -25,6 +25,7 @@
   }
   const NOTE_NAMES_BASS = buildRange('C', 2, 'G', 3);
   const NOTE_NAMES_MELODY = buildRange('C', 4, 'C', 6);
+  const NOTE_NAMES_CHORDS = buildRange('C', 3, 'C', 5);
   function isSharp(noteName) { return noteName.indexOf('#') !== -1; }
   const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const CHORD_QUALITIES = [
@@ -54,22 +55,27 @@
       return ALL_NOTES[noteIdx] + octave;
     });
   }
-  function getChordName(root, quality) {
-    return root + quality.suffix;
+  function noteToMidi(name) {
+    var m = /^([A-G]#?)(-?\d+)$/.exec(name);
+    if (!m) return null;
+    return (parseInt(m[2], 10) + 1) * 12 + ALL_NOTES.indexOf(m[1]);
   }
-  function lookupChordNotes(chordName) {
-    var sortedRoots = CHORD_ROOTS.slice().sort(function (a, b) { return b.length - a.length; });
-    for (var r = 0; r < sortedRoots.length; r++) {
-      var root = sortedRoots[r];
-      if (chordName.indexOf(root) !== 0) continue;
-      var suffix = chordName.slice(root.length);
-      for (var q = 0; q < CHORD_QUALITIES.length; q++) {
-        if (CHORD_QUALITIES[q].suffix === suffix) {
-          return getChordNotes(root, CHORD_QUALITIES[q]);
-        }
-      }
-    }
-    return null;
+  function midiToNote(midi) {
+    return ALL_NOTES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+  }
+  // Voices a chord upward from wherever it was placed, rather than from a
+  // fixed octave, so the row you click is the root you get.
+  function chordFromPitch(noteName, quality, ceilingMidi) {
+    var root = noteToMidi(noteName);
+    if (root === null) return [noteName];
+    var out = [];
+    quality.intervals.forEach(function (i) {
+      var m = root + i;
+      if (ceilingMidi != null && m > ceilingMidi) m -= 12;
+      var n = midiToNote(m);
+      if (out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
   }
   const PLAYER_COLORS = ['#a78bfa', '#e8a0bf', '#7eb8d4', '#e8b07d', '#8cc5a2', '#c9a0d4'];
   const BASS_SOUNDS = {
@@ -1023,8 +1029,14 @@
 
   // Built-in sounds plus any the pack adds, so a pack can extend the picker
   // rather than only replacing what is already there.
+  function bankFor(group) {
+    if (group === 'bass') return BASS_SOUNDS;
+    if (group === 'chords') return CHORD_SOUNDS;
+    return MELODY_SOUNDS;
+  }
+
   function soundNamesFor(group) {
-    var bank = group === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
+    var bank = bankFor(group);
     var names = Object.keys(bank);
     var fromPack = (samplePack && samplePack[group]) ? Object.keys(samplePack[group]) : [];
     fromPack.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
@@ -1035,7 +1047,7 @@
     if (soundName === PRODUCER_SOUND) return createProducerSynth(patch, group);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group);
-    var bank = group === 'bass' ? BASS_SOUNDS : MELODY_SOUNDS;
+    var bank = bankFor(group);
     var preset = bank[soundName] || bank[Object.keys(bank)[0]];
     return createSynthFromPreset(preset, poly, group);
   }
@@ -1579,7 +1591,7 @@
   function initSequencer(instrument) {
     pianoRollNotes = [];
     if (instrument === 'drums') initDrumGrid();
-    else if (instrument === 'chords') initChordTimeline();
+    else if (instrument === 'chords') initPianoRoll('chords', NOTE_NAMES_CHORDS, true, true);
     else if (instrument === 'bass') initPianoRoll('bass', NOTE_NAMES_BASS, false);
     else if (instrument === 'melody') initPianoRoll('melody', NOTE_NAMES_MELODY, true);
     else if (instrument === 'sfx') initSfxGrid();
@@ -1652,6 +1664,86 @@
       if (nEnd <= anchorEnd && nEnd > limit) limit = nEnd;
     }
     return limit;
+  }
+
+  // ── Chord roll ──
+  // Chords live on a piano roll like every other pitched part. The row you
+  // click is the root; the selector only chooses the quality. Stacks stay
+  // grouped so they behave like one pad rather than loose notes.
+  let selectedQuality = CHORD_QUALITIES[0];
+  let chordPlaceMode = 'chord';
+  let chordGroupSeq = 0;
+
+  // With Genre Lock on, only roots that the genre actually uses are placeable.
+  function lockedRootSet() {
+    var locked = getLockedChords();
+    if (!locked) return null;
+    var set = {};
+    locked.forEach(function (name) {
+      var sorted = CHORD_ROOTS.slice().sort(function (a, b) { return b.length - a.length; });
+      for (var i = 0; i < sorted.length; i++) {
+        if (name.indexOf(sorted[i]) === 0) { set[sorted[i]] = true; return; }
+      }
+    });
+    return set;
+  }
+
+  function chordRootAllowed(noteName) {
+    var set = lockedRootSet();
+    if (!set) return true;
+    return !!set[noteName.replace(/-?\d+$/, '')];
+  }
+
+  function buildChordBar() {
+    var bar = document.createElement('div');
+    bar.className = 'chord-bar';
+
+    var lock = lockedRootSet();
+    if (lock) {
+      var tag = document.createElement('span');
+      tag.className = 'genre-lock-label';
+      tag.textContent = 'Genre: ' + (currentGenreLock || 'Locked');
+      bar.appendChild(tag);
+    }
+
+    var qLabel = document.createElement('span');
+    qLabel.className = 'chord-bar-label';
+    qLabel.textContent = 'Chord';
+    bar.appendChild(qLabel);
+
+    var sel = document.createElement('select');
+    sel.className = 'chord-select';
+    CHORD_QUALITIES.forEach(function (q, i) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = q.label;
+      if (q === selectedQuality) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function () { selectedQuality = CHORD_QUALITIES[+sel.value]; };
+    bar.appendChild(sel);
+
+    var modes = document.createElement('div');
+    modes.className = 'chord-mode-toggle';
+    [['chord', 'Chord'], ['note', 'Single note']].forEach(function (m) {
+      var b = document.createElement('button');
+      b.className = 'mode-btn' + (chordPlaceMode === m[0] ? ' active' : '');
+      b.textContent = m[1];
+      b.onclick = function () {
+        modes.querySelectorAll('.mode-btn').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        chordPlaceMode = m[0];
+      };
+      modes.appendChild(b);
+    });
+    bar.appendChild(modes);
+
+    var hint = document.createElement('span');
+    hint.className = 'chord-bar-hint';
+    hint.textContent = 'click a row to place it there';
+    bar.appendChild(hint);
+
+    return bar;
   }
 
   // Which edge of a block the pointer landed on, or null for its middle.
@@ -1792,7 +1884,7 @@
   }
 
   // ── Piano Roll (bass/melody with edge-drag) ──
-  function initPianoRoll(inst, noteNames, polyphonic) {
+  function initPianoRoll(inst, noteNames, polyphonic, chordMode) {
     var grid = document.getElementById(inst + '-grid');
     grid.innerHTML = '';
     pianoRollNotes = [];
@@ -1803,7 +1895,7 @@
     // Sound selector
     var soundBar = document.createElement('div');
     soundBar.className = 'sound-selector';
-    var curSound = inst === 'bass' ? currentBassSound : currentMelodySound;
+    var curSound = inst === 'bass' ? currentBassSound : (inst === 'chords' ? currentChordSound : currentMelodySound);
     soundNamesFor(inst).forEach(function (name) {
       var btn = document.createElement('button');
       btn.className = 'sound-btn' + (name === curSound ? ' active' : '');
@@ -1812,6 +1904,7 @@
         soundBar.querySelectorAll('.sound-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         if (inst === 'bass') { currentBassSound = name; getOrCreateBassSynth(); }
+        else if (inst === 'chords') { currentChordSound = name; getOrCreateChordSynth(); }
         else { currentMelodySound = name; getOrCreateMelodySynth(); }
       };
       soundBar.appendChild(btn);
@@ -1841,6 +1934,7 @@
     }
 
     wrapper.appendChild(soundBar);
+    if (chordMode) wrapper.appendChild(buildChordBar());
     if (inst === 'melody') {
       producerPanel = buildProducerPanel();
       producerPanel.style.display = currentMelodySound === PRODUCER_SOUND ? 'flex' : 'none';
@@ -1912,7 +2006,7 @@
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
         } else {
-          pianoRollNotes.splice(idx, 1);
+          removeNoteAt(idx);
           renderPR(inst, reversed, cellH);
         }
         return;
@@ -1927,7 +2021,7 @@
         return n.note === noteName && step >= n.start && step < n.start + n.length;
       });
       if (existing >= 0) {
-        pianoRollNotes.splice(existing, 1);
+        removeNoteAt(existing);
         renderPR(inst, reversed, cellH);
         return;
       }
@@ -1938,7 +2032,16 @@
         });
       }
 
-      pianoRollNotes.push({ note: noteName, start: step, length: 1 });
+      var placed;
+      if (chordMode && chordPlaceMode === 'chord') {
+        if (!chordRootAllowed(noteName)) { toast('Not in this genre'); return; }
+        var gid = 'g' + (++chordGroupSeq);
+        placed = chordFromPitch(noteName, selectedQuality, noteToMidi(noteNames[noteNames.length - 1]))
+          .map(function (n) { return { note: n, start: step, length: 1, chord: gid }; });
+      } else {
+        placed = [{ note: noteName, start: step, length: 1 }];
+      }
+      placed.forEach(function (n) { pianoRollNotes.push(n); });
       renderPR(inst, reversed, cellH);
 
       resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
@@ -1946,9 +2049,26 @@
 
       ensureAudio().then(function () {
         if (inst === 'bass') { if (!synths.bass) getOrCreateBassSynth(); synths.bass.play(noteName, '16n'); }
+        else if (inst === 'chords') {
+          if (!synths.chords) synths.chords = createChordSynth();
+          synths.chords.play(placed.map(function (n) { return n.note; }), '8n');
+        }
         else { if (!synths.melody) getOrCreateMelodySynth(); synths.melody.play(noteName, '16n'); }
       });
     });
+
+    // Deleting or resizing one note of a chord acts on the whole stack.
+    function groupIdxs(idx) {
+      var n = pianoRollNotes[idx];
+      if (!n || !n.chord) return [idx];
+      var out = [];
+      pianoRollNotes.forEach(function (m, i) { if (m.chord === n.chord && m.start === n.start) out.push(i); });
+      return out;
+    }
+    function removeNoteAt(idx) {
+      var kill = groupIdxs(idx).sort(function (a, b) { return b - a; });
+      kill.forEach(function (i) { pianoRollNotes.splice(i, 1); });
+    }
 
     canvas.addEventListener('pointermove', function (e) {
       if (!resizing) return;
@@ -1958,14 +2078,19 @@
       var note = pianoRollNotes[resizing.noteIdx];
       if (!note) return;
 
+      var siblings = groupIdxs(resizing.noteIdx).map(function (i) { return pianoRollNotes[i]; });
+
       if (resizing.edge === 'left') {
         // The right edge stays put; the start slides and the length follows.
         var end = resizing.anchorEnd;
-        var floor = leftBoundFor(pianoRollNotes, resizing.noteIdx, end, polyphonic ? note.note : null);
+        var floor = 0;
+        siblings.forEach(function (sn) {
+          var i = pianoRollNotes.indexOf(sn);
+          floor = Math.max(floor, leftBoundFor(pianoRollNotes, i, end, polyphonic ? sn.note : null));
+        });
         var newStart = Math.max(floor, Math.min(end - 1, step));
         if (newStart !== note.start) {
-          note.start = newStart;
-          note.length = end - newStart;
+          siblings.forEach(function (sn) { sn.start = newStart; sn.length = end - newStart; });
           renderPR(inst, reversed, cellH);
         }
         return;
@@ -1976,7 +2101,10 @@
         var next = pianoRollNotes.find(function (n) { return n !== note && n.note === note.note && n.start > note.start; });
         if (next && note.start + newLen > next.start) return;
       }
-      if (newLen !== note.length) { note.length = newLen; renderPR(inst, reversed, cellH); }
+      if (newLen !== note.length) {
+        siblings.forEach(function (sn) { sn.length = newLen; });
+        renderPR(inst, reversed, cellH);
+      }
     });
 
     canvas.addEventListener('pointerup', function () { resizing = null; });
@@ -2016,248 +2144,6 @@
   }
 
   // ── Chord Timeline (Klimper-style single line) ──
-  function initChordTimeline() {
-    var grid = document.getElementById('chords-grid');
-    grid.innerHTML = '';
-    pianoRollNotes = [];
-
-    var wrapper = document.createElement('div');
-    wrapper.className = 'chord-timeline-wrapper';
-
-    var selectedRoot = 'C';
-    var selectedQuality = CHORD_QUALITIES[0];
-    var selectedChord = 'C';
-
-    // Sound selector for chords
-    var soundBar = document.createElement('div');
-    soundBar.className = 'sound-selector';
-    Object.keys(CHORD_SOUNDS).forEach(function (name) {
-      var btn = document.createElement('button');
-      btn.className = 'sound-btn' + (name === currentChordSound ? ' active' : '');
-      btn.textContent = name;
-      btn.onclick = function () {
-        soundBar.querySelectorAll('.sound-btn').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        currentChordSound = name;
-        getOrCreateChordSynth();
-      };
-      soundBar.appendChild(btn);
-    });
-    wrapper.appendChild(soundBar);
-
-    function updateSelectedChord() {
-      selectedChord = getChordName(selectedRoot, selectedQuality);
-      chordDisplay.textContent = selectedChord;
-      ensureAudio().then(function () {
-        if (!synths.chords) synths.chords = createChordSynth();
-        var cn = getChordNotes(selectedRoot, selectedQuality);
-        synths.chords.play(cn, '8n');
-      });
-    }
-
-    // Genre lock label
-    var lockedChords = getLockedChords();
-    if (lockedChords) {
-      var lockLabel = document.createElement('div');
-      lockLabel.className = 'genre-lock-label';
-      lockLabel.textContent = 'Genre: ' + (currentGenreLock || 'Locked');
-      wrapper.appendChild(lockLabel);
-    }
-
-    // Chord selector row with dropdowns
-    var selectorRow = document.createElement('div');
-    selectorRow.className = 'chord-selector-row';
-
-    var rootSelect = document.createElement('select');
-    rootSelect.className = 'chord-select';
-    var allowedRoots = lockedChords ? CHORD_ROOTS.filter(function (r) {
-      return lockedChords.some(function (ch) { return ch.startsWith(r); });
-    }) : CHORD_ROOTS;
-    allowedRoots.forEach(function (r) {
-      var opt = document.createElement('option');
-      opt.value = r;
-      opt.textContent = r;
-      rootSelect.appendChild(opt);
-    });
-    rootSelect.onchange = function () {
-      selectedRoot = rootSelect.value;
-      updateSelectedChord();
-    };
-
-    var qualitySelect = document.createElement('select');
-    qualitySelect.className = 'chord-select';
-    CHORD_QUALITIES.forEach(function (q, i) {
-      var opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = q.label;
-      qualitySelect.appendChild(opt);
-    });
-    qualitySelect.onchange = function () {
-      selectedQuality = CHORD_QUALITIES[parseInt(qualitySelect.value)];
-      updateSelectedChord();
-    };
-
-    var chordDisplay = document.createElement('span');
-    chordDisplay.className = 'chord-display';
-    chordDisplay.textContent = 'C';
-
-    selectorRow.appendChild(rootSelect);
-    selectorRow.appendChild(qualitySelect);
-    selectorRow.appendChild(chordDisplay);
-    wrapper.appendChild(selectorRow);
-
-    // Timeline
-    var timeline = document.createElement('div');
-    timeline.className = 'chord-timeline';
-
-    var canvas = document.createElement('div');
-    canvas.className = 'chord-timeline-canvas';
-
-    var cellH = 64;
-    canvas.style.width = (STEPS * CELL_W) + 'px';
-    canvas.style.height = cellH + 'px';
-    canvas.style.position = 'relative';
-
-    for (var s = 0; s < STEPS; s++) {
-      var cell = document.createElement('div');
-      cell.className = 'ct-cell' + (s % 4 === 0 ? ' ct-beat' : '');
-      cell.style.left = (s * CELL_W) + 'px';
-      cell.style.top = '0';
-      cell.style.width = CELL_W + 'px';
-      cell.style.height = cellH + 'px';
-      cell.dataset.step = s;
-      canvas.appendChild(cell);
-    }
-
-    // Beat numbers
-    for (var b = 0; b < STEPS / 4; b++) {
-      var num = document.createElement('div');
-      num.className = 'ct-beat-num';
-      num.style.left = (b * 4 * CELL_W + 2) + 'px';
-      num.textContent = b + 1;
-      canvas.appendChild(num);
-    }
-
-    var notesLayer = document.createElement('div');
-    notesLayer.className = 'ct-notes-layer';
-    notesLayer.id = 'chords-notes-layer';
-    canvas.appendChild(notesLayer);
-
-    var ph = document.createElement('div');
-    ph.className = 'pr-playhead';
-    ph.id = 'chords-playhead';
-    ph.style.display = 'none';
-    canvas.appendChild(ph);
-
-    timeline.appendChild(canvas);
-    wrapper.appendChild(timeline);
-    grid.appendChild(wrapper);
-
-    // Interaction
-    var resizing = null;
-
-    canvas.addEventListener('pointerdown', function (e) {
-      var block = e.target.closest('.ct-note-block');
-      if (block) {
-        var idx = +block.dataset.index;
-        var edge = grabbedEdge(block.getBoundingClientRect(), e.clientX);
-        var grabbed = pianoRollNotes[idx];
-        if (edge && grabbed) {
-          resizing = { noteIdx: idx, edge: edge, anchorEnd: grabbed.start + grabbed.length };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        } else {
-          pianoRollNotes.splice(idx, 1);
-          renderCT(cellH);
-        }
-        return;
-      }
-
-      var cell = e.target.closest('.ct-cell');
-      if (!cell) return;
-      var step = +cell.dataset.step;
-
-      var existing = pianoRollNotes.findIndex(function (n) {
-        return step >= n.start && step < n.start + n.length;
-      });
-      if (existing >= 0) {
-        pianoRollNotes.splice(existing, 1);
-        renderCT(cellH);
-        return;
-      }
-
-      pianoRollNotes.push({ note: selectedChord, start: step, length: 1 });
-      renderCT(cellH);
-
-      resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
-      canvas.setPointerCapture(e.pointerId);
-
-      ensureAudio().then(function () {
-        if (!synths.chords) synths.chords = createChordSynth();
-        var cn = lookupChordNotes(selectedChord);
-        if (cn) synths.chords.play(cn, '16n');
-      });
-    });
-
-    canvas.addEventListener('pointermove', function (e) {
-      if (!resizing) return;
-      var rect = canvas.getBoundingClientRect();
-      var x = e.clientX - rect.left;
-      var step = Math.floor(x / CELL_W);
-      var note = pianoRollNotes[resizing.noteIdx];
-      if (!note) return;
-
-      if (resizing.edge === 'left') {
-        // Chords share one lane, so any other block bounds the drag.
-        var end = resizing.anchorEnd;
-        var floor = leftBoundFor(pianoRollNotes, resizing.noteIdx, end, null);
-        var newStart = Math.max(floor, Math.min(end - 1, step));
-        if (newStart !== note.start) {
-          note.start = newStart;
-          note.length = end - newStart;
-          renderCT(cellH);
-        }
-        return;
-      }
-
-      var newLen = Math.max(1, Math.min(STEPS - note.start, step - note.start + 1));
-      var nextChord = pianoRollNotes
-        .filter(function (n, i) { return i !== resizing.noteIdx && n.start > note.start; })
-        .sort(function (a, b) { return a.start - b.start; })[0];
-      var maxLen = nextChord ? nextChord.start - note.start : STEPS - note.start;
-      var clamped = Math.min(newLen, maxLen);
-      if (clamped !== note.length && clamped >= 1) { note.length = clamped; renderCT(cellH); }
-    });
-
-    canvas.addEventListener('pointerup', function () { resizing = null; });
-  }
-
-  function renderCT(cellH) {
-    var layer = document.getElementById('chords-notes-layer');
-    if (!layer) return;
-    layer.innerHTML = '';
-
-    pianoRollNotes.forEach(function (n, i) {
-      var block = document.createElement('div');
-      block.className = 'ct-note-block';
-      block.dataset.index = i;
-      block.style.left = (n.start * CELL_W) + 'px';
-      block.style.top = '4px';
-      block.style.width = (n.length * CELL_W - 2) + 'px';
-      block.style.height = (cellH - 8) + 'px';
-
-      var lbl = document.createElement('span');
-      lbl.className = 'ct-note-label';
-      lbl.textContent = n.note;
-      block.appendChild(lbl);
-
-      var handle = document.createElement('div');
-      handle.className = 'ct-handle-right';
-      block.appendChild(handle);
-
-      layer.appendChild(block);
-    });
-  }
 
   // ── Preview ──
   function startPreview(instrument, includePrevious) {
@@ -2304,7 +2190,7 @@
         notes.forEach(function (n) {
           if (n.start === s) {
             var dur = n.length * Tone.Time('16n').toSeconds();
-            if (instrument === 'chords') { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, dur, time); }
+            if (instrument === 'chords') { synths.chords.play(n.note, dur, time); }
             else if (instrument === 'bass') { synths.bass.play(n.note, dur, time); }
             else { synths.melody.play(n.note, dur, time); }
           }
@@ -2354,7 +2240,7 @@
       var notes = sub.data;
       seqs.push(new Tone.Sequence(function (time, s) {
         notes.forEach(function (n) {
-          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.bgChords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
+          if (n.start === s) synths.bgChords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
@@ -2539,7 +2425,7 @@
         var notes = sub.data;
         seqs.push(new Tone.Sequence(function (time, s) {
           notes.forEach(function (n) {
-            if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
+            if (n.start === s) synths.chords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
           });
         }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'bass') {
@@ -2761,7 +2647,7 @@
       if (!synths.chords) synths.chords = createChordSynth();
       seqs.push(new Tone.Sequence(function (time, s) {
         sub.data.forEach(function (n) {
-          if (n.start === s) { var cn = lookupChordNotes(n.note); if (cn) synths.chords.play(cn, n.length * Tone.Time('16n').toSeconds(), time); }
+          if (n.start === s) synths.chords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
         });
       }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
