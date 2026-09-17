@@ -677,7 +677,10 @@
     showScreen('lobby');
     document.getElementById('room-code').textContent = roomCode;
     document.getElementById('btn-copy-code').onclick = function () {
-      navigator.clipboard.writeText(roomCode).then(function () { toast('Code copied!'); });
+      var cb = navigator.clipboard;
+      if (!cb) { toast('Room code: ' + roomCode); return; }
+      cb.writeText(roomCode).then(function () { toast('Code copied!'); })
+        .catch(function () { toast('Room code: ' + roomCode); });
     };
     renderOnlinePlayerList();
 
@@ -930,7 +933,8 @@
 
   function ensureAudio() {
     if (audioReady) return Promise.resolve();
-    return Tone.start().then(function () { audioReady = true; });
+    return Tone.start().then(function () { audioReady = true; })
+      .catch(function () { toast('Tap the screen once to enable sound'); });
   }
 
   // Per-instrument trims so every layer lands near the same peak level.
@@ -3087,7 +3091,9 @@
         mediaRecorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function () {
           stream.getTracks().forEach(function (t) { t.stop(); });
-          var blob = new Blob(chunks, { type: 'audio/webm' });
+          // Safari records audio/mp4, not webm; a wrong MIME on the data URL
+          // breaks decoding on the other players' devices.
+          var blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
           var reader = new FileReader();
           reader.onloadend = function () {
             var url = reader.result;
