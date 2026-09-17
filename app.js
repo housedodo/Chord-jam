@@ -156,10 +156,17 @@
   ];
 
   // Three skins. `skin` drives shape/texture rules in CSS; colour variables
-  // alone were never enough to change the app's character. Two are paper,
-  // one (phosphor) is a CRT terminal — the only dark scheme.
-  const DEFAULT_SCHEME = 'notebook';
+  // alone were never enough to change the app's character. Phosphor is a CRT
+  // terminal and the default; the other two are paper. Order matters — the
+  // theme picker draws one dot per key, so the default sits first.
+  const DEFAULT_SCHEME = 'phosphor';
   const COLOR_SCHEMES = {
+    phosphor: { label: 'Phosphor', color: '#6cf08a', skin: 'phosphor',
+      bg:'#061009', surface:'#0a1a10', surface2:'#0d2216', surface3:'#12301f', border:'#1f5c39',
+      text:'#6cf08a', textMuted:'#4fbf7a', textDim:'#2c7a4e',
+      accent:'#6cf08a', accentSoft:'#3ec96a',
+      grid:'#0a1a10', gridBeat:'#102a18', gridAlt:'#081409', gridAltBeat:'#0e2415', gridBorder:'#1f5c39',
+      pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' },
     notebook: { label: 'Notebook', color: '#f6eeda', skin: 'notebook',
       bg:'#f6eeda', surface:'#fffbf0', surface2:'#f3ead6', surface3:'#ebe0c8', border:'#23324f',
       text:'#23324f', textMuted:'#7a6a55', textDim:'#9aa6b8',
@@ -171,13 +178,7 @@
       text:'#17161a', textMuted:'#5f5c55', textDim:'#8d8980',
       accent:'#0a8fd8', accentSoft:'#0a63a8',
       grid:'#201f24', gridBeat:'#2a282e', gridAlt:'#1b1a1f', gridAltBeat:'#252329', gridBorder:'#3a383f',
-      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' },
-    phosphor: { label: 'Phosphor', color: '#6cf08a', skin: 'phosphor',
-      bg:'#061009', surface:'#0a1a10', surface2:'#0d2216', surface3:'#12301f', border:'#1f5c39',
-      text:'#6cf08a', textMuted:'#4fbf7a', textDim:'#2c7a4e',
-      accent:'#6cf08a', accentSoft:'#3ec96a',
-      grid:'#0a1a10', gridBeat:'#102a18', gridAlt:'#081409', gridAltBeat:'#0e2415', gridBorder:'#1f5c39',
-      pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' }
+      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' }
   };
   // Grid metrics. Phones get a denser roll so more than five steps fit on
   // screen at once; updateGridMetrics() is called whenever a grid is built,
