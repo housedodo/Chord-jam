@@ -1234,6 +1234,96 @@
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
     document.getElementById('screen-' + id).classList.add('active');
+    updateMenuMusic(id);
+  }
+
+  // ── Menu music ──
+  // Optional: drop an mp3 at music/theme.mp3 and it plays on the title and
+  // setup screens only. A plain Audio element rather than Tone, so it never
+  // shares a context with the sequencer and cannot disturb its timing.
+  const MENU_SCREENS = { home: 1, lobby: 1, solo: 1 };
+  const MUSIC_VOLUME = 0.3;
+  var menuMusic = null;
+  var musicOn = true;
+  var musicFade = null;
+  var musicWanted = false;
+
+  function fadeMusic(to, done) {
+    if (!menuMusic) return;
+    clearInterval(musicFade);
+    var step = (to - menuMusic.volume) / 12;
+    musicFade = setInterval(function () {
+      if (!menuMusic) { clearInterval(musicFade); return; }
+      var v = menuMusic.volume + step;
+      if ((step > 0 && v >= to) || (step < 0 && v <= to) || step === 0) {
+        menuMusic.volume = to;
+        clearInterval(musicFade);
+        if (done) done();
+        return;
+      }
+      menuMusic.volume = Math.min(1, Math.max(0, v));
+    }, 40);
+  }
+
+  function playMenuMusic() {
+    if (!menuMusic || !musicOn) return;
+    var p = menuMusic.play();
+    if (p && p.catch) {
+      // Autoplay is blocked until the page has been interacted with; retry
+      // on the first gesture rather than giving up.
+      p.catch(function () {
+        document.addEventListener('pointerdown', function retry() {
+          document.removeEventListener('pointerdown', retry);
+          if (musicWanted && musicOn && menuMusic) menuMusic.play().catch(function () {});
+        }, { once: true });
+      });
+    }
+  }
+
+  function updateMenuMusic(screenId) {
+    musicWanted = !!MENU_SCREENS[screenId];
+    var btn = document.getElementById('btn-music');
+    if (btn) btn.style.display = musicWanted && menuMusic ? 'flex' : 'none';
+    if (!menuMusic) return;
+    if (musicWanted && musicOn) {
+      if (menuMusic.paused) { menuMusic.volume = 0; playMenuMusic(); }
+      fadeMusic(MUSIC_VOLUME);
+    } else if (!menuMusic.paused) {
+      // Pause once silent whatever the reason — muted, or off a menu screen —
+      // so a muted track is not left decoding in the background.
+      fadeMusic(0, function () {
+        if (menuMusic && (!musicWanted || !musicOn)) menuMusic.pause();
+      });
+    }
+  }
+
+  function initMenuMusic() {
+    var btn = document.getElementById('btn-music');
+    musicOn = localStorage.getItem('st-music') !== 'off';
+    var audio = new Audio('music/theme.mp3');
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    // No file, or an unplayable one: stay silent and keep the button hidden.
+    audio.addEventListener('error', function () {
+      menuMusic = null;
+      if (btn) btn.style.display = 'none';
+    });
+    audio.addEventListener('canplaythrough', function () {
+      menuMusic = audio;
+      updateMenuMusic(document.querySelector('.screen.active').id.replace('screen-', ''));
+    }, { once: true });
+
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', String(!musicOn));
+    btn.classList.toggle('muted', !musicOn);
+    btn.onclick = function () {
+      musicOn = !musicOn;
+      localStorage.setItem('st-music', musicOn ? 'on' : 'off');
+      btn.setAttribute('aria-pressed', String(!musicOn));
+      btn.classList.toggle('muted', !musicOn);
+      updateMenuMusic(document.querySelector('.screen.active').id.replace('screen-', ''));
+    };
   }
 
   function toast(msg) {
@@ -3190,6 +3280,7 @@
   }
 
   loadSamplePack();
+  initMenuMusic();
   initThemePicker();
   initHome();
 })();

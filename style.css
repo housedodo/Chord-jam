@@ -2640,3 +2640,43 @@ body {
   0% { transform: translateY(-160px); }
   100% { transform: translateY(100vh); }
 }
+
+/* Menu music toggle. Fixed rather than in the page flow so it can sit on the
+   title, lobby and solo screens without three copies of the markup. */
+.music-toggle {
+  position: fixed;
+  right: 14px;
+  bottom: calc(14px + var(--safe-bottom));
+  z-index: 60;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 0.13s ease, color 0.13s ease, border-color 0.13s ease;
+}
+.music-toggle .music-off { display: none; }
+.music-toggle.muted { color: var(--text-dim); }
+.music-toggle.muted .music-on { display: none; }
+.music-toggle.muted .music-off { display: block; }
+.music-toggle:active { transform: scale(0.94); }
+
+:root[data-skin="phosphor"] .music-toggle {
+  border-radius: 0;
+  background: rgba(10, 26, 16, 0.85);
+  border-color: var(--ph-dim);
+  color: var(--ph-mid);
+}
+:root[data-skin="phosphor"] .music-toggle.muted { color: var(--ph-dim); }
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-skin="phosphor"] .music-toggle:hover {
+    color: var(--ph-bright);
+    border-color: var(--ph-green);
+    transform: scale(1.06);
+  }
+}
