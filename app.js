@@ -290,6 +290,43 @@
   let guestConns = []; // host's connections to guests
   let myPlayerIndex = -1;
   let roomCode = '';
+  let gameInProgress = false;
+  let joinTimer = null;
+  const JOIN_TIMEOUT_MS = 15000;
+  const MAX_NAME = 24;
+  const MAX_TEXT = 120;
+  const MAX_VOCAL_BYTES = 4 * 1024 * 1024;
+
+  // University and office networks often block the UDP that direct WebRTC
+  // needs. The TURN entries relay over TCP/TLS on 443, which is about the one
+  // thing every network allows. Open Relay is a free public TURN service.
+  const PEER_OPTIONS = {
+    debug: 1,
+    serialization: 'json',
+    config: {
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        { urls: 'turn:global.relay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:global.relay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ]
+    }
+  };
+
+  function cleanText(v, max) {
+    return typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, '').trim().slice(0, max) : '';
+  }
+
+  function leaveToHome(message) {
+    if (message) toast(message);
+    clearTimeout(joinTimer);
+    destroyPeer();
+    netMode = 'local';
+    gameInProgress = false;
+    showScreen('home');
+  }
 
   function netSend(conn, msg) {
     try {
@@ -306,9 +343,20 @@
   }
 
   function destroyPeer() {
+    gameInProgress = false;
+    clearTimeout(joinTimer);
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     hostConn = null;
     guestConns = [];
+  }
+
+  // The broker socket can drop (sleep, network change) without the data
+  // channels dropping. Reconnecting keeps the room reachable for late joiners.
+  function watchBroker(p) {
+    p.on('disconnected', function () {
+      if (peer !== p || p.destroyed) return;
+      try { p.reconnect(); } catch (e) {}
+    });
   }
 
   function createHost(code, myName) {
@@ -317,7 +365,9 @@
     myPlayerIndex = 0;
     players = [{ name: myName, color: PLAYER_COLORS[0] }];
 
-    peer = new Peer('st-' + code, { debug: 2, serialization: 'json' });
+    gameInProgress = false;
+    peer = new Peer('st-' + code, PEER_OPTIONS);
+    watchBroker(peer);
     peer.on('open', function (id) {
       console.log('Host peer open:', id);
       showOnlineLobby();
@@ -328,6 +378,8 @@
         toast('Room code taken, try again');
         destroyPeer();
         showScreen('home');
+      } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+        toast('Lost the connection server \u2014 trying to reconnect');
       } else {
         toast('Connection error: ' + err.type);
       }
@@ -337,12 +389,11 @@
       conn.on('open', function () {
         console.log('Host connection open:', conn.peer);
         conn.on('data', function (data) {
-          console.log('Host received:', data);
+          if (!data || typeof data !== 'object') return;
           handleHostMessage(conn, data);
         });
-        conn.on('close', function () {
-          handleGuestDisconnect(conn);
-        });
+        conn.on('close', function () { handleGuestDisconnect(conn); });
+        conn.on('error', function () { handleGuestDisconnect(conn); });
       });
     });
   }
@@ -352,42 +403,44 @@
     netMode = 'guest';
     toast('Connecting...');
 
-    peer = new Peer(undefined, { debug: 2, serialization: 'json' });
+    // Signalling can succeed while the data channel never opens (blocked
+    // network). Without a deadline the guest would sit on "Connecting" forever.
+    clearTimeout(joinTimer);
+    joinTimer = setTimeout(function () {
+      var reached = !!(peer && peer.open);
+      leaveToHome(reached
+        ? 'Could not reach the host \u2014 a firewall may be blocking the connection. Try a different network or a phone hotspot.'
+        : 'Could not reach the connection server \u2014 check your internet and try again.');
+    }, JOIN_TIMEOUT_MS);
+
+    peer = new Peer(undefined, PEER_OPTIONS);
+    watchBroker(peer);
     peer.on('open', function (id) {
       console.log('Guest peer open:', id);
       hostConn = peer.connect('st-' + code, { reliable: true, serialization: 'json' });
       hostConn.on('open', function () {
         console.log('Guest connected to host');
+        clearTimeout(joinTimer);
         netSend(hostConn, { type: 'join', name: myName });
       });
       hostConn.on('data', function (data) {
-        console.log('Guest received:', data);
+        if (!data || typeof data !== 'object') return;
         handleGuestReceive(data);
       });
-      hostConn.on('close', function () {
-        toast('Disconnected from host');
-        destroyPeer();
-        netMode = 'local';
-        showScreen('home');
-      });
+      hostConn.on('close', function () { leaveToHome('Disconnected from host'); });
       hostConn.on('error', function (err) {
         console.error('Guest conn error:', err);
-        toast('Connection failed');
-        destroyPeer();
-        netMode = 'local';
-        showScreen('home');
+        leaveToHome('Connection to the host failed');
+      });
+      hostConn.on('iceStateChanged', function (state) {
+        if (state === 'failed') leaveToHome('Could not reach the host \u2014 a firewall may be blocking the connection. Try a different network or a phone hotspot.');
       });
     });
     peer.on('error', function (err) {
       console.error('Guest peer error:', err);
-      if (err.type === 'peer-unavailable') {
-        toast('Room not found — check the code');
-      } else {
-        toast('Could not join: ' + err.type);
-      }
-      destroyPeer();
-      netMode = 'local';
-      showScreen('home');
+      if (err.type === 'peer-unavailable') leaveToHome('Room not found \u2014 check the code');
+      else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') leaveToHome('Could not reach the connection server \u2014 check your internet and try again');
+      else leaveToHome('Could not join: ' + err.type);
     });
   }
 
@@ -403,6 +456,15 @@
     var idx = findConnPlayerIndex(conn);
     if (idx > 0 && idx < players.length) {
       var name = players[idx].name;
+      if (gameInProgress) {
+        // Submissions and song ownership are keyed by index, so the slot
+        // stays; the round timer will end the round without their layer.
+        players[idx].left = true;
+        guestConns[idx - 1] = null;
+        netBroadcast({ type: 'players', players: players });
+        toast(name + ' left the game');
+        return;
+      }
       players.splice(idx, 1);
       guestConns.splice(idx - 1, 1);
       netBroadcast({ type: 'players', players: players });
@@ -417,14 +479,18 @@
   function handleHostMessage(conn, msg) {
     switch (msg.type) {
       case 'join':
+        var joinName = cleanText(msg.name, MAX_NAME);
+        if (!joinName) { netSend(conn, { type: 'error', text: 'Enter a name' }); return; }
+        if (gameInProgress) { netSend(conn, { type: 'error', text: 'Game already started' }); return; }
+        if (findConnPlayerIndex(conn) > 0) return;
         if (players.length >= 6) { netSend(conn, { type: 'error', text: 'Room is full' }); return; }
-        if (players.some(function (p) { return p.name === msg.name; })) { netSend(conn, { type: 'error', text: 'Name taken' }); return; }
+        if (players.some(function (p) { return p.name === joinName; })) { netSend(conn, { type: 'error', text: 'Name taken' }); return; }
         guestConns.push(conn);
-        players.push({ name: msg.name, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
+        players.push({ name: joinName, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] });
         var pIdx = players.length - 1;
         netSend(conn, { type: 'joined', playerIndex: pIdx, players: players, roomCode: roomCode });
         netBroadcastExcept(conn, { type: 'players', players: players });
-        toast(msg.name + ' joined');
+        toast(joinName + ' joined');
         if (document.getElementById('screen-lobby').classList.contains('active')) {
           renderOnlinePlayerList();
           updateStartBtn();
@@ -432,7 +498,10 @@
         break;
 
       case 'song_entered':
-        games.push({ songName: msg.songName, enteredBy: msg.playerIndex, submissions: {}, guesses: [] });
+        var songFrom = findConnPlayerIndex(conn);
+        var songName = cleanText(msg.songName, MAX_TEXT);
+        if (songFrom !== songEntryIdx || !songName) return;
+        games.push({ songName: songName, enteredBy: songFrom, submissions: {}, guesses: [] });
         songEntryIdx++;
         if (songEntryIdx < players.length) {
           netBroadcast({ type: 'enter_song', playerIndex: songEntryIdx });
@@ -442,13 +511,22 @@
         break;
 
       case 'layer_submitted':
-        var gIdx = getGameIdx(msg.playerIndex, currentRound);
+        var from = findConnPlayerIndex(conn);
+        if (from < 0 || !gameInProgress) return;
+        var gIdx = getGameIdx(from, currentRound);
         var game = games[gIdx];
         var inst = INSTRUMENTS[currentRound];
-        game.submissions[inst] = { data: msg.data, bpm: gameBpm, playerIndex: msg.playerIndex };
-        if (msg.sound) game.submissions[inst].sound = msg.sound;
-        if (msg.patch) game.submissions[inst].patch = normalisePatch(msg.patch);
-        if (msg.guess) game.guesses.push({ playerIndex: msg.playerIndex, guess: msg.guess, round: currentRound, instrument: inst });
+        if (!game || !inst || game.submissions[inst]) return;
+        var data = msg.data;
+        if (!data || typeof data !== 'object') return;
+        if (inst === 'vocal' && typeof data.dataUrl === 'string' &&
+            (data.dataUrl.length > MAX_VOCAL_BYTES || data.dataUrl.indexOf('data:audio/') !== 0)) return;
+        game.submissions[inst] = { data: data, bpm: gameBpm, playerIndex: from };
+        var soundOk = typeof msg.sound === 'string' && soundNamesFor(inst).indexOf(msg.sound) !== -1;
+        if (soundOk) game.submissions[inst].sound = msg.sound;
+        if (msg.patch && typeof msg.patch === 'object') game.submissions[inst].patch = normalisePatch(msg.patch);
+        var guess = cleanText(msg.guess, MAX_TEXT);
+        if (guess) game.guesses.push({ playerIndex: from, guess: guess, round: currentRound, instrument: inst });
         onLayerSubmittedHost();
         break;
     }
@@ -578,6 +656,24 @@
 
   // ── Online lobby ──
   function showOnlineLobby() {
+    if (netMode === 'host') {
+      gameInProgress = false;
+      // Players who left mid-game kept their slot so indices stayed valid;
+      // back in the lobby the slots can go. Everyone gets their new index.
+      if (players.some(function (p) { return p.left; })) {
+        var keptConns = [];
+        players = players.filter(function (p, i) {
+          if (i === 0) return true;
+          if (p.left) return false;
+          keptConns.push(guestConns[i - 1]);
+          return true;
+        });
+        guestConns = keptConns;
+        guestConns.forEach(function (c, i) {
+          netSend(c, { type: 'joined', playerIndex: i + 1, players: players, roomCode: roomCode });
+        });
+      }
+    }
     showScreen('lobby');
     document.getElementById('room-code').textContent = roomCode;
     document.getElementById('btn-copy-code').onclick = function () {
@@ -605,17 +701,16 @@
         if (players.length < 2) { toast('Need at least 2 players'); return; }
         games = [];
         songEntryIdx = 0;
+        gameInProgress = true;
         netBroadcast({ type: 'game_start', bpm: gameBpm, firstEntry: 0, settings: sharedSettings() });
         showSongEntryOnline();
       };
     }
 
     document.getElementById('btn-leave').onclick = function () {
-      destroyPeer();
       players = [];
       games = [];
-      netMode = 'local';
-      showScreen('home');
+      leaveToHome();
     };
 
     updateStartBtn();
@@ -631,8 +726,8 @@
       if (i === 0) badge = '<span class="player-badge">Host</span>';
       else if (netMode === 'host') badge = '<button class="btn-icon kick-player" data-i="' + i + '" title="Kick">&times;</button>';
       if (i === myPlayerIndex) badge = '<span class="player-badge" style="color:var(--accent)">You</span>' + (i === 0 ? ' <span class="player-badge">Host</span>' : '');
-      card.innerHTML = '<div class="player-avatar" style="background:' + p.color + '">' + p.name[0].toUpperCase() + '</div>' +
-        '<span class="player-name">' + esc(p.name) + '</span>' + badge;
+      card.innerHTML = '<div class="player-avatar" style="background:' + p.color + '">' + esc((p.name || '?')[0].toUpperCase()) + '</div>' +
+        '<span class="player-name">' + esc(p.name) + (p.left ? ' <small>(left)</small>' : '') + '</span>' + badge;
       list.appendChild(card);
     });
     if (netMode === 'host') {
@@ -641,7 +736,7 @@
           var idx = +btn.dataset.i;
           if (idx > 0 && idx <= guestConns.length) {
             netSend(guestConns[idx - 1], { type: 'kicked' });
-            guestConns[idx - 1].close();
+            if (guestConns[idx - 1]) guestConns[idx - 1].close();
             players.splice(idx, 1);
             guestConns.splice(idx - 1, 1);
             netBroadcast({ type: 'players', players: players });
@@ -729,7 +824,7 @@
     clearTimeout(roundTimer);
     console.log('Advancing to round ' + nextRound);
     setTimeout(function () {
-      if (nextRound >= 4) {
+      if (nextRound >= INSTRUMENTS.length) {
         netBroadcast({ type: 'reveal', games: games, players: players, bpm: gameBpm });
         showReveal();
         return;
@@ -1399,7 +1494,7 @@
     players.forEach(function (p, i) {
       var card = document.createElement('div');
       card.className = 'player-card';
-      card.innerHTML = '<div class="player-avatar" style="background:' + p.color + '">' + p.name[0].toUpperCase() + '</div>' +
+      card.innerHTML = '<div class="player-avatar" style="background:' + p.color + '">' + esc((p.name || '?')[0].toUpperCase()) + '</div>' +
         '<span class="player-name">' + esc(p.name) + '</span>' +
         (i === 0 ? '<span class="player-badge">Host</span>' : '<button class="btn-icon remove-player" data-i="' + i + '" title="Remove">&times;</button>');
       list.appendChild(card);
@@ -2470,11 +2565,11 @@
       var sub = game.submissions[inst];
       var card = document.createElement('div');
       card.className = 'layer-card';
-      var pName = sub ? players[sub.playerIndex].name : '-';
+      var pName = sub && players[sub.playerIndex] ? players[sub.playerIndex].name : '-';
       var status = sub ? (sub.sound || 'Recorded') : 'Empty';
       card.innerHTML = '<span class="layer-badge" data-inst="' + inst + '">' + inst + '</span>' +
         '<span class="layer-player">' + esc(pName) + '</span>' +
-        '<span class="layer-status">' + status + '</span>';
+        '<span class="layer-status">' + esc(status) + '</span>';
       layersEl.appendChild(card);
     });
 
@@ -2491,7 +2586,7 @@
         var row = document.createElement('div');
         row.className = 'guess-row';
         var isCorrect = g.guess.toLowerCase().trim() === game.songName.toLowerCase().trim();
-        row.innerHTML = '<span class="guess-player">' + esc(players[g.playerIndex].name) + '</span>' +
+        row.innerHTML = '<span class="guess-player">' + esc(players[g.playerIndex] ? players[g.playerIndex].name : '?') + '</span>' +
           '<span class="guess-text">"' + esc(g.guess) + '"</span>' +
           '<span class="guess-badge ' + (isCorrect ? 'correct' : 'wrong') + '">' + (isCorrect ? 'Correct!' : 'Nope') + '</span>';
         guessesEl.appendChild(row);
@@ -2690,11 +2785,11 @@
       var sub = game.submissions[inst];
       var card = document.createElement('div');
       card.className = 'layer-card';
-      var pName = sub ? players[sub.playerIndex].name : '-';
+      var pName = sub && players[sub.playerIndex] ? players[sub.playerIndex].name : '-';
       var status = sub ? (sub.sound || 'Recorded') : 'Empty';
       card.innerHTML = '<span class="layer-badge" data-inst="' + inst + '">' + inst + '</span>' +
         '<span class="layer-player">' + esc(pName) + '</span>' +
-        '<span class="layer-status">' + status + '</span>';
+        '<span class="layer-status">' + esc(status) + '</span>';
       layersEl.appendChild(card);
     });
 
