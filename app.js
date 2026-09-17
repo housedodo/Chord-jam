@@ -1225,7 +1225,10 @@
     var p = normalisePatch(patch);
     var bus = makeBus(inst);
     var reverb = makeReverb((inst || 'melody') + ':prod', 1.2, 0.14, bus);
-    var filter = new Tone.Filter({ type: 'lowpass', frequency: p.cutoff, rolloff: -24, Q: 1 }).connect(reverb);
+    // Q 1 put a resonant peak on the cutoff, which made the middle of the
+    // sweep both louder and harsher than the ends. 0.7 is a clean rolloff, so
+    // opening the filter now only ever adds brightness.
+    var filter = new Tone.Filter({ type: 'lowpass', frequency: p.cutoff, rolloff: -24, Q: 0.7 }).connect(reverb);
     var syn = capVoices(new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: p.wave },
       envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release },
@@ -1328,9 +1331,9 @@
   }
 
   // ── Title-screen spectrum ──
-  // Bars along the lower third, driven by the theme's own spectrum. Deliberately
-  // coarse: redrawn at 14fps and snapped to 10 height steps, so it jitters like
-  // a cheap meter rather than gliding like a chart.
+  // Bars along the lower third, driven by the theme's own spectrum. Shaped to
+  // breathe with the track rather than twitch at it: a fast rise, a slow fall,
+  // and per-band normalisation so the whole row moves, not just the bass end.
   const HOME_BAR_COUNT = 24;
   const HOME_BAR_FPS = 30;
   // The theme's energy sits between roughly 60Hz and 4kHz and is 45dB down by
@@ -1339,17 +1342,40 @@
   // right-hand half of the screen permanently flat.
   const HOME_BAR_LO_HZ = 55;
   const HOME_BAR_HI_HZ = 5000;
-  const HOME_BAR_TILT = 110;   // bytes added across the row; ~30dB of rolloff
+  const HOME_BAR_RISE = 0.30;  // how fast a bar climbs to a new peak
+  const HOME_BAR_FALL = 0.09;  // and how slowly it settles back
+  const HOME_BAR_MIN = 8;      // % — a resting line, so no bar ever reads dead
+  const HOME_BAR_MAX = 92;     // % — leaves the mask a little air at the top
+  // Each band is measured against its own slow average and its own typical
+  // swing, so every bar breathes around the middle of the row whatever its
+  // absolute level. A fixed tilt could not do that: the bass bands sat pinned
+  // at the top while the treble ones never left the floor.
+  const HOME_BAR_TRACK = 0.02;  // how fast the average and spread follow the mix
+  const HOME_BAR_SPREAD = 3;    // deviations that map to the full height
+  const HOME_BAR_DEV_MIN = 7;   // bytes — stops a near-silent band amplifying noise
+  const HOME_BAR_BLEND = 0.25;  // how much of each neighbour a bar borrows
+  // Percussion lives in the top bands and hits far harder than anything in the
+  // bass, so those bars are given a lazier response — otherwise the right-hand
+  // end of the row twitches while the left-hand end drifts.
+  const HOME_BAR_EASE = 0.55;   // how much slower the topmost bar reacts
   var homeBarEls = [];
   var homeBarRaf = null;
   var homeBarLast = 0;
   var homeBarData = null;
+  var homeBarValues = [];
+  var homeBarMean = [];
+  var homeBarDev = [];
+  var homeBarTargets = [];
 
   function buildHomeBars() {
     var wrap = document.getElementById('home-bars');
     if (!wrap || homeBarEls.length) return;
     var html = '';
-    for (var i = 0; i < HOME_BAR_COUNT; i++) html += '<i></i>';
+    for (var i = 0; i < HOME_BAR_COUNT; i++) {
+      html += '<i></i>';
+      homeBarValues.push(0); homeBarMean.push(60); homeBarDev.push(20);
+      homeBarTargets.push(0);
+    }
     wrap.innerHTML = html;
     homeBarEls = Array.prototype.slice.call(wrap.children);
   }
@@ -1371,11 +1397,30 @@
       var hi = Math.max(lo + 1, Math.ceil(f1 / hzPerBin));
       var peak = 0;
       for (var b = lo; b < hi && b < bins; b++) if (homeBarData[b] > peak) peak = homeBarData[b];
-      // getByteFrequencyData is already logarithmic, so the tilt adds rather
-      // than multiplies — a multiplier cannot lift a band that reads zero.
-      var lifted = peak > 0 ? peak + (i / (HOME_BAR_COUNT - 1)) * HOME_BAR_TILT : 0;
-      // No quantising: stepped heights were most of what read as jitter.
-      homeBarEls[i].style.height = (Math.min(255, lifted) / 255 * 100).toFixed(1) + '%';
+      // Centre the bar on this band's own running average and scale it by the
+      // band's own typical deviation, so it sits mid-row and swings both ways.
+      var mean = homeBarMean[i] + (peak - homeBarMean[i]) * HOME_BAR_TRACK;
+      var dev = homeBarDev[i] + (Math.abs(peak - mean) - homeBarDev[i]) * HOME_BAR_TRACK;
+      homeBarMean[i] = mean;
+      homeBarDev[i] = dev;
+      homeBarTargets[i] = Math.max(0, Math.min(1,
+        0.5 + (peak - mean) / (HOME_BAR_SPREAD * Math.max(HOME_BAR_DEV_MIN, dev))));
+    }
+    for (var i = 0; i < HOME_BAR_COUNT; i++) {
+      // Borrow a little from each neighbour. A band on its own can spike when
+      // nothing around it does — that is what made the last bar jump — and
+      // blending also makes the row read as one wave instead of 24 meters.
+      var l = homeBarTargets[i > 0 ? i - 1 : 1];
+      var r = homeBarTargets[i < HOME_BAR_COUNT - 1 ? i + 1 : HOME_BAR_COUNT - 2];
+      var target = homeBarTargets[i] * (1 - 2 * HOME_BAR_BLEND) + (l + r) * HOME_BAR_BLEND;
+      // Rise quickly, fall slowly: how a meter moves, and what stops a bar
+      // twitching when its band drops out for a frame.
+      var ease = 1 - HOME_BAR_EASE * (i / (HOME_BAR_COUNT - 1));
+      var v = homeBarValues[i];
+      v += (target - v) * (target > v ? HOME_BAR_RISE : HOME_BAR_FALL) * ease;
+      homeBarValues[i] = v;
+      homeBarEls[i].style.height =
+        (HOME_BAR_MIN + v * (HOME_BAR_MAX - HOME_BAR_MIN)).toFixed(1) + '%';
     }
   }
 

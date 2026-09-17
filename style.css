@@ -2772,9 +2772,9 @@ body {
   display: block;
   height: 0;
   background: var(--accent);
-  /* The analyser is smoothed and the bars are redrawn 30 times a second, so
-     a short ease on top is enough to make the movement read as a swell. */
-  transition: height 0.14s ease-out;
+  /* The rise and fall is shaped in JS now, so a CSS ease on top would only
+     add lag. A hair of linear smoothing covers the gap between frames. */
+  transition: height 0.05s linear;
 }
 :root[data-skin="phosphor"] .home-bars i {
   background: linear-gradient(to top, var(--ph-green), var(--ph-bright));
