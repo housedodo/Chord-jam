@@ -39,10 +39,10 @@
     "Piano": {
       "baseUrl": "chords/",
       "urls": {
-        "C4": "piano.mp3"
+        "C3": "piano.mp3"
       },
       "release": 0.8,
-      "gain": -4.0
+      "gain": -4.7
     },
     "Guitar": {
       "baseUrl": "chords/",
@@ -50,7 +50,7 @@
         "C4": "guitar.mp3"
       },
       "release": 0.6,
-      "gain": -10.2
+      "gain": -11.0
     },
     "Violin": {
       "baseUrl": "chords/",
@@ -58,25 +58,49 @@
         "C4": "violin.mp3"
       },
       "release": 0.4,
-      "gain": -6.6
+      "gain": -9.2
     },
     "Choir": {
       "baseUrl": "chords/",
       "urls": {
-        "C4": "choir.mp3"
+        "A4": "choir.mp3"
       },
       "release": 0.5,
-      "gain": -10.8
+      "gain": -11.0
     }
   },
   "melody": {
     "Piano": {
       "baseUrl": "chords/",
       "urls": {
-        "C4": "piano.mp3"
+        "C3": "piano.mp3"
       },
       "release": 0.8,
-      "gain": -2.9
+      "gain": -1.8
+    },
+    "High Synth": {
+      "baseUrl": "melody/",
+      "urls": {
+        "C5": "high-synth.mp3"
+      },
+      "release": 0.6,
+      "gain": -12.1
+    },
+    "Saw Synth": {
+      "baseUrl": "melody/",
+      "urls": {
+        "C4": "saw-synth.mp3"
+      },
+      "release": 0.4,
+      "gain": -3.3
+    },
+    "Deep": {
+      "baseUrl": "melody/",
+      "urls": {
+        "D2": "deep.mp3"
+      },
+      "release": 0.4,
+      "gain": -9.0
     }
   }
 }
