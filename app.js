@@ -105,7 +105,6 @@
     'Retro': { harmonicity: 2, modulationIndex: 5, envelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.2 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.08, sustain: 0.3, release: 0.1 }, volume: -5.2 }
   };
   const CHORD_SOUNDS = {
-    'Piano Chords': { harmonicity: 3, modulationIndex: 0.8, envelope: { attack: 0.02, decay: 0.4, sustain: 0.5, release: 0.8 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.4 }, volume: -9.4 },
     'Warm Pad': { harmonicity: 1.5, modulationIndex: 0.3, envelope: { attack: 0.25, decay: 0.6, sustain: 0.8, release: 1.5 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.3, decay: 0.4, sustain: 0.5, release: 0.8 }, volume: -5.8 },
     'Bright Keys': { harmonicity: 2, modulationIndex: 2, envelope: { attack: 0.01, decay: 0.25, sustain: 0.3, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.4, release: 0.2 }, volume: -8.1 },
     'Electric Piano': { harmonicity: 3.5, modulationIndex: 1.2, envelope: { attack: 0.005, decay: 0.5, sustain: 0.2, release: 0.6 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.3 }, volume: -8.2 },
@@ -161,7 +160,10 @@
   let previewSource = null; // 'current' | 'previous' — which control started it
   let currentBassSound = 'Analog Bass';
   let currentMelodySound = 'Piano';
-  let currentChordSound = 'Piano Chords';
+  // A sampled piano, from the pack. Everything falls back to a built-in sound
+  // if the pack is missing, so the game still runs without it.
+  const DEFAULT_CHORD_SOUND = 'Piano';
+  let currentChordSound = DEFAULT_CHORD_SOUND;
   let pianoRollNotes = [];
 
   // ── Game settings ──
@@ -876,7 +878,7 @@
     var sound = sub && sub.sound;
     var shape = sub && sub.shape ? normaliseShape(inst, sound, sub.shape) : presetShape(inst, sound);
     if (inst === 'chords') {
-      currentChordSound = sound || currentChordSound;
+      currentChordSound = sound || DEFAULT_CHORD_SOUND;
       if (synths.chords) synths.chords.dispose();
       synths.chords = createChordSynth(currentChordSound, shape);
     } else if (inst === 'bass') {
@@ -985,8 +987,10 @@
   const synths = {};
 
   function ensureAudio() {
-    if (audioReady) return Promise.resolve();
-    return Tone.start().then(function () { audioReady = true; })
+    var pack = samplePackReady || Promise.resolve();
+    if (audioReady) return pack;
+    return pack.then(function () { return Tone.start(); })
+      .then(function () { audioReady = true; })
       .catch(function () { toast('Tap the screen once to enable sound'); });
   }
 
@@ -1108,7 +1112,7 @@
     if (name === PIANO_SOUND) return createPianoSynth('chords', sh);
     var sampled = packEntry('chords', name);
     if (sampled) return createSampledInstrument(sampled, 'chords', sh);
-    var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS['Piano Chords'];
+    var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS[Object.keys(CHORD_SOUNDS)[0]];
     var bus = makeBus('chords');
     var reverb = makeReverb('chords', 2, 0.25, bus);
     var poly = capVoices(new Tone.PolySynth(Tone.FMSynth, withShape(preset, sh))
@@ -1149,11 +1153,16 @@
   // synth, so a partial pack is fine and a missing one changes nothing.
   var samplePack = null;
 
+  // Held onto, not fired and forgotten: the default chord sound now comes from
+  // the pack, so anything that builds a voice has to know the manifest has
+  // landed or it would quietly fall back to a built-in.
+  var samplePackReady = null;
   function loadSamplePack() {
-    return fetch('samples/pack.json')
+    samplePackReady = fetch('samples/pack.json')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (p) { samplePack = p; })
       .catch(function () { samplePack = null; });
+    return samplePackReady;
   }
 
   function packEntry(group, name) {
@@ -1542,9 +1551,12 @@
     var bank = bankFor(group);
     var names = Object.keys(bank);
     if (PIANO_LAYERS.indexOf(group) !== -1) names.unshift(PIANO_SOUND);
+    // Recordings first. They are the ones people reach for, and the default
+    // chord sound is one of them, so it should not sit at the bottom of a
+    // list behind a dozen synths.
     var fromPack = (samplePack && samplePack[group]) ? Object.keys(samplePack[group]) : [];
-    fromPack.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
-    return names;
+    names = names.filter(function (n) { return fromPack.indexOf(n) < 0; });
+    return fromPack.concat(names);
   }
 
   function createInstrument(group, soundName, poly, shape) {
@@ -2695,7 +2707,7 @@
     });
 
     paint();
-    return { el: wrap, paint: paint };
+    return { el: wrap, key: key, paint: paint };
   }
 
   function buildShaper(inst) {
@@ -2852,6 +2864,9 @@
         layerShapeEdited[inst] = true;
         panel.classList.add('edited');
         if (changed === 'table') drawWave(shapeFor(inst).table);
+        // Turning a knob the current sound ignores should not tear the voice
+        // down and build it again — for a sampler that means refetching.
+        if (k && k.el.classList.contains('inert')) return;
         // A cutoff sweep rides the filter that is already in the chain;
         // everything else needs the voices rebuilt, which is debounced so a
         // drag does not dispose and recreate the synth on every frame.
@@ -2870,6 +2885,11 @@
     hear.onclick = function () {
       ensureAudio().then(function () {
         var syn = rebuildLayerSynth(inst);
+        // A sampled sound is still fetching its file the first time it is
+        // picked, and a sampler that has not loaded plays nothing at all.
+        return Promise.all(pendingAudioLoads.slice()).then(function () { return syn; });
+      }).then(function (syn) {
+        if (!syn) return;
         var now = Tone.now();
         var notes = inst === 'bass' ? ['C2', 'G2', 'C3'] : ['C4', 'E4', 'G4'];
         notes.forEach(function (n, i) { syn.play(n, 0.4, now + i * 0.18); });
@@ -2902,6 +2922,16 @@
       if (nm !== PRODUCER_SOUND) fieldName.textContent = nm;
       syncSource();
     };
+    // A sampler plays a recording: it has an attack and a release, but no
+    // decay or sustain of its own. Those two knobs are shown inert rather
+    // than left looking live and doing nothing.
+    const SAMPLER_DEAD_KNOBS = { decay: 1, sustain: 1 };
+    function syncKnobs() {
+      var sampled = !!packEntry(inst, currentSoundFor(inst));
+      knobs.forEach(function (k) {
+        k.el.classList.toggle('inert', sampled && !!SAMPLER_DEAD_KNOBS[k.key]);
+      });
+    }
     function syncSource() {
       var onTable = currentSoundFor(inst) === PRODUCER_SOUND;
       tableRow.style.display = onTable ? 'flex' : 'none';
@@ -2912,6 +2942,7 @@
       srcPreset.setAttribute('aria-pressed', onTable ? 'false' : 'true');
       if (onTable) drawWave(shapeFor(inst).table);
       else closeList();
+      syncKnobs();
     }
     srcTable.onclick = function () {
       if (currentSoundFor(inst) !== PRODUCER_SOUND) pickSound(PRODUCER_SOUND);

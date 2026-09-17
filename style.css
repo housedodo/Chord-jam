@@ -1956,6 +1956,10 @@ body {
 }
 .knob-name { opacity: 0.6; }
 
+/* A control the current sound cannot honour. Still turnable — the value is
+   kept, so it applies again the moment a sound that uses it is picked. */
+.knob-cell.inert { opacity: 0.32; }
+
 /* The knob itself: a dark cap with a pointer line, ringed by segments that
    light up to the current value. --angle is set from JS. */
 .knob {
