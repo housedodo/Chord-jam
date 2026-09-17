@@ -1,0 +1,690 @@
+/* Notebook and Risograph skins — archived, not loaded.
+
+   Both were switchable skins alongside Phosphor until we narrowed the app to
+   one look. Nothing here is referenced by the app; it is kept so either can be
+   brought back without rebuilding it from scratch.
+
+   To restore one:
+     1. Paste its rules back into style.css (order does not matter much, but
+        keep them after the base components they override).
+     2. Add its entry back to COLOR_SCHEMES in app.js — see schemes.js here.
+     3. Add its name to the allow-list in the head script in index.html.
+     4. Re-add its fonts to the Google Fonts <link>: Notebook needs Cabin
+        Sketch, Patrick Hand and Caveat; Riso needs Archivo and Archivo Black.
+
+   Both assume the paper-coloured :root variable defaults that style.css
+   carried at the time. :root is now the Phosphor palette, so restoring a skin
+   means restoring those defaults too (see schemes.js).
+*/
+
+/* ============================================================
+   NOTEBOOK SKIN
+   Shape + texture layer on top of the colour variables. Only the
+   "notebook" scheme sets data-skin, so the dark schemes are untouched.
+   Sketchiness lives on the chrome; grid interiors stay crisp so a
+   32-step sequencer is still readable.
+   ============================================================ */
+
+:root[data-skin="notebook"] {
+  --ink: #23324f;
+  --ink-soft: rgba(35, 50, 79, 0.55);
+  --pen-red: #b5482a;
+  --rule: #cfd9e8;
+  /* Lopsided radii read as a pen going round a corner */
+  --sketch-radius: 255px 14px 225px 16px / 16px 225px 14px 255px;
+  --sketch-radius-alt: 14px 235px 16px 225px / 225px 16px 235px 14px;
+}
+
+:root[data-skin="notebook"] body {
+  font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+  font-size: 1.06rem;
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 33px, var(--rule) 33px 34px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23p)' opacity='0.1'/%3E%3C/svg%3E");
+}
+
+/* Title: Cabin Sketch is drawn with hatching, so the letters read as sketched */
+:root[data-skin="notebook"] .logo {
+  font-family: 'Cabin Sketch', 'Patrick Hand', cursive;
+  font-weight: 700;
+  font-size: 3.4rem;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-shadow: none;
+  transform: rotate(-1.2deg);
+}
+
+:root[data-skin="notebook"] .tagline,
+:root[data-skin="notebook"] .home-hint {
+  font-family: 'Caveat', cursive;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+}
+
+:root[data-skin="notebook"] .listen-title,
+:root[data-skin="notebook"] .voting-title,
+:root[data-skin="notebook"] .reveal-song,
+:root[data-skin="notebook"] .handoff-player,
+:root[data-skin="notebook"] .listen-song {
+  font-family: 'Cabin Sketch', cursive;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+:root[data-skin="notebook"] .room-code {
+  font-family: 'Cabin Sketch', cursive;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* Panels and inputs get hand-drawn edges */
+:root[data-skin="notebook"] .sequencer,
+:root[data-skin="notebook"] .guess-section,
+:root[data-skin="notebook"] .game-options,
+:root[data-skin="notebook"] .layer-card,
+:root[data-skin="notebook"] .guess-row,
+:root[data-skin="notebook"] .player-chip,
+:root[data-skin="notebook"] .vocal-timeline,
+:root[data-skin="notebook"] .option-toggle,
+:root[data-skin="notebook"] .song-input,
+:root[data-skin="notebook"] .name-input,
+:root[data-skin="notebook"] .code-input,
+:root[data-skin="notebook"] .piano-roll,
+:root[data-skin="notebook"] .chord-timeline,
+:root[data-skin="notebook"] .vocal-waveform {
+  border: 2.5px solid var(--ink);
+  border-radius: var(--sketch-radius);
+  background: var(--surface);
+}
+
+:root[data-skin="notebook"] .layer-card:nth-child(even),
+:root[data-skin="notebook"] .option-toggle:nth-child(even) {
+  border-radius: var(--sketch-radius-alt);
+}
+
+/* Buttons: ink block, hard shadow, slight tilt — no blur anywhere */
+:root[data-skin="notebook"] .btn-primary {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 1.3rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  background: var(--ink);
+  color: #fffbf0;
+  border: 2.5px solid #16203a;
+  border-radius: var(--sketch-radius);
+  box-shadow: 4px 4px 0 rgba(35, 50, 79, 0.28);
+  transform: rotate(-0.7deg);
+}
+:root[data-skin="notebook"] .btn-primary:active {
+  transform: rotate(-0.7deg) translate(3px, 3px);
+  box-shadow: 1px 1px 0 rgba(35, 50, 79, 0.28);
+  opacity: 1;
+}
+
+:root[data-skin="notebook"] .btn-secondary {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 1.1rem;
+  font-weight: 400;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--sketch-radius-alt);
+  box-shadow: 3px 3px 0 rgba(35, 50, 79, 0.2);
+  transform: rotate(0.5deg);
+}
+:root[data-skin="notebook"] .btn-secondary:active {
+  transform: rotate(0.5deg) translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(35, 50, 79, 0.2);
+}
+
+:root[data-skin="notebook"] .btn-text {
+  font-family: 'Caveat', cursive;
+  font-size: 1.15rem;
+  text-decoration: underline wavy var(--ink-soft) 1px;
+  text-underline-offset: 4px;
+}
+
+:root[data-skin="notebook"] .btn-seq-play,
+:root[data-skin="notebook"] .btn-icon {
+  background: var(--surface);
+  color: var(--ink);
+  border: 2.5px solid var(--ink);
+  border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+  box-shadow: 3px 3px 0 rgba(35, 50, 79, 0.2);
+}
+
+/* Drum hits become pen X marks instead of filled blocks */
+:root[data-skin="notebook"] .drum-cell {
+  background: var(--surface);
+  border: 1.5px solid rgba(35, 50, 79, 0.16);
+  border-radius: 3px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 74% 74%;
+}
+:root[data-skin="notebook"] .drum-cell.beat {
+  background-color: #f1ead8;
+  border-color: rgba(35, 50, 79, 0.3);
+}
+:root[data-skin="notebook"] .drum-cell.on {
+  background-color: var(--surface);
+  border-color: rgba(35, 50, 79, 0.16);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='none' stroke='%23b5482a' stroke-width='2.8' stroke-linecap='round'%3E%3Cpath d='M4.5 4 L15.5 16'/%3E%3Cpath d='M15.5 4.5 L4 15.5'/%3E%3C/g%3E%3C/svg%3E");
+}
+:root[data-skin="notebook"] .drum-cell.on.beat { background-color: #f1ead8; }
+:root[data-skin="notebook"] .drum-cell.playing {
+  box-shadow: none;
+  background-color: #fdf0c8;
+}
+
+:root[data-skin="notebook"] .drum-label,
+:root[data-skin="notebook"] .pr-label {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+/* Notes as hand-drawn lozenges */
+:root[data-skin="notebook"] .pr-note-block,
+:root[data-skin="notebook"] .ct-note-block {
+  border-radius: 18px 5px 16px 6px / 6px 16px 5px 18px !important;
+  border: 2px solid var(--ink) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+  font-family: 'Patrick Hand', cursive;
+}
+:root[data-skin="notebook"] .pr-note-block[data-inst="bass"],
+:root[data-skin="notebook"] .pr-note-block[data-inst="melody"],
+:root[data-skin="notebook"] .pr-note-block[data-inst="chords"] {
+  background: var(--note-color) !important;
+}
+
+:root[data-skin="notebook"] .vocal-block {
+  border-radius: 18px 5px 16px 6px / 6px 16px 5px 18px;
+  border: 2.5px solid var(--ink);
+  background: var(--note-color);
+  color: var(--ink);
+  font-family: 'Patrick Hand', cursive;
+  box-shadow: 3px 3px 0 rgba(35, 50, 79, 0.2);
+}
+
+/* Badges and chips: outlined, not filled */
+:root[data-skin="notebook"] .build-badge,
+:root[data-skin="notebook"] .layer-badge,
+:root[data-skin="notebook"] .guess-badge {
+  border: 2px solid var(--ink);
+  border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+  color: var(--ink);
+  font-family: 'Patrick Hand', cursive;
+  font-weight: 400;
+}
+
+:root[data-skin="notebook"] .crystal-pill,
+:root[data-skin="notebook"] .listen-counter,
+:root[data-skin="notebook"] .bpm-display,
+:root[data-skin="notebook"] .build-timer,
+:root[data-skin="notebook"] .vocal-status,
+:root[data-skin="notebook"] .genre-lock-label {
+  font-family: 'Caveat', cursive;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+}
+
+:root[data-skin="notebook"] .sound-btn,
+:root[data-skin="notebook"] .chord-pick,
+:root[data-skin="notebook"] .chord-select {
+  font-family: 'Patrick Hand', cursive;
+  border: 2px solid var(--ink);
+  border-radius: 40px 10px 36px 12px / 12px 36px 10px 40px;
+  background: var(--surface);
+  color: var(--ink);
+}
+:root[data-skin="notebook"] .sound-btn.active,
+:root[data-skin="notebook"] .chord-pick.active {
+  background: var(--note-color);
+  color: var(--ink);
+}
+
+:root[data-skin="notebook"] .theme-dot {
+  border: 2px solid var(--ink);
+}
+
+/* The red margin rule down the left edge of the page */
+:root[data-skin="notebook"] .screen.active::before {
+  content: '';
+  position: fixed;
+  left: 30px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(217, 138, 138, 0.75);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (max-width: 480px) {
+  :root[data-skin="notebook"] .screen.active::before { left: 14px; }
+  :root[data-skin="notebook"] .logo { font-size: 2.7rem; }}
+
+/* --- Notebook skin corrections --- */
+
+/* A 32-step row leaves ~11px cells, where a bare pen X is illegible.
+   Pair it with a wash so "on" still reads when the mark is too small. */
+:root[data-skin="notebook"] .drum-cell.on {
+  background-color: #fbe0ad;
+  background-size: 92% 92%;
+  border-color: rgba(35, 50, 79, 0.38);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='none' stroke='%23b5482a' stroke-width='3.4' stroke-linecap='round'%3E%3Cpath d='M4.5 4 L15.5 16'/%3E%3Cpath d='M15.5 4.5 L4 15.5'/%3E%3C/g%3E%3C/svg%3E");
+}
+:root[data-skin="notebook"] .drum-cell.on.beat { background-color: #f7d79b; }
+:root[data-skin="notebook"] .drum-cell.playing {
+  background-color: #d8ecd2;
+  border-color: rgba(35, 50, 79, 0.5);
+}
+
+/* brightness() was tuned for the dark schemes; on cream it reads as mud */
+:root[data-skin="notebook"] .pr-cell.pr-sharp {
+  background: #ece2cc;
+  filter: none;
+}
+:root[data-skin="notebook"] .pr-cell.pr-sharp.pr-beat {
+  background: #e4d8bd;
+  filter: none;
+}
+
+/* Badges as highlighter swipes rather than flat colour blocks */
+:root[data-skin="notebook"] .build-badge[data-inst="drums"],
+:root[data-skin="notebook"] .layer-badge[data-inst="drums"] { background: color-mix(in srgb, var(--drums-color) 50%, #fffbf0); }
+:root[data-skin="notebook"] .build-badge[data-inst="chords"],
+:root[data-skin="notebook"] .layer-badge[data-inst="chords"] { background: color-mix(in srgb, var(--chords-color) 50%, #fffbf0); }
+:root[data-skin="notebook"] .build-badge[data-inst="bass"],
+:root[data-skin="notebook"] .layer-badge[data-inst="bass"] { background: color-mix(in srgb, var(--bass-color) 50%, #fffbf0); }
+:root[data-skin="notebook"] .build-badge[data-inst="melody"],
+:root[data-skin="notebook"] .layer-badge[data-inst="melody"] { background: color-mix(in srgb, var(--melody-color) 50%, #fffbf0); }
+:root[data-skin="notebook"] .build-badge[data-inst="sfx"],
+:root[data-skin="notebook"] .layer-badge[data-inst="sfx"] { background: color-mix(in srgb, var(--mauve) 50%, #fffbf0); }
+:root[data-skin="notebook"] .build-badge[data-inst="vocal"],
+:root[data-skin="notebook"] .layer-badge[data-inst="vocal"] { background: color-mix(in srgb, var(--vocal-color) 50%, #fffbf0); }
+
+:root[data-skin="notebook"] .toast {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 1.05rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--sketch-radius);
+  box-shadow: 3px 3px 0 rgba(35, 50, 79, 0.2);
+}
+
+/* ============================================================
+   RISOGRAPH SKIN
+   Two spot inks on grainy paper. The misregistration effect is done
+   with zero-blur offset shadows rather than duplicated elements, so
+   it costs nothing and never fights existing pseudo-elements.
+   ============================================================ */
+
+:root[data-skin="riso"] {
+  --riso-pink: #ff4f9a;
+  --riso-blue: #0a8fd8;
+  --riso-ink: #17161a;
+  --riso-paper: #f2efe2;
+}
+
+:root[data-skin="riso"] body {
+  font-family: 'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+  font-weight: 500;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.2'/%3E%3C/svg%3E");
+}
+
+/* Title: the pink plate printed a few px off the black one */
+:root[data-skin="riso"] .logo {
+  font-family: 'Archivo Black', 'Archivo', sans-serif;
+  font-weight: 400;
+  font-size: 3.5rem;
+  letter-spacing: -0.02em;
+  line-height: 0.88;
+  color: var(--riso-ink);
+  text-shadow: 4px 4px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .listen-title,
+:root[data-skin="riso"] .voting-title,
+:root[data-skin="riso"] .reveal-song,
+:root[data-skin="riso"] .handoff-player,
+:root[data-skin="riso"] .listen-song,
+:root[data-skin="riso"] .room-code {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  color: var(--riso-ink);
+  text-shadow: 2px 2px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .tagline,
+:root[data-skin="riso"] .home-hint {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--riso-blue);
+}
+
+/* Panels: heavy black keyline plus an offset second ink */
+:root[data-skin="riso"] .sequencer,
+:root[data-skin="riso"] .guess-section,
+:root[data-skin="riso"] .game-options,
+:root[data-skin="riso"] .layer-card,
+:root[data-skin="riso"] .guess-row,
+:root[data-skin="riso"] .vocal-timeline,
+:root[data-skin="riso"] .option-toggle,
+:root[data-skin="riso"] .song-input,
+:root[data-skin="riso"] .name-input,
+:root[data-skin="riso"] .code-input,
+:root[data-skin="riso"] .piano-roll,
+:root[data-skin="riso"] .chord-timeline,
+:root[data-skin="riso"] .vocal-waveform,
+:root[data-skin="riso"] .player-card {
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: 4px 4px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .btn-primary {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--riso-blue);
+  color: var(--riso-paper);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--riso-ink);
+}
+:root[data-skin="riso"] .btn-primary:active {
+  transform: translate(3px, 3px);
+  box-shadow: 2px 2px 0 var(--riso-ink);
+  opacity: 1;
+}
+
+:root[data-skin="riso"] .btn-secondary {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  background: var(--surface);
+  color: var(--riso-ink);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-pink);
+}
+:root[data-skin="riso"] .btn-secondary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--riso-pink);
+}
+
+:root[data-skin="riso"] .btn-text {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.76rem;
+  color: var(--riso-blue);
+}
+
+:root[data-skin="riso"] .btn-seq-play,
+:root[data-skin="riso"] .btn-icon {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-blue);
+}
+
+/* Drum hits: pink block, blue plate showing through underneath */
+:root[data-skin="riso"] .drum-cell {
+  background: var(--surface);
+  border: 2px solid var(--riso-ink);
+  border-radius: 0;
+}
+:root[data-skin="riso"] .drum-cell.beat { background: #e6e2d2; }
+:root[data-skin="riso"] .drum-cell.on {
+  background: var(--riso-pink);
+  border-color: var(--riso-ink);
+  box-shadow: inset -2px -2px 0 rgba(10, 143, 216, 0.85);
+}
+:root[data-skin="riso"] .drum-cell.playing {
+  background: var(--riso-blue);
+  box-shadow: none;
+}
+
+:root[data-skin="riso"] .drum-label {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--riso-ink);
+}
+
+/* The roll is the dark plate, so its labels invert */
+:root[data-skin="riso"] .pr-label {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  font-size: 0.6rem;
+  color: var(--riso-paper);
+}
+:root[data-skin="riso"] .pr-label-sharp { color: #6e6b75; opacity: 1; }
+
+:root[data-skin="riso"] .pr-cell.pr-sharp,
+:root[data-skin="riso"] .pr-cell.pr-sharp.pr-beat { filter: none; }
+:root[data-skin="riso"] .pr-cell.pr-sharp { background: #141317; }
+:root[data-skin="riso"] .pr-cell.pr-sharp.pr-beat { background: #1c1b20; }
+
+:root[data-skin="riso"] .pr-note-block,
+:root[data-skin="riso"] .ct-note-block {
+  border-radius: 0 !important;
+  border: 2.5px solid var(--riso-paper) !important;
+  background: var(--riso-blue) !important;
+  color: var(--riso-paper) !important;
+  box-shadow: none !important;
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+}
+
+:root[data-skin="riso"] .vocal-block {
+  border-radius: 0;
+  border: 3px solid var(--riso-ink);
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  font-family: 'Archivo Black', sans-serif;
+  box-shadow: 4px 4px 0 var(--riso-blue);
+}
+
+:root[data-skin="riso"] .build-badge,
+:root[data-skin="riso"] .layer-badge,
+:root[data-skin="riso"] .guess-badge {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-ink);
+}
+
+:root[data-skin="riso"] .sound-btn,
+:root[data-skin="riso"] .chord-pick,
+:root[data-skin="riso"] .chord-select {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--riso-ink);
+}
+:root[data-skin="riso"] .sound-btn.active,
+:root[data-skin="riso"] .chord-pick.active {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-blue);
+}
+
+:root[data-skin="riso"] .crystal-pill,
+:root[data-skin="riso"] .listen-counter,
+:root[data-skin="riso"] .bpm-display,
+:root[data-skin="riso"] .build-timer,
+:root[data-skin="riso"] .vocal-status,
+:root[data-skin="riso"] .genre-lock-label {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.74rem;
+  color: var(--riso-ink);
+}
+
+:root[data-skin="riso"] .theme-dot {
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+}
+
+:root[data-skin="riso"] .toast {
+  font-family: 'Archivo Black', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  background: var(--riso-blue);
+  color: var(--riso-paper);
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-ink);
+}
+
+/* Halftone rule under the home logo */
+:root[data-skin="riso"] .tagline::after {
+  content: '';
+  display: block;
+  height: 8px;
+  margin-top: 10px;
+  background-image: radial-gradient(var(--riso-ink) 1.7px, transparent 1.8px);
+  background-size: 9px 9px;
+  opacity: 0.5;
+}
+
+/* The label gutter is the panel, not the cells: leaving it white made the
+   near-white natural labels invisible. Riso's roll is the dark plate. */
+:root[data-skin="riso"] .piano-roll,
+:root[data-skin="riso"] .chord-timeline {
+  background: var(--piano-roll-bg);
+}
+
+@media (max-width: 420px) {
+  :root[data-skin="riso"] .logo { font-size: 2.6rem; }
+  :root[data-skin="notebook"] .logo { font-size: 2.5rem; }}
+
+/* At ~9px cells a 2px keyline plus an inset second ink leaves no room for
+   the fill to read. Keep the misregistration on chrome, not on the grid. */
+:root[data-skin="riso"] .drum-cell {
+  border-width: 1.5px;
+}
+:root[data-skin="riso"] .drum-cell.on {
+  background: var(--riso-pink);
+  box-shadow: none;
+}
+
+/* Archivo Black is too wide for the 56px label gutter */
+:root[data-skin="riso"] .drum-label {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0;
+}
+
+:root[data-skin="riso"] .pr-note-block::before,
+:root[data-skin="riso"] .pr-note-block::after,
+:root[data-skin="riso"] .ct-note-block::before,
+:root[data-skin="riso"] .ct-note-block::after {
+  background: rgba(242, 239, 226, 0.65);
+}
+
+/* Skins */
+:root[data-skin="notebook"] .producer-panel {
+  border: 2.5px solid var(--ink);
+  border-radius: var(--sketch-radius);
+}
+:root[data-skin="notebook"] .wave-btn {
+  border: 2px solid var(--ink);
+  border-radius: 40px 10px 36px 12px / 12px 36px 10px 40px;
+  color: var(--ink);
+  background: var(--surface);
+}
+:root[data-skin="notebook"] .wave-btn.active {
+  background: var(--note-color);
+  color: var(--ink);
+}
+:root[data-skin="notebook"] .knob-label,
+:root[data-skin="notebook"] .knob-value {
+  font-family: 'Caveat', cursive;
+  font-size: 1rem;
+}
+
+:root[data-skin="riso"] .producer-panel {
+  border: 3px solid var(--riso-ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--riso-pink);
+}
+:root[data-skin="riso"] .wave-btn {
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--riso-ink);
+}
+:root[data-skin="riso"] .wave-btn.active {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-blue);
+}
+:root[data-skin="riso"] .knob-label,
+:root[data-skin="riso"] .knob-value {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+:root[data-skin="notebook"] .mode-btn {
+  border: 2px solid var(--ink);
+  border-radius: 40px 10px 36px 12px / 12px 36px 10px 40px;
+  font-family: 'Patrick Hand', cursive;
+  color: var(--ink);
+  background: var(--surface);
+}
+:root[data-skin="notebook"] .mode-btn.active { background: var(--note-color); color: var(--ink); }
+:root[data-skin="notebook"] .chord-bar-label,
+:root[data-skin="notebook"] .chord-bar-hint { font-family: 'Caveat', cursive; font-size: 1rem; }
+
+:root[data-skin="riso"] .mode-btn {
+  border: 2.5px solid var(--riso-ink);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--riso-ink);
+  text-transform: uppercase;
+}
+:root[data-skin="riso"] .mode-btn.active {
+  background: var(--riso-pink);
+  color: var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--riso-blue);
+}
+
+:root[data-skin="notebook"] .opt-help { font-family: 'Caveat', cursive; font-size: 0.92rem; }
+:root[data-skin="riso"] .opt-help { font-size: 0.66rem; letter-spacing: 0.01em; }

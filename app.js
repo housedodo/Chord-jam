@@ -155,10 +155,10 @@
     { genre: 'Folk', bpm: [90,120], icon: '🪕', examples: ['The Sound of Silence','Blowin\' in the Wind','Landslide','Big Yellow Taxi','Fast Car','Wagon Wheel','Little Lion Man','Ho Hey'] }
   ];
 
-  // Three skins. `skin` drives shape/texture rules in CSS; colour variables
-  // alone were never enough to change the app's character. Phosphor is a CRT
-  // terminal and the default; the other two are paper. Order matters — the
-  // theme picker draws one dot per key, so the default sits first.
+  // One skin for now. `skin` drives shape/texture rules in CSS; colour
+  // variables alone were never enough to change the app's character. The
+  // Notebook and Riso skins live in archive/skins/ — the picker below still
+  // renders a dot per scheme, so adding one back needs no other change.
   const DEFAULT_SCHEME = 'phosphor';
   const COLOR_SCHEMES = {
     phosphor: { label: 'Phosphor', color: '#6cf08a', skin: 'phosphor',
@@ -166,19 +166,7 @@
       text:'#6cf08a', textMuted:'#4fbf7a', textDim:'#2c7a4e',
       accent:'#6cf08a', accentSoft:'#3ec96a',
       grid:'#0a1a10', gridBeat:'#102a18', gridAlt:'#081409', gridAltBeat:'#0e2415', gridBorder:'#1f5c39',
-      pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' },
-    notebook: { label: 'Notebook', color: '#f6eeda', skin: 'notebook',
-      bg:'#f6eeda', surface:'#fffbf0', surface2:'#f3ead6', surface3:'#ebe0c8', border:'#23324f',
-      text:'#23324f', textMuted:'#7a6a55', textDim:'#9aa6b8',
-      accent:'#23324f', accentSoft:'#41568a',
-      grid:'#fffbf0', gridBeat:'#f1ead8', gridAlt:'#fdf8ec', gridAltBeat:'#efe7d3', gridBorder:'rgba(35,50,79,0.18)',
-      pianoRollBg:'#fffbf0', note:'#e8a33c', noteBorder:'#23324f' },
-    riso: { label: 'Riso Zine', color: '#ff4f9a', skin: 'riso',
-      bg:'#f2efe2', surface:'#ffffff', surface2:'#e9e5d5', surface3:'#ddd8c6', border:'#17161a',
-      text:'#17161a', textMuted:'#5f5c55', textDim:'#8d8980',
-      accent:'#0a8fd8', accentSoft:'#0a63a8',
-      grid:'#201f24', gridBeat:'#2a282e', gridAlt:'#1b1a1f', gridAltBeat:'#252329', gridBorder:'#3a383f',
-      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' }
+      pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' }
   };
   // Grid metrics. Phones get a denser roll so more than five steps fit on
   // screen at once; updateGridMetrics() is called whenever a grid is built,
@@ -1231,7 +1219,14 @@
     if (!container) return;
     var saved = localStorage.getItem('st-theme');
     if (!COLOR_SCHEMES[saved]) saved = DEFAULT_SCHEME;
-    Object.keys(COLOR_SCHEMES).forEach(function (key) {
+    var keys = Object.keys(COLOR_SCHEMES);
+    // A picker with one option is just a decoration that invites a click.
+    if (keys.length < 2) {
+      container.style.display = 'none';
+      applyColorScheme(saved);
+      return;
+    }
+    keys.forEach(function (key) {
       var s = COLOR_SCHEMES[key];
       var dot = document.createElement('button');
       dot.className = 'theme-dot' + (key === saved ? ' active' : '');

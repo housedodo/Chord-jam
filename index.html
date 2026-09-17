@@ -6,17 +6,17 @@
   <title>SOUND TELEPHONE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&family=Caveat:wght@500;700&family=Archivo:wght@500;600;700&family=Archivo+Black&family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script>
-    // Apply the skin before first paint. Phosphor is the default and it is
-    // dark, so without this every visit flashes the paper-coloured :root
-    // defaults while app.js loads. applyColorScheme() sets the rest.
-    // Kept in sync with DEFAULT_SCHEME and COLOR_SCHEMES in app.js.
+    // Apply the skin before first paint, so the page never renders unskinned
+    // while app.js loads. applyColorScheme() sets the variables afterwards.
+    // Kept in sync with DEFAULT_SCHEME and COLOR_SCHEMES in app.js; a stored
+    // name that is no longer a skin (an archived one) falls back to the default.
     var t = 'phosphor';
     try {
       var saved = localStorage.getItem('st-theme');
-      if (saved === 'notebook' || saved === 'riso' || saved === 'phosphor') t = saved;
+      if (saved === 'phosphor') t = saved;
     } catch (e) {}
     document.documentElement.setAttribute('data-skin', t);
   </script>
