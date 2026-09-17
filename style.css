@@ -2532,14 +2532,16 @@ body {
 
 /* ============================================================
    PHOSPHOR — CRT MOTION
-   One band of mistracking rolling down the tube, on the home screen
-   only. It sets the tone where there is nothing to do, and stays out
-   of the way once a round is running. Transform only, so it
+   One band of mistracking rolling down the tube, on the screens where
+   there is nothing to do yet — the title screen and the two setup
+   screens. It stays out of the way once a round is running. Transform only, so it
    composites on the GPU, and off under prefers-reduced-motion.
    ============================================================ */
 
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-skin="phosphor"] #screen-home.active::before {
+  :root[data-skin="phosphor"] #screen-home.active::before,
+  :root[data-skin="phosphor"] #screen-lobby.active::before,
+  :root[data-skin="phosphor"] #screen-solo.active::before {
     content: '';
     position: fixed;
     left: 0;
@@ -2694,4 +2696,91 @@ body {
 @media (max-width: 600px) {
   .vote-song { gap: 8px; padding: 9px 10px; }
   .vote-song-play, .vote-song-pick { padding: 8px 10px; font-size: 0.75rem; min-height: 40px; }
+}
+
+/* Waiting screen: the round's instrument playing to itself. The same grid and
+   playhead as the build screen, shrunk, so it reads as "a loop is running". */
+.wait-seq {
+  position: relative;
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 4px auto 0;
+}
+.wait-lane {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.wait-cell {
+  height: 15px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.wait-cell.on {
+  animation: waitHit 1.6s linear infinite;
+  animation-delay: var(--d);
+}
+@keyframes waitHit {
+  0%, 7% {
+    background: var(--wait-color);
+    border-color: var(--wait-color);
+    box-shadow: 0 0 8px var(--wait-color);
+  }
+  24%, 100% { background: transparent; border-color: var(--border); box-shadow: none; }
+}
+.wait-head {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text);
+  opacity: 0.7;
+  animation: waitSweep 1.6s steps(8) infinite;
+}
+@keyframes waitSweep {
+  from { transform: translateX(0); }
+  to { transform: translateX(168px); }
+}
+:root[data-skin="phosphor"] .wait-cell { border-radius: 0; border-color: var(--ph-dim); }
+:root[data-skin="phosphor"] .wait-head { background: var(--ph-bright); box-shadow: 0 0 8px var(--ph-bright); }
+
+/* Title screen: the theme's own spectrum, along the lower third. Sits behind
+   everything and never takes a tap. */
+.home-bars {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 33vh;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 2px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.22;
+  /* Fade the tops out rather than ending them in a hard line across the
+     buttons: the bars read as background instead of competing with the menu. */
+  -webkit-mask-image: linear-gradient(to top, #000 30%, rgba(0, 0, 0, 0.35) 70%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 30%, rgba(0, 0, 0, 0.35) 70%, transparent 100%);
+}
+.home-bars i {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  height: 0;
+  background: var(--accent);
+}
+:root[data-skin="phosphor"] .home-bars i {
+  background: linear-gradient(to top, var(--ph-green), var(--ph-bright));
+  box-shadow: 0 0 6px rgba(108, 240, 138, 0.5);
+}
+.home-container { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wait-cell.on { animation: none; background: var(--wait-color); border-color: var(--wait-color); }
+  .wait-head { display: none; }
+  .home-bars { display: none; }
 }

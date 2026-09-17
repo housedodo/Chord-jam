@@ -10,7 +10,7 @@
   <!-- ?v= is a cache buster. Bump it on every deploy: without it a phone
        keeps serving the CSS and JS it cached last visit, and the site looks
        like it never changed. -->
-  <link rel="stylesheet" href="style.css?v=20250917a">
+  <link rel="stylesheet" href="style.css?v=20250917b">
   <script>
     // Apply the skin before first paint, so the page never renders unskinned
     // while app.js loads. applyColorScheme() sets the variables afterwards.
@@ -35,6 +35,8 @@
 
   <!-- HOME screen -->
   <div id="screen-home" class="screen active">
+    <!-- Driven by the theme music's spectrum; empty and invisible without it. -->
+    <div id="home-bars" class="home-bars" aria-hidden="true"></div>
     <div class="home-container">
       <h1 class="logo">SOUND<br>TELEPHONE</h1>
       <p class="tagline">Write songs together, one layer at a time</p>
@@ -150,6 +152,7 @@
       <p class="handoff-label">WAITING</p>
       <h2 id="waiting-player" class="handoff-player"></h2>
       <p id="waiting-info" class="handoff-instrument"></p>
+      <div id="waiting-anim" class="wait-seq" style="display:none"></div>
       <div class="waiting-dots"><span>.</span><span>.</span><span>.</span></div>
     </div>
   </div>
@@ -331,6 +334,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
-  <script src="app.js?v=20250917a"></script>
+  <script src="app.js?v=20250917b"></script>
 </body>
 </html>

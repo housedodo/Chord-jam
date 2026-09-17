@@ -583,7 +583,7 @@
         break;
 
       case 'wait_turn':
-        showWaiting(players[msg.turnPlayer].name, 'is building ' + msg.instrument + '...');
+        showWaiting(players[msg.turnPlayer].name, 'is building ' + msg.instrument + '...', msg.instrument);
         break;
 
       case 'reveal':
@@ -880,7 +880,7 @@
       toast('Layer submitted!');
       onLayerSubmittedHost();
       if (!roundAdvanced) {
-        showWaiting('Others', 'are still building...');
+        showWaiting('Others', 'are still building...', INSTRUMENTS[currentRound]);
       }
     } else {
       netSend(hostConn, {
@@ -892,7 +892,7 @@
         guess: guess
       });
       toast('Layer submitted!');
-      showWaiting('Others', 'are still building...');
+      showWaiting('Others', 'are still building...', INSTRUMENTS[currentRound]);
     }
   }
 
@@ -903,10 +903,41 @@
     };
   }
 
-  function showWaiting(name, info) {
+  // Eight steps per lane, chosen so each instrument reads as itself at a
+  // glance: four-on-the-floor for drums, a held stab for chords, and so on.
+  const WAIT_PATTERNS = {
+    drums:  [[0, 4], [2, 6], [0, 1, 2, 3, 4, 5, 6, 7]],
+    chords: [[0, 4], [0, 4], [0, 4]],
+    bass:   [[0, 3, 4, 6], [1, 5], [2, 7]],
+    melody: [[0, 5], [2, 7], [1, 3, 6]],
+    sfx:    [[0], [3], [6]],
+    vocal:  [[1, 2, 3], [0, 4, 5], [6, 7]]
+  };
+
+  function renderWaitSeq(inst) {
+    var el = document.getElementById('waiting-anim');
+    if (!el) return;
+    var lanes = WAIT_PATTERNS[inst];
+    if (!lanes) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    el.style.setProperty('--wait-color', 'var(--' + inst + '-color)');
+    var html = '';
+    lanes.forEach(function (steps) {
+      html += '<div class="wait-lane">';
+      for (var s = 0; s < 8; s++) {
+        html += '<i class="wait-cell' + (steps.indexOf(s) !== -1 ? ' on' : '') +
+          '" style="--d:' + (s * 0.2).toFixed(2) + 's"></i>';
+      }
+      html += '</div>';
+    });
+    el.innerHTML = html + '<span class="wait-head"></span>';
+  }
+
+  function showWaiting(name, info, inst) {
     showScreen('waiting');
     document.getElementById('waiting-player').textContent = name;
     document.getElementById('waiting-info').textContent = info;
+    renderWaitSeq(inst);
   }
 
   // ── Audio ──
@@ -1264,6 +1295,7 @@
 
   var musicCtx = null;
   var musicGain = null;
+  var musicAnalyser = null;
   var musicBuffer = null;
   var musicSource = null;
   var musicLoop = { start: 0, end: 0 };
@@ -1287,6 +1319,69 @@
     // A few ms of tail so a decaying note is not clipped mid-sample.
     last = Math.min(n - 1, last + Math.round(buf.sampleRate * 0.005));
     return { start: first / buf.sampleRate, end: (last + 1) / buf.sampleRate };
+  }
+
+  // ── Title-screen spectrum ──
+  // Bars along the lower third, driven by the theme's own spectrum. Deliberately
+  // coarse: redrawn at 14fps and snapped to 10 height steps, so it jitters like
+  // a cheap meter rather than gliding like a chart.
+  const HOME_BAR_COUNT = 28;
+  const HOME_BAR_FPS = 14;
+  const HOME_BAR_LEVELS = 10;
+  // The theme's energy sits between roughly 60Hz and 4kHz and is 45dB down by
+  // the top of that, so the bars span that range on a log scale and the higher
+  // ones get a lift. Mapping them across the full spectrum instead left the
+  // right-hand half of the screen permanently flat.
+  const HOME_BAR_LO_HZ = 55;
+  const HOME_BAR_HI_HZ = 5000;
+  const HOME_BAR_TILT = 110;   // bytes added across the row; ~30dB of rolloff
+  var homeBarEls = [];
+  var homeBarRaf = null;
+  var homeBarLast = 0;
+  var homeBarData = null;
+
+  function buildHomeBars() {
+    var wrap = document.getElementById('home-bars');
+    if (!wrap || homeBarEls.length) return;
+    var html = '';
+    for (var i = 0; i < HOME_BAR_COUNT; i++) html += '<i></i>';
+    wrap.innerHTML = html;
+    homeBarEls = Array.prototype.slice.call(wrap.children);
+  }
+
+  function homeBarsTick(now) {
+    homeBarRaf = requestAnimationFrame(homeBarsTick);
+    if (now - homeBarLast < 1000 / HOME_BAR_FPS) return;
+    homeBarLast = now;
+    if (!musicAnalyser || !homeBarEls.length) return;
+    if (!homeBarData) homeBarData = new Uint8Array(musicAnalyser.frequencyBinCount);
+    musicAnalyser.getByteFrequencyData(homeBarData);
+    var bins = homeBarData.length;
+    var hzPerBin = musicCtx.sampleRate / 2 / bins;
+    var ratio = HOME_BAR_HI_HZ / HOME_BAR_LO_HZ;
+    for (var i = 0; i < HOME_BAR_COUNT; i++) {
+      var f0 = HOME_BAR_LO_HZ * Math.pow(ratio, i / HOME_BAR_COUNT);
+      var f1 = HOME_BAR_LO_HZ * Math.pow(ratio, (i + 1) / HOME_BAR_COUNT);
+      var lo = Math.floor(f0 / hzPerBin);
+      var hi = Math.max(lo + 1, Math.ceil(f1 / hzPerBin));
+      var peak = 0;
+      for (var b = lo; b < hi && b < bins; b++) if (homeBarData[b] > peak) peak = homeBarData[b];
+      // getByteFrequencyData is already logarithmic, so the tilt adds rather
+      // than multiplies — a multiplier cannot lift a band that reads zero.
+      var lifted = peak > 0 ? peak + (i / (HOME_BAR_COUNT - 1)) * HOME_BAR_TILT : 0;
+      var level = Math.round((Math.min(255, lifted) / 255) * HOME_BAR_LEVELS);
+      homeBarEls[i].style.height = (level / HOME_BAR_LEVELS * 100) + '%';
+    }
+  }
+
+  function setHomeBars(on) {
+    if (on) {
+      if (homeBarRaf === null) homeBarRaf = requestAnimationFrame(homeBarsTick);
+    } else if (homeBarRaf !== null) {
+      cancelAnimationFrame(homeBarRaf);
+      homeBarRaf = null;
+      homeBarEls.forEach(function (el) { el.style.height = '0'; });
+    }
   }
 
   function musicNow() { return musicCtx ? musicCtx.currentTime : 0; }
@@ -1351,6 +1446,7 @@
 
   function updateMenuMusic(screenId) {
     musicWanted = !!MENU_SCREENS[screenId];
+    setHomeBars(screenId === 'home' && musicOn && !!musicBuffer);
     var btn = document.getElementById('btn-music');
     if (btn) btn.style.display = musicWanted && musicBuffer ? 'flex' : 'none';
     if (!musicBuffer) return;
@@ -1391,6 +1487,14 @@
     musicGain = musicCtx.createGain();
     musicGain.gain.value = 0;
     musicGain.connect(musicCtx.destination);
+    // A small FFT with no smoothing: the bars are meant to twitch, not glide.
+    musicAnalyser = musicCtx.createAnalyser();
+    musicAnalyser.fftSize = 1024;
+    musicAnalyser.smoothingTimeConstant = 0;
+    musicAnalyser.minDecibels = -95;
+    musicAnalyser.maxDecibels = -25;
+    musicGain.connect(musicAnalyser);
+    buildHomeBars();
 
     fetch('music/theme.mp3')
       .then(function (r) { return r.ok ? r.arrayBuffer() : Promise.reject(new Error('no track')); })
