@@ -5,7 +5,7 @@
     "Moog": {
       "baseUrl": "bass/",
       "urls": {
-        "C1": "moog.mp3"
+        "C4": "moog.mp3"
       },
       "release": 0.3,
       "gain": -14.6
@@ -13,7 +13,7 @@
     "Moog Bright": {
       "baseUrl": "bass/",
       "urls": {
-        "C1": "moog-bright.mp3"
+        "C4": "moog-bright.mp3"
       },
       "release": 0.3,
       "gain": -14.2
