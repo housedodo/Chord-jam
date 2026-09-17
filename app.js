@@ -1109,7 +1109,6 @@
     var name = presetName || currentChordSound;
     var sh = shape || shapeFor('chords');
     if (name === PRODUCER_SOUND) return createOscSynth('chords', sh);
-    if (name === PIANO_SOUND) return createPianoSynth('chords', sh);
     var sampled = packEntry('chords', name);
     if (sampled) return createSampledInstrument(sampled, 'chords', sh);
     var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS[Object.keys(CHORD_SOUNDS)[0]];
@@ -1382,8 +1381,6 @@
     var env = null;
     if (soundName === PRODUCER_SOUND) {
       env = PRODUCER_DEFAULT;
-    } else if (soundName === PIANO_SOUND) {
-      env = PIANO_ENV;
     } else if (!packEntry(inst, soundName)) {
       var bank = bankFor(inst);
       var preset = bank[soundName] || bank[Object.keys(bank)[0]];
@@ -1482,63 +1479,6 @@
     });
   }
 
-  // ── Grand Piano ──
-  // Three layers rather than one preset, because what makes a piano read as a
-  // piano is not its waveform: the tone is bright at the hammer and dulls as
-  // it rings, there is no sustain at all (a real string only ever decays),
-  // and two strings per note beat slowly against each other.
-  //
-  // So: a body voice whose filter closes as the note decays, a second body a
-  // few cents sharp for that beating, and a short FM layer for the knock of
-  // the hammer. It is still synthesis — a sampled piano would beat it — but
-  // it carries the cues a single FM voice cannot.
-  const PIANO_SOUND = 'Grand Piano';
-  const PIANO_LAYERS = ['chords', 'melody'];
-  const PIANO_ENV = { attack: 0.002, decay: 2.4, sustain: 0, release: 0.5 };
-
-  function createPianoSynth(inst, shape) {
-    var sh = shape || presetShape(inst, PIANO_SOUND);
-    var reverb = makeReverb(inst + ':piano', 2.2, 0.18, makeBus(inst));
-    var out = shapeFilter(inst + ':piano', sh, reverb);
-    function body(detune, vol, decayScale) {
-      return capVoices(new Tone.PolySynth(Tone.MonoSynth, {
-        oscillator: { type: 'triangle' },
-        detune: sh.fine + detune,
-        volume: vol,
-        envelope: {
-          attack: sh.attack, decay: sh.decay * decayScale,
-          sustain: sh.sustain, release: sh.release
-        },
-        filter: { type: 'lowpass', rolloff: -12, Q: 1 },
-        // The brightness envelope is the piano cue: it opens instantly and
-        // shuts long before the note has finished sounding.
-        filterEnvelope: {
-          attack: 0.001, decay: 0.35, sustain: 0.06, release: 0.3,
-          baseFrequency: 320, octaves: 4.6, exponent: 2
-        }
-      }).connect(out), 12);
-    }
-    var strings = body(0, -21, 1);
-    var detuned = body(5, -27, 1.2);
-    var hammer = capVoices(new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3.01,
-      modulationIndex: 2.5,
-      detune: sh.fine,
-      volume: -32,
-      envelope: { attack: 0.001, decay: Math.min(0.25, sh.decay), sustain: 0, release: 0.2 },
-      modulation: { type: 'square' },
-      modulationEnvelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.1 }
-    }).connect(out), 12);
-    return {
-      play: function (notes, dur, time) {
-        strings.triggerAttackRelease(notes, dur, time);
-        detuned.triggerAttackRelease(notes, dur, time);
-        hammer.triggerAttackRelease(notes, dur, time);
-      },
-      dispose: function () { strings.dispose(); detuned.dispose(); hammer.dispose(); }
-    };
-  }
-
   // Built-in sounds plus any the pack adds, so a pack can extend the picker
   // rather than only replacing what is already there.
   function bankFor(group) {
@@ -1550,7 +1490,6 @@
   function soundNamesFor(group) {
     var bank = bankFor(group);
     var names = Object.keys(bank);
-    if (PIANO_LAYERS.indexOf(group) !== -1) names.unshift(PIANO_SOUND);
     // Recordings first. They are the ones people reach for, and the default
     // chord sound is one of them, so it should not sit at the bottom of a
     // list behind a dozen synths.
@@ -1562,7 +1501,6 @@
   function createInstrument(group, soundName, poly, shape) {
     var sh = shape === undefined ? shapeFor(group) : shape;
     if (soundName === PRODUCER_SOUND) return createOscSynth(group, sh);
-    if (soundName === PIANO_SOUND) return createPianoSynth(group, sh);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group, sh);
     var bank = bankFor(group);
@@ -1791,10 +1729,47 @@
         if (musicCtx.state !== 'running') return;
         events.forEach(function (e) { document.removeEventListener(e, go, true); });
         musicArmed = false;
-        if (musicWanted && musicOn) { startMusicSource(); fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK); }
+        ensureMusicPlaying();
       }).catch(function () {});
     }
     events.forEach(function (e) { document.addEventListener(e, go, true); });
+  }
+
+  // The one place that decides whether the theme should be sounding right now,
+  // called from everywhere that could change the answer: a screen change, the
+  // track finishing loading, a tap, the tab coming back, the audio context
+  // changing state by itself. Anything that leaves it suspended re-arms the
+  // gesture listeners, so the next tap picks the music back up.
+  //
+  // This is what a reload needs. A page that has just loaded has no user
+  // activation, so its context starts suspended; and a context suspended by
+  // the browser — backgrounding the tab on a phone does it — never resumes on
+  // its own. Either way the music has to be started again from outside.
+  function ensureMusicPlaying() {
+    if (!musicBuffer || !musicCtx) return;
+    if (!(musicWanted && musicOn)) {
+      if (musicSource) {
+        fadeMusicTo(0);
+        // Tear the source down once silent, not before, or the fade is cut off.
+        setTimeout(function () {
+          if (!musicWanted || !musicOn) stopMusicSource();
+        }, MUSIC_FADE * 1000 + 60);
+      }
+      return;
+    }
+    if (musicCtx.state === 'running') {
+      startMusicSource();
+      fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
+      return;
+    }
+    // Arm the gesture listeners first and unconditionally. A resume() with no
+    // user activation behind it does not reject — Chrome leaves the promise
+    // pending until a gesture arrives — so waiting on it to fail meant the
+    // fallback was never set up and the title screen stayed silent.
+    armMusicGesture();
+    musicCtx.resume().then(function () {
+      if (musicCtx.state === 'running') ensureMusicPlaying();
+    }).catch(function () {});
   }
 
   function updateMenuMusic(screenId) {
@@ -1802,33 +1777,7 @@
     setHomeBars(screenId === 'home' && musicOn && !!musicBuffer);
     var btn = document.getElementById('btn-music');
     if (btn) btn.style.display = musicWanted && musicBuffer ? 'flex' : 'none';
-    if (!musicBuffer) return;
-
-    if (musicWanted && musicOn) {
-      if (musicCtx.state === 'running') {
-        startMusicSource();
-        fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
-      } else {
-        // Arm the gesture listeners first and unconditionally. A resume() with
-        // no user activation behind it does not reject — Chrome leaves the
-        // promise pending until a gesture arrives — so waiting on it to fail
-        // meant the fallback was never set up and the title screen stayed
-        // silent until something else happened to start the context.
-        armMusicGesture();
-        musicCtx.resume().then(function () {
-          if (musicCtx.state === 'running' && musicWanted && musicOn) {
-            startMusicSource();
-            fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
-          }
-        }).catch(function () {});
-      }
-    } else if (musicSource) {
-      fadeMusicTo(0);
-      // Tear the source down once silent, not before, or the fade is cut off.
-      setTimeout(function () {
-        if (!musicWanted || !musicOn) stopMusicSource();
-      }, MUSIC_FADE * 1000 + 60);
-    }
+    ensureMusicPlaying();
   }
 
   function initMenuMusic() {
@@ -1850,6 +1799,20 @@
     musicAnalyser.maxDecibels = -25;
     musicGain.connect(musicAnalyser);
     buildHomeBars();
+
+    // Armed before the track has even arrived, so the first tap of the session
+    // unlocks audio whether or not the file has finished loading by then.
+    armMusicGesture();
+    // A context can be suspended by the browser as well as by autoplay policy:
+    // backgrounding a tab on a phone does it, and it does not come back on its
+    // own when the page is looked at again.
+    musicCtx.onstatechange = function () {
+      if (musicCtx.state === 'running') ensureMusicPlaying();
+      else if (musicWanted && musicOn) { stopMusicSource(); armMusicGesture(); }
+    };
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) ensureMusicPlaying();
+    });
 
     fetch('music/theme.mp3')
       .then(function (r) { return r.ok ? r.arrayBuffer() : Promise.reject(new Error('no track')); })

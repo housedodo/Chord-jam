@@ -39,7 +39,7 @@
     "Piano": {
       "baseUrl": "chords/",
       "urls": {
-        "C3": "piano.mp3"
+        "C4": "piano.mp3"
       },
       "release": 0.8,
       "gain": -4.0
@@ -63,7 +63,7 @@
     "Choir": {
       "baseUrl": "chords/",
       "urls": {
-        "A4": "choir.mp3"
+        "C4": "choir.mp3"
       },
       "release": 0.5,
       "gain": -10.8
