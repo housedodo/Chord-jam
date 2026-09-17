@@ -198,6 +198,7 @@
   let buildSecondsLeft = BUILD_TIME;
   let previewPlaying = false;
   let previewSeqs = [];
+  let previewSource = null; // 'current' | 'previous' — which control started it
   let currentBassSound = 'Analog Bass';
   let currentMelodySound = 'Piano';
   let currentChordSound = 'Piano Chords';
@@ -942,15 +943,42 @@
   // -4 dB while chords/bass/melody sit between -15 and -19. These bring all
   // of them to roughly -10.
   const MIX_TRIM = { drums: -5.5, sfx: -3.5, chords: 5, bass: 7, melody: 9, vocal: 6 };
+  // Per-layer trims run as high as +9 dB, which is right for one layer alone
+  // but slams the limiter once five or six sum together — that was the
+  // distortion. MASTER_TRIM buys back enough headroom for a full mix.
+  const MASTER_TRIM = -8;
   let masterBus = null;
+  let masterTrim = null;
+  const busCache = {};
+  const reverbCache = {};
 
   function getMasterBus() {
-    if (!masterBus) masterBus = new Tone.Limiter(-1).toDestination();
-    return masterBus;
+    if (!masterBus) {
+      masterBus = new Tone.Limiter(-1).toDestination();
+      masterTrim = new Tone.Volume(MASTER_TRIM).connect(masterBus);
+    }
+    return masterTrim;
   }
 
+  // Buses and reverbs are shared per instrument and never disposed. Building a
+  // fresh Tone.Reverb per synth meant every sound change rendered a new
+  // impulse response, and the old nodes piled up.
   function makeBus(inst) {
-    return new Tone.Volume(MIX_TRIM[inst] || 0).connect(getMasterBus());
+    var key = inst || 'melody';
+    if (!busCache[key]) busCache[key] = new Tone.Volume(MIX_TRIM[key] || 0).connect(getMasterBus());
+    return busCache[key];
+  }
+
+  function makeReverb(key, decay, wet, bus) {
+    if (!reverbCache[key]) reverbCache[key] = new Tone.Reverb({ decay: decay, wet: wet }).connect(bus);
+    return reverbCache[key];
+  }
+
+  // A voice limit the sustained chord/pad sounds cannot blow past. Without it
+  // long notes stacked until the context ran out of CPU and went silent.
+  function capVoices(poly, max) {
+    try { poly.maxPolyphony = max; } catch (e) {}
+    return poly;
   }
 
   function createDrumSynth() {
@@ -1027,11 +1055,11 @@
     if (sampled) return createSampledInstrument(sampled, 'chords');
     var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS['Piano Chords'];
     var bus = makeBus('chords');
-    var reverb = new Tone.Reverb({ decay: 2, wet: 0.25 }).connect(bus);
-    var poly = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
+    var reverb = makeReverb('chords', 2, 0.25, bus);
+    var poly = capVoices(new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb), 16);
     return {
       play: function (notes, dur, time) { poly.triggerAttackRelease(notes, dur, time); },
-      dispose: function () { poly.dispose(); reverb.dispose(); bus.dispose(); }
+      dispose: function () { poly.dispose(); }
     };
   }
 
@@ -1042,17 +1070,18 @@
   }
 
   function createSynthFromPreset(preset, poly, inst) {
-    var bus = makeBus(inst || (poly ? 'melody' : 'bass'));
-    var reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).connect(bus);
+    var key = inst || (poly ? 'melody' : 'bass');
+    var bus = makeBus(key);
+    var reverb = makeReverb(key + ':std', 1.5, 0.2, bus);
     var syn;
     if (poly) {
-      syn = new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb);
+      syn = capVoices(new Tone.PolySynth(Tone.FMSynth, preset).connect(reverb), 16);
     } else {
       syn = new Tone.FMSynth(preset).connect(reverb);
     }
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
-      dispose: function () { syn.dispose(); reverb.dispose(); bus.dispose(); }
+      dispose: function () { syn.dispose(); }
     };
   }
 
@@ -1104,7 +1133,7 @@
         if (!sampler.loaded) return;
         sampler.triggerAttackRelease(note, dur, time);
       },
-      dispose: function () { sampler.dispose(); bus.dispose(); }
+      dispose: function () { sampler.dispose(); }
     };
   }
 
@@ -1128,7 +1157,7 @@
         }).connect(bus);
       })));
     });
-    if (!pending.length) { bus.dispose(); return fallback; }
+    if (!pending.length) return fallback;
     pendingAudioLoads.push(Promise.all(pending));
     return {
       trigger: function (name, time) {
@@ -1138,7 +1167,6 @@
       },
       dispose: function () {
         Object.keys(players).forEach(function (k) { players[k].dispose(); });
-        bus.dispose();
         fallback.dispose();
       }
     };
@@ -1178,18 +1206,18 @@
   function createProducerSynth(patch, inst) {
     var p = normalisePatch(patch);
     var bus = makeBus(inst);
-    var reverb = new Tone.Reverb({ decay: 1.2, wet: 0.14 }).connect(bus);
+    var reverb = makeReverb((inst || 'melody') + ':prod', 1.2, 0.14, bus);
     var filter = new Tone.Filter({ type: 'lowpass', frequency: p.cutoff, rolloff: -24, Q: 1 }).connect(reverb);
-    var syn = new Tone.PolySynth(Tone.Synth, {
+    var syn = capVoices(new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: p.wave },
       envelope: { attack: p.attack, decay: p.decay, sustain: p.sustain, release: p.release },
       volume: -10
-    }).connect(filter);
+    }).connect(filter), 16);
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
       // Sweeping the cutoff should not tear the synth down and rebuild it.
       setCutoff: function (hz) { filter.frequency.rampTo(hz, 0.03); },
-      dispose: function () { syn.dispose(); filter.dispose(); reverb.dispose(); bus.dispose(); }
+      dispose: function () { syn.dispose(); filter.dispose(); }
     };
   }
 
@@ -1721,24 +1749,18 @@
     var instIdx = INSTRUMENTS.indexOf(instrument);
     var prevInst = instIdx > 0 ? INSTRUMENTS[instIdx - 1] : null;
     var hasPrev = prevInst && game.submissions[prevInst];
-    var listeningExisting = false;
     listenBtn.style.display = hasPrev ? 'flex' : 'none';
-    var prevLabel = prevInst ? prevInst.charAt(0).toUpperCase() + prevInst.slice(1) : '';
-    listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with ' + prevLabel;
+    var prevLabel = prevInst ? 'Play with ' + prevInst.charAt(0).toUpperCase() + prevInst.slice(1) : 'Play';
+    listenBtn.dataset.label = prevLabel;
     listenBtn.onclick = function () {
       ensureAudio().then(function () {
-        if (listeningExisting) {
-          stopPreview();
-          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> Play with ' + prevLabel;
-          listeningExisting = false;
-        } else {
-          stopPreview();
-          startPreview(instrument, true);
-          listenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
-          listeningExisting = true;
-        }
+        // Same rule as the other control: if this one is running, stop;
+        // otherwise take over from whatever is.
+        if (previewPlaying && previewSource === 'previous') stopPreview();
+        else { stopPreview(); startPreview(instrument, true); }
       });
     };
+    refreshTransportButtons();
 
     // Guess section
     var guessSection = document.getElementById('guess-section');
@@ -1861,16 +1883,33 @@
     }
 
     var playBtn = document.getElementById(instrument + '-play');
-    var playIcon = document.getElementById(instrument + '-play-icon');
-    var stopIcon = document.getElementById(instrument + '-stop-icon');
     playBtn.onclick = function () {
       ensureAudio().then(function () {
-        if (previewPlaying) stopPreview();
-        else startPreview(instrument, false);
-        playIcon.style.display = previewPlaying ? 'none' : 'block';
-        stopIcon.style.display = previewPlaying ? 'block' : 'none';
+        // Playing from the other control counts as playing: switch to this one
+        // rather than needing a stop first.
+        if (previewPlaying && previewSource === 'current') stopPreview();
+        else { stopPreview(); startPreview(instrument, false); }
       });
     };
+  }
+
+  // Both play controls reflect one piece of state, so neither can be left
+  // showing "Stop" while the other is the one running.
+  function refreshTransportButtons() {
+    INSTRUMENTS.forEach(function (inst) {
+      var pi = document.getElementById(inst + '-play-icon');
+      var si = document.getElementById(inst + '-stop-icon');
+      var on = previewPlaying && previewSource === 'current';
+      if (pi) pi.style.display = on ? 'none' : 'block';
+      if (si) si.style.display = on ? 'block' : 'none';
+    });
+    var listenBtn = document.getElementById('btn-listen-existing');
+    if (listenBtn && listenBtn.dataset.label) {
+      var playing = previewPlaying && previewSource === 'previous';
+      listenBtn.innerHTML = playing
+        ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop'
+        : '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg> ' + listenBtn.dataset.label;
+    }
   }
 
   // A bar ruler above the lanes. On a phone the grid scrolls sideways, so
@@ -2482,11 +2521,16 @@
 
   // ── Preview ──
   function startPreview(instrument, includePrevious) {
+    // Never drop sequence references on the floor: a second start used to leak
+    // the previous run's sequences, which kept stacking voices.
+    disposePreviewSeqs();
     Tone.Transport.bpm.value = gameBpm;
     Tone.Transport.stop();
     Tone.Transport.cancel();
     previewPlaying = true;
+    previewSource = includePrevious ? 'previous' : 'current';
     previewSeqs = [];
+    refreshTransportButtons();
 
     if (includePrevious && currentGameIdx >= 0 && games[currentGameIdx]) {
       addExistingLayerSeqs(currentGameIdx, instrument, previewSeqs);
@@ -2494,23 +2538,23 @@
 
     if (instrument === 'drums') {
       if (!synths.drums) synths.drums = createDrumSynth();
-      var seq = new Tone.Sequence(function (time, s) {
+      var seq = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { highlightDrumStep(s); }, time);
         DRUM_NAMES.forEach(function (name) {
           var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
           if (cell && cell.classList.contains('on')) synths.drums.trigger(name, time);
         });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq);
     } else if (instrument === 'sfx') {
       if (!synths.sfx) synths.sfx = createSfxSynth();
-      var sfxSeq = new Tone.Sequence(function (time, s) {
+      var sfxSeq = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { highlightSfxStep(s); }, time);
         SFX_NAMES.forEach(function (name) {
           var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
           if (cell && cell.classList.contains('on')) synths.sfx.trigger(name, time);
         });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(sfxSeq);
     } else if (instrument === 'vocal') {
       pendingAudioLoads.push(addVocalToTransport({ data: vocalClip }, previewSeqs));
@@ -2519,10 +2563,10 @@
       else if (instrument === 'bass') { if (!synths.bass) getOrCreateBassSynth(); }
       else { if (!synths.melody) getOrCreateMelodySynth(); }
 
-      var notes = pianoRollNotes;
-      var seq2 = new Tone.Sequence(function (time, s) {
+      var seq2 = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { showPlayhead(instrument, s); }, time);
-        notes.forEach(function (n) {
+        // Read the live array every step, never a captured reference.
+        pianoRollNotes.forEach(function (n) {
           if (n.start === s) {
             var dur = n.length * Tone.Time('16n').toSeconds();
             if (instrument === 'chords') { synths.chords.play(n.note, dur, time); }
@@ -2530,7 +2574,7 @@
             else { synths.melody.play(n.note, dur, time); }
           }
         });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq2);
     }
 
@@ -2561,55 +2605,62 @@
     if (inst === 'drums') {
       if (!synths.bgDrums) synths.bgDrums = createDrumSynth();
       var data = sub.data;
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name, time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
       if (!synths.bgSfx) synths.bgSfx = createSfxSynth();
       var sfxData = sub.data;
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name, time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
       if (!synths.bgChords) synths.bgChords = createChordSynth();
       var notes = sub.data;
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         notes.forEach(function (n) {
           if (n.start === s) synths.bgChords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
         });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
       if (!synths.bgBass) synths.bgBass = createInstrument('bass', sub.sound || 'Analog Bass', false);
       var bnotes = sub.data;
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
       if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true, sub.patch);
       var mnotes = sub.data;
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
       pendingAudioLoads.push(addVocalToTransport(sub, seqs));
     }
   }
 
   function playExistingOnly(gameIdx) {
+    disposePreviewSeqs();
     Tone.Transport.bpm.value = gameBpm;
     Tone.Transport.stop();
     Tone.Transport.cancel();
     previewPlaying = true;
+    previewSource = 'previous';
     previewSeqs = [];
     addExistingLayerSeqs(gameIdx, null, previewSeqs);
     startTransportWhenReady();
   }
 
+  function disposePreviewSeqs() {
+    previewSeqs.forEach(function (s) { try { s.dispose(); } catch (e) {} });
+    previewSeqs = [];
+  }
+
   function stopPreview() {
     previewPlaying = false;
+    previewSource = null;
     cancelPendingPlayback();
-    previewSeqs.forEach(function (s) { s.dispose(); });
-    previewSeqs = [];
+    disposePreviewSeqs();
     Tone.Transport.stop();
     Tone.Transport.cancel();
     ['bgDrums', 'bgChords', 'bgBass', 'bgMelody', 'bgSfx'].forEach(function (k) {
@@ -2617,12 +2668,7 @@
     });
     document.querySelectorAll('.drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
     document.querySelectorAll('.pr-playhead').forEach(function (el) { el.style.display = 'none'; });
-    INSTRUMENTS.forEach(function (inst) {
-      var pi = document.getElementById(inst + '-play-icon');
-      var si = document.getElementById(inst + '-stop-icon');
-      if (pi) pi.style.display = 'block';
-      if (si) si.style.display = 'none';
-    });
+    refreshTransportButtons();
   }
 
   function highlightDrumStep(step) {
@@ -2752,38 +2798,38 @@
       if (inst === 'drums') {
         if (!synths.drums) synths.drums = createDrumSynth();
         var data = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
+        seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.drums.trigger(name, time); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+        }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'chords') {
         if (!synths.chords) synths.chords = createChordSynth();
         var notes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
+        seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           notes.forEach(function (n) {
             if (n.start === s) synths.chords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
           });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+        }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'bass') {
         currentBassSound = sub.sound || 'Analog Bass';
         getOrCreateBassSynth();
         var bnotes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
+        seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           bnotes.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+        }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'melody') {
         currentMelodySound = sub.sound || 'Piano';
         if (sub.patch) melodyPatch = normalisePatch(sub.patch);
         getOrCreateMelodySynth();
         var mnotes = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
+        seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           mnotes.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+        }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'sfx') {
         if (!synths.sfx) synths.sfx = createSfxSynth();
         var sfxData = sub.data;
-        seqs.push(new Tone.Sequence(function (time, s) {
+        seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.sfx.trigger(name, time); });
-        }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+        }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
       } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
         pendingAudioLoads.push(addVocalToTransport(sub, seqs));
       }
@@ -2975,34 +3021,34 @@
     if (!sub) return;
     if (inst === 'drums') {
       if (!synths.drums) synths.drums = createDrumSynth();
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.drums.trigger(name, time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
       if (!synths.chords) synths.chords = createChordSynth();
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         sub.data.forEach(function (n) {
           if (n.start === s) synths.chords.play(n.note, n.length * Tone.Time('16n').toSeconds(), time);
         });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
       currentBassSound = sub.sound || 'Analog Bass';
       getOrCreateBassSynth();
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         sub.data.forEach(function (n) { if (n.start === s) synths.bass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
       currentMelodySound = sub.sound || 'Piano';
       if (sub.patch) melodyPatch = normalisePatch(sub.patch);
       getOrCreateMelodySynth();
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         sub.data.forEach(function (n) { if (n.start === s) synths.melody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
       if (!synths.sfx) synths.sfx = createSfxSynth();
-      seqs.push(new Tone.Sequence(function (time, s) {
+      seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         SFX_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.sfx.trigger(name, time); });
-      }, Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
+      }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'vocal' && sub.data && sub.data.dataUrl) {
       pendingAudioLoads.push(addVocalToTransport(sub, seqs));
     }
@@ -3044,6 +3090,15 @@
   // ── Vocal Recording ──
   // The clip is a block on the 32-step grid like a chord: { dataUrl, start, steps }
   var vocalClip = null;
+
+  // A Sequence callback that throws takes the Transport down with it, which is
+  // how a single bad note could silence the whole song. Every step callback
+  // goes through here.
+  function safeStep(fn) {
+    return function (time, s) {
+      try { fn(time, s); } catch (e) { console.warn('step error', e); }
+    };
+  }
 
   function stepSeconds() { return Tone.Time('16n').toSeconds(); }
 
@@ -3109,7 +3164,6 @@
         dispose: function () {
           try { player.unsync(); player.stop(); } catch (e) { /* not started */ }
           player.dispose();
-          bus.dispose();
         }
       });
     });
