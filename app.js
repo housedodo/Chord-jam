@@ -471,6 +471,18 @@
         }
         break;
 
+      case 'song_vote':
+        var voter = findConnPlayerIndex(conn);
+        var gi = msg.gameIdx;
+        if (voter < 0 || typeof gi !== 'number' || !games[gi]) return;
+        if (votedPlayers[voter]) return;         // one vote each
+        votedPlayers[voter] = true;
+        songVotes[gi] = (songVotes[gi] || 0) + 1;
+        votersSeen++;
+        netBroadcast({ type: 'song_votes', votes: songVotes, voters: votersSeen });
+        renderSongVotes();
+        break;
+
       case 'layer_submitted':
         var from = findConnPlayerIndex(conn);
         if (from < 0 || !gameInProgress) return;
@@ -575,10 +587,17 @@
         break;
 
       case 'reveal':
+        songVotes = {}; myVote = null; votersSeen = 0;
         games = msg.games;
         players = msg.players;
         gameBpm = msg.bpm;
         showReveal();
+        break;
+
+      case 'song_votes':
+        if (msg.votes && typeof msg.votes === 'object') songVotes = msg.votes;
+        votersSeen = +msg.voters || 0;
+        renderSongVotes();
         break;
 
       case 'kicked':
@@ -661,6 +680,12 @@
 
       document.getElementById('btn-start').onclick = function () {
         if (players.length < 2) { toast('Need at least 2 players'); return; }
+        // The online lobby shares its markup with the local one but never read
+        // the toggles, so none of the options applied in an online game — no
+        // SFX or vocal layer, no blind or speed round, no round length, no
+        // voting — whatever the host had switched on.
+        readGameOptions('');
+        if (gameSettings.switcheroo) buildSwitcherooMap(players.length, INSTRUMENTS.length);
         games = [];
         songEntryIdx = 0;
         gameInProgress = true;
@@ -1683,7 +1708,7 @@
 
   function nextTurn() {
     if (currentRound >= INSTRUMENTS.length) {
-      if (gameSettings.voting) { showVoting(0); return; }
+      songVotes = {}; votedPlayers = {}; myVote = null; votersSeen = 0;
       if (gameSettings.buildup) { showBuildupReveal(0); return; }
       showReveal();
       return;
@@ -2771,6 +2796,9 @@
     if (games.length > 1 && idx < games.length - 1) {
       nextBtn.textContent = 'Next Song';
       nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; showRevealForSong(idx + 1); };
+    } else if (gameSettings.voting && games.length > 1) {
+      nextBtn.textContent = 'Vote';
+      nextBtn.onclick = function () { stopAllLayers(allSeqs); allSeqs = []; showSongVote(); };
     } else {
       nextBtn.textContent = 'Play Again';
       nextBtn.onclick = function () {
@@ -2842,76 +2870,159 @@
   }
 
   // ── Voting ──
-  function showVoting(gameIdx) {
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="7,4 21,12 7,20"/></svg>';
+  const STOP_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+  // ── Song vote ──
+  // Runs once, after every song has been played through on the reveal screen.
+  // One row per song: hear it again, then vote. A device votes once.
+  var songVotes = {};       // gameIdx -> count
+  var votedPlayers = {};    // host only: playerIndex -> true
+  var myVote = null;
+  var votersSeen = 0;
+
+  function totalVoters() {
+    if (netMode === 'local') return 1;
+    // Someone who dropped mid-game keeps their slot so indices stay valid, but
+    // they are never going to vote — waiting on them would hang the screen.
+    return players.filter(function (p) { return !p.left; }).length || 1;
+  }
+
+  function showSongVote() {
     showScreen('voting');
-    var game = games[gameIdx];
-    document.getElementById('voting-song').textContent = 'Song: ' + game.songName;
     var optionsEl = document.getElementById('voting-options');
     var resultsEl = document.getElementById('voting-results');
-    var submitBtn = document.getElementById('btn-vote-submit');
+    var statusEl = document.getElementById('voting-status');
     var nextBtn = document.getElementById('btn-vote-next');
+    var homeBtn = document.getElementById('btn-vote-home');
     optionsEl.innerHTML = '';
-    resultsEl.innerHTML = '';
     resultsEl.style.display = 'none';
-    submitBtn.style.display = 'inline-flex';
     nextBtn.style.display = 'none';
 
-    var selected = null;
-    var candidates = [];
-    INSTRUMENTS.forEach(function (inst) {
-      var sub = game.submissions[inst];
-      if (!sub) return;
-      candidates.push({ inst: inst, playerIndex: sub.playerIndex });
-    });
+    var seqs = [];
+    var playingIdx = -1;
 
-    candidates.forEach(function (c) {
-      var card = document.createElement('div');
-      card.className = 'vote-option';
-      card.setAttribute('data-inst', c.inst);
-      card.innerHTML = '<span class="vote-layer" data-inst="' + c.inst + '">' + c.inst.charAt(0).toUpperCase() + c.inst.slice(1) + '</span>' +
-        '<span class="vote-player">' + esc(players[c.playerIndex].name) + '</span>' +
-        '<span class="vote-check"></span>';
-      card.onclick = function () {
-        optionsEl.querySelectorAll('.vote-option').forEach(function (el) { el.classList.remove('selected'); });
-        card.classList.add('selected');
-        selected = c.inst;
-      };
-      optionsEl.appendChild(card);
-    });
-
-    submitBtn.onclick = function () {
-      if (!selected) { toast('Pick a layer!'); return; }
-      if (!votes[gameIdx]) votes[gameIdx] = {};
-      votes[gameIdx][selected] = (votes[gameIdx][selected] || 0) + 1;
-      submitBtn.style.display = 'none';
-      resultsEl.style.display = 'flex';
-      nextBtn.style.display = 'inline-flex';
-
-      var maxVotes = 0;
-      Object.keys(votes[gameIdx]).forEach(function (k) { if (votes[gameIdx][k] > maxVotes) maxVotes = votes[gameIdx][k]; });
-
-      resultsEl.innerHTML = '<h4 class="results-title">Results</h4>';
-      candidates.forEach(function (c) {
-        var count = (votes[gameIdx] && votes[gameIdx][c.inst]) || 0;
-        var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
-        var row = document.createElement('div');
-        row.className = 'vote-result';
-        row.innerHTML = '<span class="vote-result-label">' + c.inst.charAt(0).toUpperCase() + c.inst.slice(1) +
-          ' (' + esc(players[c.playerIndex].name) + ')</span>' +
-          '<div class="vote-bar-track"><div class="vote-bar-fill" style="width:' + pct + '%"></div></div>' +
-          '<span class="vote-count">' + count + '</span>';
-        resultsEl.appendChild(row);
+    function stopSong() {
+      stopAllLayers(seqs);
+      playingIdx = -1;
+      optionsEl.querySelectorAll('.vote-song-play').forEach(function (b) {
+        b.classList.remove('playing');
+        b.innerHTML = PLAY_SVG + ' Play';
       });
-    };
+    }
+
+    games.forEach(function (game, idx) {
+      var row = document.createElement('div');
+      row.className = 'vote-song';
+      row.dataset.idx = idx;
+      var author = players[game.enteredBy] ? players[game.enteredBy].name : '';
+
+      var title = document.createElement('div');
+      title.className = 'vote-song-title';
+      title.innerHTML = '<span class="vote-song-name">' + esc(game.songName) + '</span>' +
+        (author ? '<span class="vote-song-by">named by ' + esc(author) + '</span>' : '');
+
+      var play = document.createElement('button');
+      play.className = 'vote-song-play';
+      play.innerHTML = PLAY_SVG + ' Play';
+      play.onclick = function () {
+        ensureAudio().then(function () {
+          var wasPlaying = playingIdx === idx;
+          stopSong();
+          if (wasPlaying) return;
+          playingIdx = idx;
+          play.classList.add('playing');
+          play.innerHTML = STOP_SVG + ' Stop';
+          playAllLayersForGame(idx, seqs);
+        });
+      };
+
+      var pick = document.createElement('button');
+      pick.className = 'vote-song-pick';
+      pick.textContent = 'Vote';
+      // Voting for your own song would just be a popularity contest with
+      // yourself; only enforceable online, where we know who you are.
+      var ownSong = netMode !== 'local' && game.enteredBy === myPlayerIndex;
+      if (ownSong) { pick.disabled = true; pick.title = 'You named this one'; }
+      pick.onclick = function () {
+        if (myVote !== null) return;
+        castSongVote(idx);
+      };
+
+      var count = document.createElement('span');
+      count.className = 'vote-song-count';
+      count.textContent = '';
+
+      row.appendChild(title);
+      row.appendChild(play);
+      row.appendChild(pick);
+      row.appendChild(count);
+      optionsEl.appendChild(row);
+    });
 
     nextBtn.onclick = function () {
-      if (gameIdx < games.length - 1) {
-        showVoting(gameIdx + 1);
-      } else {
-        if (gameSettings.buildup) showBuildupReveal(0);
-        else showReveal();
-      }
+      stopSong();
+      if (soloMode) showSoloSetup();
+      else if (netMode === 'host' || netMode === 'guest') showOnlineLobby();
+      else showLobby();
     };
+    homeBtn.onclick = function () {
+      stopSong();
+      leaveToHome();
+    };
+
+    renderSongVotes();
+  }
+
+  function castSongVote(idx) {
+    myVote = idx;
+    if (netMode === 'guest') {
+      netSend(hostConn, { type: 'song_vote', gameIdx: idx });
+    } else {
+      if (netMode === 'host') votedPlayers[myPlayerIndex] = true;
+      songVotes[idx] = (songVotes[idx] || 0) + 1;
+      votersSeen++;
+      if (netMode === 'host') netBroadcast({ type: 'song_votes', votes: songVotes, voters: votersSeen });
+    }
+    renderSongVotes();
+  }
+
+  function renderSongVotes() {
+    var optionsEl = document.getElementById('voting-options');
+    if (!optionsEl) return;
+    var statusEl = document.getElementById('voting-status');
+    var nextBtn = document.getElementById('btn-vote-next');
+    var need = totalVoters();
+    var done = votersSeen >= need;
+
+    var best = -1, bestCount = 0, topCount = 0;
+    Object.keys(songVotes).forEach(function (k) {
+      if (songVotes[k] > bestCount) { bestCount = songVotes[k]; best = +k; }
+    });
+    Object.keys(songVotes).forEach(function (k) { if (songVotes[k] === bestCount) topCount++; });
+    var tied = topCount > 1;
+
+    optionsEl.querySelectorAll('.vote-song').forEach(function (row) {
+      var idx = +row.dataset.idx;
+      var pick = row.querySelector('.vote-song-pick');
+      var count = row.querySelector('.vote-song-count');
+      count.textContent = songVotes[idx] ? songVotes[idx] : '';
+      pick.classList.toggle('voted', myVote === idx);
+      if (myVote !== null) { pick.disabled = true; pick.textContent = myVote === idx ? 'Voted' : 'Vote'; }
+      // Nothing is crowned on a tie; highlighting one of them would be a lie.
+      row.classList.toggle('winner', done && !tied && bestCount > 0 && idx === best);
+    });
+
+    if (statusEl) {
+      if (myVote === null) statusEl.textContent = 'Pick the one you liked best.';
+      else if (!done) statusEl.textContent = 'Waiting for the others\u2026 ' + votersSeen + ' of ' + need + ' voted.';
+      else if (bestCount > 0) {
+        statusEl.textContent = tied
+          ? 'It\u2019s a tie \u2014 nobody wins, everybody wins.'
+          : '\u201c' + games[best].songName + '\u201d wins with ' + bestCount + ' vote' + (bestCount !== 1 ? 's' : '') + '.';
+      }
+    }
+    if (nextBtn) nextBtn.style.display = done ? 'flex' : 'none';
   }
 
   // ── Buildup Reveal ──
