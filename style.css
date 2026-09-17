@@ -1786,106 +1786,168 @@ body {
   letter-spacing: 0.03em;
 }
 
-.producer-panel {
+/* ── Shaper ──
+   The knob panel under the sound picker on chords, bass and melody. Amber on
+   black, with a ring of lit segments round each knob: it reads as a piece of
+   hardware bolted under the roll rather than another row of web controls. */
+.shaper {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-}
-
-.producer-waves {
-  display: flex;
-  gap: 8px;
-}
-
-.wave-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 4px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  cursor: pointer;
-  min-height: 44px;
-}
-.wave-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
-}
-
-.producer-knobs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-}
-
-/* Cutoff is the one people sweep, so give it the full width */
-.producer-knob.knob-wide { grid-column: 1 / -1; }
-
-.producer-knob {
-  display: grid;
-  grid-template-columns: 58px 1fr 46px;
-  align-items: center;
-  gap: 8px;
-}
-
-.knob-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.knob-value {
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.producer-knob input[type="range"] {
-  width: 100%;
-  min-width: 0;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  background: var(--border);
+  background: #081409;
+  border: 1px solid var(--peach);
   border-radius: 2px;
-  outline: none;
-}
-.producer-knob input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-}
-.producer-knob input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.producer-footer {
+.shaper-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  padding: 3px 10px;
+  background: var(--peach);
+  color: #061009;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-shadow: none;
 }
-.producer-footer .btn-secondary { flex: 1; }
+.shaper.edited .shaper-head::after {
+  content: 'EDITED';
+  order: 1;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  opacity: 0.65;
+}
+.shaper-tools { display: flex; gap: 6px; order: 2; }
+.shaper-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 0;
+  padding: 3px 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-shadow: none;
+}
+.shaper-caret { transition: transform 0.15s ease; font-size: 0.9em; }
+.shaper.collapsed .shaper-caret { transform: rotate(-90deg); }
+.shaper.collapsed .shaper-waves,
+.shaper.collapsed .shaper-knobs { display: none; }
+.shaper-btn {
+  background: transparent;
+  border: 1px solid rgba(6, 16, 9, 0.5);
+  color: #061009;
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  padding: 1px 9px;
+  min-height: 24px;
+  cursor: pointer;
+  text-shadow: none;
+}
+.shaper-btn:hover { background: rgba(6, 16, 9, 0.12); }
+.shaper-btn:active { background: rgba(6, 16, 9, 0.22); }
 
-@media (max-width: 480px) {
-  .producer-knobs { grid-template-columns: 1fr; }
+.shaper-waves {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.shaper-knobs {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 12px 12px 10px;
+}
+
+.knob-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.knob-name,
+.knob-value {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--peach);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.knob-name { opacity: 0.6; }
+
+/* The knob itself: a dark cap with a pointer line, ringed by segments that
+   light up to the current value. --angle is set from JS. */
+.knob {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 207, 92, 0.3);
+  background: radial-gradient(circle at 50% 40%, var(--surface-3), var(--surface) 72%);
+  cursor: grab;
+  touch-action: none;
+  flex: none;
+}
+.knob.grabbed { cursor: grabbing; }
+.knob:focus-visible { outline: 2px solid var(--peach); outline-offset: 4px; }
+.knob::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 2px;
+  height: 13px;
+  margin-left: -1px;
+  background: var(--peach);
+  transform-origin: 50% 18px;
+  transform: rotate(var(--angle, 0deg));
+  box-shadow: 0 0 5px rgba(255, 207, 92, 0.9);
+}
+
+.knob-seg { position: absolute; inset: -8px; }
+.knob-seg i {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 5px;
+  margin-left: -1px;
+  background: rgba(255, 207, 92, 0.22);
+  transform-origin: 50% 30px;
+}
+.knob-seg i.on {
+  background: var(--peach);
+  box-shadow: 0 0 5px rgba(255, 207, 92, 0.8);
+}
+
+@media (max-width: 600px) {
+  /* Two rows of three rather than six squeezed across a phone. */
+  .shaper-knobs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px 4px;
+  }
+}
+
+/* The title bar is the whole control when the panel is folded, so on anything
+   touched by a finger its buttons get a thumb-sized target rather than the
+   desktop's compact one. Keyed on the pointer, not the width: a phone held
+   landscape is wider than the mobile breakpoint and still has no mouse. */
+@media (max-width: 600px), (pointer: coarse) {
+  .shaper-head { padding: 5px 10px; }
+  .shaper-toggle,
+  .shaper-btn { min-height: 36px; }
+  .shaper-btn { padding: 2px 12px; }
 }
 
 /* Quick fill (drums only) */
@@ -2108,7 +2170,6 @@ body {
 :root[data-skin="phosphor"] .name-input,
 :root[data-skin="phosphor"] .code-input,
 :root[data-skin="phosphor"] .piano-roll,
-:root[data-skin="phosphor"] .producer-panel,
 :root[data-skin="phosphor"] .vocal-waveform {
   border: 1px solid var(--ph-dim);
   border-radius: 0;
@@ -2294,7 +2355,7 @@ body {
 :root[data-skin="phosphor"] .chord-bar-hint,
 :root[data-skin="phosphor"] .fill-bar-label,
 :root[data-skin="phosphor"] .fill-bar-hint,
-:root[data-skin="phosphor"] .knob-label,
+:root[data-skin="phosphor"] .knob-name,
 :root[data-skin="phosphor"] .knob-value {
   font-family: 'VT323', monospace;
   font-weight: 400;
@@ -2388,6 +2449,47 @@ body {
 
 @media (max-width: 480px) {
   :root[data-skin="phosphor"] .logo { font-size: 2.5rem; padding: 8px 14px; }
+}
+
+/* The shaper is the one amber panel in a green room, so it keeps its own
+   colour against the skin's blanket green rules. It comes after them on
+   purpose: they select on the same specificity and would otherwise win. */
+:root[data-skin="phosphor"] .shaper {
+  border: 1px solid var(--ph-amber);
+  border-radius: 0;
+  background: rgba(8, 20, 9, 0.9);
+  box-shadow: 0 0 14px rgba(255, 207, 92, 0.1);
+}
+:root[data-skin="phosphor"] .shaper-head {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 1.1rem;
+  background: var(--ph-amber);
+  color: var(--ph-black);
+}
+:root[data-skin="phosphor"] .shaper-toggle,
+:root[data-skin="phosphor"] .shaper-btn {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: var(--ph-black);
+}
+:root[data-skin="phosphor"] .knob-name,
+:root[data-skin="phosphor"] .knob-value {
+  color: var(--ph-amber);
+  font-size: 1rem;
+  text-shadow: var(--ph-glow-amber);
+}
+:root[data-skin="phosphor"] .knob { border-radius: 50%; }
+:root[data-skin="phosphor"] .shaper .wave-btn {
+  border-color: var(--ph-dim);
+  color: var(--ph-amber);
+  border-radius: 0;
+}
+:root[data-skin="phosphor"] .shaper .wave-btn.active {
+  background: var(--ph-amber);
+  border-color: var(--ph-amber);
+  color: var(--ph-black);
+  box-shadow: 0 0 12px rgba(255, 207, 92, 0.35);
 }
 
 /* ============================================================
