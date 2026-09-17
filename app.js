@@ -114,46 +114,6 @@
     'Glass': { harmonicity: 5, modulationIndex: 1.5, envelope: { attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.8 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.5 }, volume: -8.2 },
     'Lo-Fi': { harmonicity: 1, modulationIndex: 0.5, envelope: { attack: 0.03, decay: 0.3, sustain: 0.4, release: 0.6 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.05, decay: 0.15, sustain: 0.3, release: 0.3 }, volume: -8 }
   };
-  const GENRE_SUGGESTIONS = [
-    { genre: 'Pop', bpm: [100,130], icon: '🎤', examples: ['Shape of You','Blinding Lights','Happy','Uptown Funk','Bad Guy','Shake It Off','Rolling in the Deep','Somebody That I Used to Know'] },
-    { genre: 'Rock', bpm: [110,140], icon: '🎸', examples: ['Seven Nation Army','Smells Like Teen Spirit','Back in Black','Smoke on the Water','Highway to Hell','Sweet Child O\' Mine','Bohemian Rhapsody','Stairway to Heaven'] },
-    { genre: 'Hip Hop', bpm: [80,100], icon: '🎧', examples: ['Lose Yourself','HUMBLE.','Sicko Mode','In Da Club','Hotline Bling','Old Town Road','God\'s Plan','Alright'] },
-    { genre: 'EDM / House', bpm: [120,130], icon: '🎛️', examples: ['Levels','Titanium','Lean On','Wake Me Up','Don\'t You Worry Child','Clarity','Animals','This Is What You Came For'] },
-    { genre: 'Drum & Bass', bpm: [160,180], icon: '🥁', examples: ['Gold Dust','Hold Your Colour','T2 - Heartbroken','Netsky - Memory Lane','Chase & Status - Blind Faith','Sub Focus - Splash'] },
-    { genre: 'R&B / Soul', bpm: [60,80], icon: '🎷', examples: ['No Scrubs','Crazy in Love','Stay','Kiss from a Rose','Ain\'t No Sunshine','Superstition','I Will Always Love You','Fallin\''] },
-    { genre: 'Reggaeton', bpm: [90,100], icon: '🌴', examples: ['Despacito','Mi Gente','Dákiti','Gasolina','Tusa','Con Calma','Baila Conmigo','Hawái'] },
-    { genre: 'Jazz', bpm: [100,160], icon: '🎺', examples: ['Take Five','So What','Fly Me to the Moon','Autumn Leaves','My Favorite Things','Blue in Green','Summertime','All of Me'] },
-    { genre: 'Country', bpm: [100,120], icon: '🤠', examples: ['Jolene','Ring of Fire','Take Me Home Country Roads','Wagon Wheel','Friends in Low Places','Chicken Fried','Need You Now','The Gambler'] },
-    { genre: 'Funk', bpm: [100,120], icon: '🕺', examples: ['Superstition','Get Lucky','Le Freak','Play That Funky Music','Brick House','September','I Got You','Give Up the Funk'] },
-    { genre: 'Metal', bpm: [120,180], icon: '🤘', examples: ['Enter Sandman','Master of Puppets','Chop Suey!','Ace of Spades','Iron Man','The Trooper','Raining Blood','Paranoid'] },
-    { genre: 'Ballad', bpm: [60,80], icon: '💜', examples: ['Someone Like You','All of Me','Perfect','Hallelujah','Let It Be','Imagine','Yesterday','My Heart Will Go On'] },
-    { genre: 'Disco', bpm: [110,130], icon: '🪩', examples: ['Stayin\' Alive','I Will Survive','Don\'t Stop \'Til You Get Enough','Le Freak','Funkytown','Night Fever','Boogie Wonderland','Hot Stuff'] },
-    { genre: 'Lo-Fi', bpm: [70,90], icon: '☕', examples: ['Snowman','Coffee','Afternoon','Daydream','Rainy Days','Sunflower','Moonlight','Chillwave'] },
-    { genre: 'Punk', bpm: [140,180], icon: '⚡', examples: ['Basket Case','Blitzkrieg Bop','American Idiot','Dammit','All the Small Things','Anarchy in the U.K.','London Calling','I Wanna Be Sedated'] },
-    { genre: 'Latin', bpm: [90,110], icon: '💃', examples: ['Livin\' La Vida Loca','Bailando','Hips Don\'t Lie','Waka Waka','La Bamba','Conga','Vivir Mi Vida','Mas Que Nada'] },
-    { genre: 'Techno', bpm: [125,140], icon: '🕳️', examples: ['Spastik','Hey Hey','The Bells','Strings of Life','Age of Love','Rej','Higher State of Consciousness','Windowlicker'] },
-    { genre: 'Dubstep', bpm: [138,145], icon: '🔊', examples: ['Scary Monsters and Nice Sprites','Bangarang','Cinema','In For the Kill','Midnight Request Line','I Need Air','Promises','Centipede'] },
-    { genre: 'Hardstyle', bpm: [148,160], icon: '⚡', examples: ['Project One','Dragonborn','Year of Summer','Imaginary','Lion','Words Too Pure','Tyrant','Endymion'] },
-    { genre: 'Ska', bpm: [150,180], icon: '🎺', examples: ['A Message to You Rudy','The Impression That I Get','Sell Out','Enjoy Yourself','One Step Beyond','Monkey Man','Ghost Town','Rudie Can\'t Fail'] },
-    { genre: 'Trance', bpm: [132,142], icon: '🌌', examples: ['Adagio for Strings','For an Angel','Silence','Children','Out of the Blue','Communication','Airport','Everybody\'s Free'] },
-    { genre: 'Trap', bpm: [135,150], icon: '💥', examples: ['Mask Off','Bad and Boujee','Panda','Goosebumps','XO Tour Llif3','Rockstar','Antidote','Black Beatles'] },
-    { genre: 'Drill', bpm: [138,145], icon: '🧊', examples: ['Body','Dior','Welcome to the Party','Gatti','Own It','Bad Habits','Sticky','Mad About Bars'] },
-    { genre: 'Afrobeats', bpm: [100,115], icon: '🥁', examples: ['Essence','Last Last','Ye','Calm Down','Peru','Love Nwantiti','Ojuelegba','Fall'] },
-    { genre: 'K-Pop', bpm: [100,132], icon: '🌟', examples: ['Dynamite','Gangnam Style','How You Like That','Fancy','Butter','Next Level','Kill This Love','Boy With Luv'] },
-    { genre: 'Synthwave', bpm: [80,110], icon: '🕶️', examples: ['Nightcall','Turbo Killer','Sunset','Resonance','A Real Hero','Tech Noir','Miami Nights','Outrun'] },
-    { genre: 'Grunge', bpm: [100,130], icon: '🪓', examples: ['Smells Like Teen Spirit','Black Hole Sun','Alive','Man in the Box','Come as You Are','Even Flow','Heart-Shaped Box','Would?'] },
-    { genre: 'Blues', bpm: [60,100], icon: '🎸', examples: ['The Thrill Is Gone','Sweet Home Chicago','Pride and Joy','Crossroads','Hoochie Coochie Man','Born Under a Bad Sign','Stormy Monday','Red House'] },
-    { genre: 'Reggae', bpm: [60,90], icon: '🌿', examples: ['No Woman No Cry','Three Little Birds','Is This Love','Buffalo Soldier','Redemption Song','Could You Be Loved','Jamming','One Love'] },
-    { genre: 'Gospel', bpm: [70,100], icon: '🙌', examples: ['Oh Happy Day','Total Praise','Amazing Grace','Take Me to the King','Break Every Chain','I Smile','Optimistic','His Eye Is on the Sparrow'] },
-    { genre: 'Salsa', bpm: [180,200], icon: '🍅', examples: ['La Vida Es Un Carnaval','Idilio','Pedro Navaja','El Cantante','Vivir Mi Vida','Aguanile','Quimbara','Llorarás'] },
-    { genre: 'Bossa Nova', bpm: [120,140], icon: '🏖️', examples: ['The Girl from Ipanema','Corcovado','Desafinado','Wave','Mas Que Nada','Águas de Março','Chega de Saudade','One Note Samba'] },
-    { genre: 'Swing', bpm: [120,180], icon: '🎷', examples: ['Sing Sing Sing','In the Mood','Take the A Train','Jumpin\' at the Woodside','Caravan','It Don\'t Mean a Thing','Moonlight Serenade','Zoot Suit Riot'] },
-    { genre: 'Ambient', bpm: [60,90], icon: '🌁', examples: ['Music for Airports','Weightless','An Ending','Avril 14th','Rhubarb','Teardrop','Xtal','Hoppipolla'] },
-    { genre: 'UK Garage', bpm: [130,140], icon: '👟', examples: ['Re-Rewind','Flowers','Sweet Like Chocolate','Do You Really Like It','Little Man','Baby Cakes','Gotta Get Thru This','Ripgroove'] },
-    { genre: 'Psytrance', bpm: [140,150], icon: '🍄', examples: ['Kalifornia','Spirit of the Forest','Dark Whisper','Barbapapa','Hypnotic','Doses','Astral Projection','Becoming Insane'] },
-    { genre: 'Phonk', bpm: [130,150], icon: '🚗', examples: ['Murder in My Mind','Why Not','Sahara','Montagem','Gigachad','Metamorphosis','Close Eyes','Shadow'] },
-    { genre: 'Folk', bpm: [90,120], icon: '🪕', examples: ['The Sound of Silence','Blowin\' in the Wind','Landslide','Big Yellow Taxi','Fast Car','Wagon Wheel','Little Lion Man','Ho Hey'] }
-  ];
 
   // One skin for now. `skin` drives shape/texture rules in CSS; colour
   // variables alone were never enough to change the app's character. The
@@ -560,7 +520,7 @@
         if (msg.playerIndex === myPlayerIndex) {
           showSongEntryOnline();
         } else {
-          showWaiting(players[msg.playerIndex].name, 'is entering their song...');
+          showWaiting(players[msg.playerIndex].name, 'is naming their song...');
         }
         break;
 
@@ -636,7 +596,7 @@
         if (msg.firstEntry === myPlayerIndex) {
           showSongEntryOnline();
         } else {
-          showWaiting(players[msg.firstEntry].name, 'is entering their song...');
+          showWaiting(players[msg.firstEntry].name, 'is naming their song...');
         }
         break;
     }
@@ -697,8 +657,6 @@
       var tv = document.getElementById('lobby-tempo-val');
       ts.value = gameBpm; tv.textContent = gameBpm;
       ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
-      var lgc = document.getElementById('lobby-genres');
-      if (lgc) renderGenreRoller(lgc, ts, tv);
       initRoundLengthSlider();
 
       document.getElementById('btn-start').onclick = function () {
@@ -755,21 +713,19 @@
   // ── Online song entry ──
   function showSongEntryOnline() {
     showScreen('songentry');
-    document.getElementById('songentry-player').textContent = 'Enter your song:';
+    document.getElementById('songentry-player').textContent = 'Name your song:';
     var input = document.getElementById('songentry-input');
     input.value = '';
-    var gc = document.getElementById('songentry-genres');
-    if (gc) renderGenreRoller(gc, null, null);
     setTimeout(function () { input.focus(); }, 100);
     document.getElementById('btn-songentry-done').onclick = function () {
       var song = input.value.trim();
-      if (!song) { toast('Enter a song name'); return; }
+      if (!song) { toast('Give your song a name'); return; }
       if (netMode === 'host') {
         games.push({ songName: song, enteredBy: myPlayerIndex, submissions: {}, guesses: [] });
         songEntryIdx++;
         if (songEntryIdx < players.length) {
           netBroadcast({ type: 'enter_song', playerIndex: songEntryIdx });
-          showWaiting(players[songEntryIdx].name, 'is entering their song...');
+          showWaiting(players[songEntryIdx].name, 'is naming their song...');
         } else {
           startGameRoundsOnline();
         }
@@ -1278,7 +1234,7 @@
   const MENU_SCREENS = { home: 1, lobby: 1, solo: 1 };
   const MUSIC_VOLUME = 0.3;
   const MUSIC_FADE = 0.45;        // seconds, fading out
-  const MUSIC_ATTACK = 1.6;       // seconds, fading in
+  const MUSIC_ATTACK = 2.6;       // seconds, fading in
   const MUSIC_SILENCE = 0.0032;   // about -50 dBFS
 
   var musicCtx = null;
@@ -1454,43 +1410,6 @@
 
   function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  function renderGenreRoller(container, tempoSlider, tempoDisplay) {
-    container.innerHTML = '';
-    var resultDiv = document.createElement('div');
-    resultDiv.className = 'genre-result';
-    resultDiv.style.display = 'none';
-
-    var genreLabel = document.createElement('div');
-    genreLabel.className = 'genre-result-genre';
-    var bpmLabel = document.createElement('div');
-    bpmLabel.className = 'genre-result-bpm';
-    var exampleLabel = document.createElement('div');
-    exampleLabel.className = 'genre-result-example';
-
-    resultDiv.appendChild(genreLabel);
-    resultDiv.appendChild(bpmLabel);
-    resultDiv.appendChild(exampleLabel);
-
-    var btn = document.createElement('button');
-    btn.className = 'btn-secondary genre-roll-btn';
-    btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg> Random Genre';
-    btn.onclick = function () {
-      var g = GENRE_SUGGESTIONS[Math.floor(Math.random() * GENRE_SUGGESTIONS.length)];
-      var mid = Math.round((g.bpm[0] + g.bpm[1]) / 2);
-      var example = g.examples[Math.floor(Math.random() * g.examples.length)];
-      genreLabel.textContent = g.icon + ' ' + g.genre;
-      bpmLabel.textContent = g.bpm[0] + '-' + g.bpm[1] + ' BPM';
-      exampleLabel.textContent = 'Try: ' + example;
-      resultDiv.style.display = 'flex';
-      resultDiv.classList.add('genre-result-pop');
-      setTimeout(function () { resultDiv.classList.remove('genre-result-pop'); }, 300);
-      if (tempoSlider) { tempoSlider.value = mid; tempoDisplay.textContent = mid; gameBpm = mid; }
-      btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg> Roll Again';
-    };
-    container.appendChild(btn);
-    container.appendChild(resultDiv);
-  }
-
   function applyColorScheme(name) {
     var s = COLOR_SCHEMES[name] || COLOR_SCHEMES[DEFAULT_SCHEME];
     if (!s) return;
@@ -1619,12 +1538,9 @@
     var tv = document.getElementById('solo-tempo-val');
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
-    var gc = document.getElementById('solo-genres');
-    if (gc) renderGenreRoller(gc, ts, tv);
     document.getElementById('btn-solo-start').onclick = function () {
       readGameOptions('solo-');
       var sn = document.getElementById('solo-song').value.trim() || 'Free Jam';
-      // Capture genre for genre lock
       soloInstIdx = 0;
       games = [{ songName: sn, enteredBy: 0, submissions: {}, guesses: [] }];
       currentGameIdx = 0;
@@ -1660,8 +1576,6 @@
     var tv = document.getElementById('lobby-tempo-val');
     ts.value = gameBpm; tv.textContent = gameBpm;
     ts.oninput = function () { gameBpm = +ts.value; tv.textContent = gameBpm; };
-    var lgc = document.getElementById('lobby-genres');
-    if (lgc) renderGenreRoller(lgc, ts, tv);
     initRoundLengthSlider();
 
     var startBtn = document.getElementById('btn-start');
@@ -1735,22 +1649,20 @@
     showScreen('handoff');
     document.getElementById('handoff-label').textContent = 'It\'s your turn';
     document.getElementById('handoff-player').textContent = players[songEntryIdx].name;
-    document.getElementById('handoff-instrument').textContent = 'Enter your song (no peeking, everyone!)';
+    document.getElementById('handoff-instrument').textContent = 'Name your song (no peeking, everyone!)';
     document.getElementById('handoff-hint').textContent = 'Share your screen on Discord when ready';
     document.getElementById('btn-handoff-ready').onclick = function () { showSongEntry(); };
   }
 
   function showSongEntry() {
     showScreen('songentry');
-    document.getElementById('songentry-player').textContent = players[songEntryIdx].name + ', enter your song:';
+    document.getElementById('songentry-player').textContent = players[songEntryIdx].name + ', name your song:';
     var input = document.getElementById('songentry-input');
     input.value = '';
-    var gc = document.getElementById('songentry-genres');
-    if (gc) renderGenreRoller(gc, null, null);
     setTimeout(function () { input.focus(); }, 100);
     document.getElementById('btn-songentry-done').onclick = function () {
       var song = input.value.trim();
-      if (!song) { toast('Enter a song name'); return; }
+      if (!song) { toast('Give your song a name'); return; }
       games.push({ songName: song, enteredBy: songEntryIdx, submissions: {}, guesses: [] });
       songEntryIdx++;
       if (songEntryIdx < players.length) showSongEntryHandoff();
@@ -1801,7 +1713,7 @@
       document.getElementById('handoff-hint').textContent = 'Build ' + inst + ' for your song — share your screen!';
     } else {
       document.getElementById('handoff-hint').textContent =
-        'Listen to ' + existingCount + ' existing layer' + (existingCount !== 1 ? 's' : '') + ', guess the song, and add ' + inst + '!';
+        'Listen to ' + existingCount + ' layer' + (existingCount !== 1 ? 's' : '') + ' so far, then add your ' + inst + '!';
     }
 
     document.getElementById('btn-handoff-ready').onclick = function () {

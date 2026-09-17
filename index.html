@@ -34,7 +34,7 @@
   <div id="screen-home" class="screen active">
     <div class="home-container">
       <h1 class="logo">SOUND<br>TELEPHONE</h1>
-      <p class="tagline">Recreate songs together, one layer at a time</p>
+      <p class="tagline">Write songs together, one layer at a time</p>
       <div id="theme-picker" class="theme-picker"></div>
       <div class="home-actions">
         <input id="input-name" type="text" class="name-input" placeholder="Your name" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;text-align:center;font-size:1rem;padding:14px 16px">
@@ -62,11 +62,7 @@
       <div id="player-list" class="player-list"></div>
       <div id="host-controls" class="host-controls" style="display:none">
         <div class="song-input-row">
-          <input id="input-song" type="text" class="song-input" placeholder="Enter song name..." maxlength="80" autocomplete="off" spellcheck="false">
-        </div>
-        <div class="genre-section">
-          <label class="genre-section-label">Genre & BPM suggestion</label>
-          <div id="lobby-genres" class="genre-roller"></div>
+          <input id="input-song" type="text" class="song-input" placeholder="Name your song..." maxlength="80" autocomplete="off" spellcheck="false">
         </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
@@ -115,10 +111,6 @@
       <p style="color:var(--text-muted);font-size:0.85rem">Build all layers yourself: drums, chords, bass, and melody.</p>
       <div class="host-controls" style="display:flex">
         <input id="solo-song" type="text" class="song-input" placeholder="Song name (optional)" maxlength="80" autocomplete="off" spellcheck="false">
-        <div class="genre-section">
-          <label class="genre-section-label">Genre & BPM suggestion</label>
-          <div id="solo-genres" class="genre-roller"></div>
-        </div>
         <div class="lobby-tempo">
           <label>Tempo</label>
           <div class="tempo-control">
@@ -144,11 +136,7 @@
   <div id="screen-songentry" class="screen">
     <div class="songentry-container">
       <p id="songentry-player" class="songentry-player"></p>
-      <input id="songentry-input" type="text" class="song-input" placeholder="Enter your song..." maxlength="80" autocomplete="off" spellcheck="false">
-      <div class="genre-section">
-        <label class="genre-section-label">Need inspiration?</label>
-        <div id="songentry-genres" class="genre-roller"></div>
-      </div>
+      <input id="songentry-input" type="text" class="song-input" placeholder="Name your song..." maxlength="80" autocomplete="off" spellcheck="false">
       <button id="btn-songentry-done" class="btn-primary">Done</button>
     </div>
   </div>
@@ -177,7 +165,7 @@
   <!-- REVEAL screen (shows the song name briefly) -->
   <div id="screen-reveal" class="screen">
     <div class="reveal-container">
-      <p class="reveal-label">Recreate this song:</p>
+      <p class="reveal-label">Build on this song:</p>
       <h2 id="reveal-song" class="reveal-song"></h2>
       <p class="reveal-instrument">Your instrument: <strong id="reveal-instrument"></strong></p>
       <div class="reveal-timer">
@@ -291,8 +279,8 @@
         Listen to Previous Layer
       </button>
       <div id="guess-section" class="guess-section" style="display:none">
-        <label class="guess-label">What song is this?</label>
-        <input id="guess-input" type="text" class="song-input" placeholder="Your guess..." maxlength="80" autocomplete="off" spellcheck="false">
+        <label class="guess-label">What would you call this?</label>
+        <input id="guess-input" type="text" class="song-input" placeholder="Your title..." maxlength="80" autocomplete="off" spellcheck="false">
       </div>
       <button id="btn-submit" class="btn-primary btn-submit">Submit Layer</button>
     </div>
@@ -301,7 +289,7 @@
   <!-- LISTEN screen (combined playback) -->
   <div id="screen-listen" class="screen">
     <div class="listen-container">
-      <h2 class="listen-title">The Song Was:</h2>
+      <h2 class="listen-title">You Made:</h2>
       <h3 id="listen-song" class="listen-song"></h3>
       <span id="listen-counter" class="listen-counter"></span>
       <div id="listen-layers" class="listen-layers"></div>

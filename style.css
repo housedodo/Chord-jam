@@ -1283,70 +1283,6 @@ body {
   box-shadow: 0 0 0 2px var(--bg), 0 0 12px var(--accent-glow);
 }
 
-/* Genre roller */
-.genre-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.genre-section-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-
-.genre-roller {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.genre-roll-btn {
-  width: 100%;
-  gap: 8px;
-}
-
-.genre-result {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  transition: transform 0.2s;
-}
-
-.genre-result-pop {
-  transform: scale(1.03);
-}
-
-.genre-result-genre {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: var(--accent);
-}
-
-.genre-result-bpm {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-}
-
-.genre-result-example {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  font-style: italic;
-  margin-top: 4px;
-}
-
 /* Listen counter (Song X of Y) */
 .listen-counter {
   font-size: 0.75rem;
@@ -1822,19 +1758,6 @@ body {
 .btn-sm {
   font-size: 0.75rem;
   padding: 6px 12px;
-}
-
-/* Genre lock label */
-.genre-lock-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  background: var(--accent-bg);
-  border-radius: 10px;
-  white-space: nowrap;
 }
 
 /* Grip marks so both drag edges are discoverable — blocks resize from
@@ -2422,7 +2345,6 @@ body {
 }
 
 :root[data-skin="phosphor"] .tempo-display,
-:root[data-skin="phosphor"] .genre-section-label,
 :root[data-skin="phosphor"] .opt-group-title,
 :root[data-skin="phosphor"] .lobby-section-label {
   font-family: 'VT323', monospace;
