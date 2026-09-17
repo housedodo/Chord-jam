@@ -6,8 +6,18 @@
   <title>SOUND TELEPHONE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&family=Caveat:wght@500;700&family=Archivo:wght@500;600;700&family=Archivo+Black&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&family=Caveat:wght@500;700&family=Archivo:wght@500;600;700&family=Archivo+Black&family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply the saved skin before first paint, so a dark scheme doesn't flash
+    // paper-white while app.js loads. applyColorScheme() sets the rest.
+    try {
+      var t = localStorage.getItem('st-theme');
+      if (t === 'notebook' || t === 'riso' || t === 'phosphor') {
+        document.documentElement.setAttribute('data-skin', t);
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
 

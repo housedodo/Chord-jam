@@ -155,8 +155,9 @@
     { genre: 'Folk', bpm: [90,120], icon: '🪕', examples: ['The Sound of Silence','Blowin\' in the Wind','Landslide','Big Yellow Taxi','Fast Car','Wagon Wheel','Little Lion Man','Ho Hey'] }
   ];
 
-  // Two skins, both paper-based. `skin` drives shape/texture rules in CSS;
-  // colour variables alone were never enough to change the app's character.
+  // Three skins. `skin` drives shape/texture rules in CSS; colour variables
+  // alone were never enough to change the app's character. Two are paper,
+  // one (phosphor) is a CRT terminal — the only dark scheme.
   const DEFAULT_SCHEME = 'notebook';
   const COLOR_SCHEMES = {
     notebook: { label: 'Notebook', color: '#f6eeda', skin: 'notebook',
@@ -170,7 +171,13 @@
       text:'#17161a', textMuted:'#5f5c55', textDim:'#8d8980',
       accent:'#0a8fd8', accentSoft:'#0a63a8',
       grid:'#201f24', gridBeat:'#2a282e', gridAlt:'#1b1a1f', gridAltBeat:'#252329', gridBorder:'#3a383f',
-      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' }
+      pianoRollBg:'#17161a', note:'#0a8fd8', noteBorder:'#f2efe2' },
+    phosphor: { label: 'Phosphor', color: '#6cf08a', skin: 'phosphor',
+      bg:'#061009', surface:'#0a1a10', surface2:'#0d2216', surface3:'#12301f', border:'#1f5c39',
+      text:'#6cf08a', textMuted:'#4fbf7a', textDim:'#2c7a4e',
+      accent:'#6cf08a', accentSoft:'#3ec96a',
+      grid:'#0a1a10', gridBeat:'#102a18', gridAlt:'#081409', gridAltBeat:'#0e2415', gridBorder:'#1f5c39',
+      pianoRollBg:'#061009', note:'#ffcf5c', noteBorder:'#061009' }
   };
   const CELL_W = 34;
   const LABEL_W = 54;

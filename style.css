@@ -2611,3 +2611,388 @@ body {
 
 :root[data-skin="notebook"] .opt-help { font-family: 'Caveat', cursive; font-size: 0.92rem; }
 :root[data-skin="riso"] .opt-help { font-size: 0.66rem; letter-spacing: 0.01em; }
+
+/* ============================================================
+   PHOSPHOR SKIN
+   A CRT terminal that happens to be a sequencer. The whole look is
+   one font, square corners, two colours and a glow — no textures and
+   no images, so it costs almost nothing and stays consistent on
+   screens the other two skins never reached.
+   Green is structure, amber is the thing you are placing right now.
+   ============================================================ */
+
+:root[data-skin="phosphor"] {
+  --ph-green: #6cf08a;
+  --ph-bright: #c8ffd8;
+  --ph-mid: #3ec96a;
+  --ph-dim: #2c7a4e;
+  --ph-amber: #ffcf5c;
+  --ph-black: #061009;
+  --ph-glow: 0 0 6px rgba(108, 240, 138, 0.45);
+  --ph-glow-amber: 0 0 6px rgba(255, 207, 92, 0.45);
+  /* The four classic monitor phosphors, one per layer. Overriding the
+     instrument variables here means badges, note blocks, layer cards and
+     the reveal screen all follow without touching their own rules. */
+  --drums-color: #6cf08a;
+  --chords-color: #5ad2e0;
+  --bass-color: #ffcf5c;
+  --melody-color: #c8ffd8;
+  --mauve: #9ae66e;
+  --vocal-color: #ff9d6c;
+}
+
+/* VT323 ships one weight, so every bold in the app is synthesised and smears.
+   !important is needed because some headings carry an inline font-weight. */
+:root[data-skin="phosphor"] body,
+:root[data-skin="phosphor"] body * {
+  font-weight: 400 !important;
+}
+
+:root[data-skin="phosphor"] body {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 1.22rem;
+  letter-spacing: 0.01em;
+  background-color: var(--ph-black);
+  background-image: none;
+  color: var(--ph-green);
+  text-shadow: var(--ph-glow);
+}
+
+/* Scanlines sit above the content but never eat a tap */
+:root[data-skin="phosphor"] .screen.active::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: repeating-linear-gradient(to bottom,
+    rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 3px);
+}
+
+/* Logo: framed like a boot banner rather than glowing loose text */
+:root[data-skin="phosphor"] .logo {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 3.1rem;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  color: var(--ph-bright);
+  text-shadow: 0 0 10px rgba(200, 255, 216, 0.4);
+  border: 2px solid var(--ph-green);
+  padding: 10px 20px;
+}
+
+:root[data-skin="phosphor"] .tagline,
+:root[data-skin="phosphor"] .home-hint {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ph-mid);
+}
+
+:root[data-skin="phosphor"] .listen-title,
+:root[data-skin="phosphor"] .voting-title,
+:root[data-skin="phosphor"] .reveal-song,
+:root[data-skin="phosphor"] .handoff-player,
+:root[data-skin="phosphor"] .listen-song,
+:root[data-skin="phosphor"] .room-code {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: var(--ph-bright);
+  text-shadow: 0 0 9px rgba(200, 255, 216, 0.35);
+}
+
+/* Panels: a single hairline rule, square. Depth comes from the glow */
+:root[data-skin="phosphor"] .sequencer,
+:root[data-skin="phosphor"] .guess-section,
+:root[data-skin="phosphor"] .game-options,
+:root[data-skin="phosphor"] .layer-card,
+:root[data-skin="phosphor"] .guess-row,
+:root[data-skin="phosphor"] .player-chip,
+:root[data-skin="phosphor"] .player-card,
+:root[data-skin="phosphor"] .vocal-timeline,
+:root[data-skin="phosphor"] .option-toggle,
+:root[data-skin="phosphor"] .song-input,
+:root[data-skin="phosphor"] .name-input,
+:root[data-skin="phosphor"] .code-input,
+:root[data-skin="phosphor"] .piano-roll,
+:root[data-skin="phosphor"] .producer-panel,
+:root[data-skin="phosphor"] .vocal-waveform {
+  border: 1px solid var(--ph-dim);
+  border-radius: 0;
+  background: rgba(10, 26, 16, 0.6);
+  box-shadow: none;
+}
+
+:root[data-skin="phosphor"] .song-input,
+:root[data-skin="phosphor"] .name-input,
+:root[data-skin="phosphor"] .code-input {
+  font-family: 'VT323', monospace;
+  color: var(--ph-bright);
+  caret-color: var(--ph-amber);
+  letter-spacing: 0.08em;
+}
+
+/* Buttons read as terminal keys: filled = the action, outlined = the rest */
+:root[data-skin="phosphor"] .btn-primary {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--ph-green);
+  color: var(--ph-black);
+  border: 2px solid var(--ph-green);
+  border-radius: 0;
+  text-shadow: none;
+}
+:root[data-skin="phosphor"] .btn-primary:active {
+  background: var(--ph-bright);
+  border-color: var(--ph-bright);
+  transform: none;
+}
+
+:root[data-skin="phosphor"] .btn-secondary {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 1.05rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--ph-green);
+  border: 1px solid var(--ph-green);
+  border-radius: 0;
+}
+:root[data-skin="phosphor"] .btn-secondary:active {
+  background: rgba(108, 240, 138, 0.16);
+  transform: none;
+}
+
+:root[data-skin="phosphor"] .btn-text {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ph-mid);
+}
+
+:root[data-skin="phosphor"] .btn-seq-play,
+:root[data-skin="phosphor"] .btn-icon {
+  border: 1px solid var(--ph-green);
+  border-radius: 0;
+  color: var(--ph-green);
+  background: transparent;
+}
+
+/* Drum hits: a lit cell on a dark grid, which is the whole metaphor */
+:root[data-skin="phosphor"] .drum-cell {
+  background: rgba(10, 26, 16, 0.55);
+  border: 1px solid var(--ph-dim);
+  border-radius: 0;
+}
+:root[data-skin="phosphor"] .drum-cell.beat { background: rgba(16, 42, 24, 0.85); }
+:root[data-skin="phosphor"] .drum-cell.on,
+:root[data-skin="phosphor"] .drum-cell.on.beat {
+  background: var(--drums-color);
+  border-color: var(--drums-color);
+  box-shadow: 0 0 8px rgba(108, 240, 138, 0.5);
+}
+:root[data-skin="phosphor"] .drum-cell.playing {
+  background: var(--ph-bright);
+  border-color: var(--ph-bright);
+  box-shadow: 0 0 12px rgba(200, 255, 216, 0.7);
+}
+
+:root[data-skin="phosphor"] .drum-label,
+:root[data-skin="phosphor"] .pr-label {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ph-mid);
+}
+:root[data-skin="phosphor"] .pr-label-sharp { color: var(--ph-dim); opacity: 1; }
+
+:root[data-skin="phosphor"] .pr-cell {
+  border-color: rgba(31, 92, 57, 0.5);
+}
+:root[data-skin="phosphor"] .pr-cell.pr-sharp,
+:root[data-skin="phosphor"] .pr-cell.pr-sharp.pr-beat { filter: none; }
+:root[data-skin="phosphor"] .pr-cell.pr-sharp { background: #040b07; }
+:root[data-skin="phosphor"] .pr-cell.pr-sharp.pr-beat { background: #07140d; }
+
+/* Notes keep their layer's phosphor; the skin only squares them and lights them */
+:root[data-skin="phosphor"] .pr-note-block,
+:root[data-skin="phosphor"] .ct-note-block {
+  border-radius: 0 !important;
+  border: 1px solid rgba(6, 16, 9, 0.7) !important;
+  color: var(--ph-black) !important;
+  box-shadow: 0 0 7px rgba(108, 240, 138, 0.3) !important;
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  text-shadow: none;
+}
+
+:root[data-skin="phosphor"] .vocal-block {
+  border-radius: 0;
+  border: 1px solid var(--ph-amber);
+  background: rgba(255, 207, 92, 0.2);
+  color: var(--ph-amber);
+  font-family: 'VT323', monospace;
+  box-shadow: 0 0 8px rgba(255, 207, 92, 0.35);
+}
+
+/* Badges are bracketed labels, not filled pills */
+:root[data-skin="phosphor"] .build-badge,
+:root[data-skin="phosphor"] .layer-badge,
+:root[data-skin="phosphor"] .guess-badge {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--ph-black);
+  text-shadow: none;
+}
+
+:root[data-skin="phosphor"] .build-song {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ph-mid);
+}
+
+:root[data-skin="phosphor"] .sound-btn,
+:root[data-skin="phosphor"] .chord-pick,
+:root[data-skin="phosphor"] .chord-select,
+:root[data-skin="phosphor"] .mode-btn,
+:root[data-skin="phosphor"] .wave-btn {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--ph-dim);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ph-mid);
+}
+:root[data-skin="phosphor"] .sound-btn.active,
+:root[data-skin="phosphor"] .chord-pick.active,
+:root[data-skin="phosphor"] .mode-btn.active,
+:root[data-skin="phosphor"] .wave-btn.active {
+  background: rgba(108, 240, 138, 0.16);
+  border-color: var(--ph-green);
+  color: var(--ph-bright);
+  box-shadow: none;
+}
+
+:root[data-skin="phosphor"] .crystal-pill,
+:root[data-skin="phosphor"] .listen-counter,
+:root[data-skin="phosphor"] .bpm-display,
+:root[data-skin="phosphor"] .build-timer,
+:root[data-skin="phosphor"] .vocal-status,
+:root[data-skin="phosphor"] .chord-bar-label,
+:root[data-skin="phosphor"] .chord-bar-hint,
+:root[data-skin="phosphor"] .knob-label,
+:root[data-skin="phosphor"] .knob-value {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 1rem;
+  color: var(--ph-mid);
+}
+
+/* The clock is the one number people watch, so it gets the amber */
+:root[data-skin="phosphor"] .build-timer {
+  color: var(--ph-amber);
+  text-shadow: var(--ph-glow-amber);
+  font-size: 1.3rem;
+}
+
+/* Every slider is a square amber handle on a hairline track */
+:root[data-skin="phosphor"] input[type="range"] {
+  background: var(--ph-dim);
+  border-radius: 0;
+  height: 2px;
+}
+:root[data-skin="phosphor"] input[type="range"]::-webkit-slider-thumb {
+  border-radius: 0;
+  width: 10px;
+  height: 20px;
+  background: var(--ph-amber);
+}
+:root[data-skin="phosphor"] input[type="range"]::-moz-range-thumb {
+  border-radius: 0;
+  width: 10px;
+  height: 20px;
+  border: none;
+  background: var(--ph-amber);
+}
+
+:root[data-skin="phosphor"] .option-toggle input[type="checkbox"] {
+  border-radius: 0;
+  border: 1px solid var(--ph-mid);
+  background: transparent;
+}
+:root[data-skin="phosphor"] .option-toggle input[type="checkbox"]:checked {
+  background: var(--ph-green);
+  border-color: var(--ph-green);
+}
+:root[data-skin="phosphor"] .option-toggle input[type="checkbox"]:checked::after {
+  border-color: var(--ph-black);
+}
+
+:root[data-skin="phosphor"] .tempo-display,
+:root[data-skin="phosphor"] .genre-section-label,
+:root[data-skin="phosphor"] .opt-group-title,
+:root[data-skin="phosphor"] .lobby-section-label {
+  font-family: 'VT323', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:root[data-skin="phosphor"] .opt-name {
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+:root[data-skin="phosphor"] .opt-help {
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: var(--ph-dim);
+}
+
+:root[data-skin="phosphor"] .theme-dot {
+  border: 1px solid var(--ph-dim);
+  border-radius: 0;
+}
+:root[data-skin="phosphor"] .theme-dot.active {
+  border-color: var(--ph-bright);
+  box-shadow: 0 0 8px rgba(108, 240, 138, 0.6);
+}
+
+:root[data-skin="phosphor"] .toast {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ph-green);
+  color: var(--ph-black);
+  border: 1px solid var(--ph-green);
+  border-radius: 0;
+  box-shadow: 0 0 14px rgba(108, 240, 138, 0.4);
+  text-shadow: none;
+}
+
+@media (max-width: 480px) {
+  :root[data-skin="phosphor"] .logo { font-size: 2.5rem; padding: 8px 14px; }
+}
