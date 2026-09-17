@@ -1774,6 +1774,7 @@ body {
 .shaper-caret { transition: transform 0.15s ease; font-size: 0.9em; }
 .shaper.collapsed .shaper-caret { transform: rotate(-90deg); }
 .shaper.collapsed .shaper-preset,
+.shaper.collapsed .shaper-source,
 .shaper.collapsed .shaper-table,
 .shaper.collapsed .shaper-knobs { display: none; }
 .shaper-btn {
@@ -1790,6 +1791,33 @@ body {
 }
 .shaper-btn:hover { background: rgba(6, 16, 9, 0.12); }
 .shaper-btn:active { background: rgba(6, 16, 9, 0.22); }
+
+/* Source toggle: presets or wavetable, one at a time. */
+.shaper-source {
+  display: flex;
+  gap: 0;
+  padding: 10px 12px 0;
+}
+.src-btn {
+  flex: 1;
+  min-height: 34px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 207, 92, 0.35);
+  color: rgba(255, 207, 92, 0.65);
+  font: inherit;
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.src-btn + .src-btn { border-left: 0; }
+.src-btn:hover:not(.on) { background: rgba(255, 207, 92, 0.08); }
+.src-btn.on {
+  background: var(--peach);
+  border-color: var(--peach);
+  color: #061009;
+  text-shadow: none;
+}
 
 /* Preset picker: a lit window with a step arrow either side, and a drop-down
    list of every sound for the layer. */
@@ -2519,6 +2547,7 @@ body {
   text-shadow: var(--ph-glow-amber);
 }
 :root[data-skin="phosphor"] .knob { border-radius: 50%; }
+:root[data-skin="phosphor"] .src-btn,
 :root[data-skin="phosphor"] .preset-field,
 :root[data-skin="phosphor"] .preset-step,
 :root[data-skin="phosphor"] .preset-option {
@@ -2529,7 +2558,8 @@ body {
   color: var(--ph-amber);
   border-radius: 0;
 }
-:root[data-skin="phosphor"] .preset-option.on { color: var(--ph-black); }
+:root[data-skin="phosphor"] .preset-option.on,
+:root[data-skin="phosphor"] .src-btn.on { color: var(--ph-black); }
 :root[data-skin="phosphor"] .preset-list { border-radius: 0; }
 
 /* ============================================================

@@ -1105,6 +1105,7 @@
     var name = presetName || currentChordSound;
     var sh = shape || shapeFor('chords');
     if (name === PRODUCER_SOUND) return createOscSynth('chords', sh);
+    if (name === PIANO_SOUND) return createPianoSynth('chords', sh);
     var sampled = packEntry('chords', name);
     if (sampled) return createSampledInstrument(sampled, 'chords', sh);
     var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS['Piano Chords'];
@@ -1372,6 +1373,8 @@
     var env = null;
     if (soundName === PRODUCER_SOUND) {
       env = PRODUCER_DEFAULT;
+    } else if (soundName === PIANO_SOUND) {
+      env = PIANO_ENV;
     } else if (!packEntry(inst, soundName)) {
       var bank = bankFor(inst);
       var preset = bank[soundName] || bank[Object.keys(bank)[0]];
@@ -1402,6 +1405,9 @@
   // What each layer is currently shaped to, and whether anyone has touched it.
   var layerShapes = {};
   var layerShapeEdited = {};
+  // The preset a layer sits on, remembered while it is off on the wavetable
+  // so switching back does not dump everyone on the first sound in the list.
+  var layerLastPreset = {};
 
   function currentSoundFor(inst) {
     if (inst === 'bass') return currentBassSound;
@@ -1467,6 +1473,63 @@
     });
   }
 
+  // ── Grand Piano ──
+  // Three layers rather than one preset, because what makes a piano read as a
+  // piano is not its waveform: the tone is bright at the hammer and dulls as
+  // it rings, there is no sustain at all (a real string only ever decays),
+  // and two strings per note beat slowly against each other.
+  //
+  // So: a body voice whose filter closes as the note decays, a second body a
+  // few cents sharp for that beating, and a short FM layer for the knock of
+  // the hammer. It is still synthesis — a sampled piano would beat it — but
+  // it carries the cues a single FM voice cannot.
+  const PIANO_SOUND = 'Grand Piano';
+  const PIANO_LAYERS = ['chords', 'melody'];
+  const PIANO_ENV = { attack: 0.002, decay: 2.4, sustain: 0, release: 0.5 };
+
+  function createPianoSynth(inst, shape) {
+    var sh = shape || presetShape(inst, PIANO_SOUND);
+    var reverb = makeReverb(inst + ':piano', 2.2, 0.18, makeBus(inst));
+    var out = shapeFilter(inst + ':piano', sh, reverb);
+    function body(detune, vol, decayScale) {
+      return capVoices(new Tone.PolySynth(Tone.MonoSynth, {
+        oscillator: { type: 'triangle' },
+        detune: sh.fine + detune,
+        volume: vol,
+        envelope: {
+          attack: sh.attack, decay: sh.decay * decayScale,
+          sustain: sh.sustain, release: sh.release
+        },
+        filter: { type: 'lowpass', rolloff: -12, Q: 1 },
+        // The brightness envelope is the piano cue: it opens instantly and
+        // shuts long before the note has finished sounding.
+        filterEnvelope: {
+          attack: 0.001, decay: 0.35, sustain: 0.06, release: 0.3,
+          baseFrequency: 320, octaves: 4.6, exponent: 2
+        }
+      }).connect(out), 12);
+    }
+    var strings = body(0, -21, 1);
+    var detuned = body(5, -27, 1.2);
+    var hammer = capVoices(new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3.01,
+      modulationIndex: 2.5,
+      detune: sh.fine,
+      volume: -32,
+      envelope: { attack: 0.001, decay: Math.min(0.25, sh.decay), sustain: 0, release: 0.2 },
+      modulation: { type: 'square' },
+      modulationEnvelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.1 }
+    }).connect(out), 12);
+    return {
+      play: function (notes, dur, time) {
+        strings.triggerAttackRelease(notes, dur, time);
+        detuned.triggerAttackRelease(notes, dur, time);
+        hammer.triggerAttackRelease(notes, dur, time);
+      },
+      dispose: function () { strings.dispose(); detuned.dispose(); hammer.dispose(); }
+    };
+  }
+
   // Built-in sounds plus any the pack adds, so a pack can extend the picker
   // rather than only replacing what is already there.
   function bankFor(group) {
@@ -1478,6 +1541,7 @@
   function soundNamesFor(group) {
     var bank = bankFor(group);
     var names = Object.keys(bank);
+    if (PIANO_LAYERS.indexOf(group) !== -1) names.unshift(PIANO_SOUND);
     var fromPack = (samplePack && samplePack[group]) ? Object.keys(samplePack[group]) : [];
     fromPack.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
     return names;
@@ -1486,6 +1550,7 @@
   function createInstrument(group, soundName, poly, shape) {
     var sh = shape === undefined ? shapeFor(group) : shape;
     if (soundName === PRODUCER_SOUND) return createOscSynth(group, sh);
+    if (soundName === PIANO_SOUND) return createPianoSynth(group, sh);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group, sh);
     var bank = bankFor(group);
@@ -2657,6 +2722,21 @@
     head.appendChild(tools);
     panel.appendChild(head);
 
+    // Two sources, one at a time: the presets, or the wavetable. The toggle
+    // swaps which one's controls are on show, so the panel stays the size of
+    // whichever is actually in use.
+    var srcRow = document.createElement('div');
+    srcRow.className = 'shaper-source';
+    var srcPreset = document.createElement('button');
+    srcPreset.className = 'src-btn';
+    srcPreset.textContent = 'PRESETS';
+    var srcTable = document.createElement('button');
+    srcTable.className = 'src-btn';
+    srcTable.textContent = 'WAVETABLE';
+    srcRow.appendChild(srcPreset);
+    srcRow.appendChild(srcTable);
+    panel.appendChild(srcRow);
+
     // The preset picker. A row of buttons used to sit above the panel; as a
     // field with a drop-down it costs one line instead of three, which is
     // most of a phone's roll back, and it keeps every preset one tap away
@@ -2687,12 +2767,9 @@
     list.setAttribute('role', 'listbox');
     list.hidden = true;
 
-    function soundList() {
-      // The wavetable is offered on every shaped layer, not just melody: a
-      // scanned bass or a scanned pad is as much use as a scanned lead.
-      return [PRODUCER_SOUND].concat(soundNamesFor(inst));
-    }
+    function soundList() { return soundNamesFor(inst); }
     function pickSound(name) {
+      if (name !== PRODUCER_SOUND) layerLastPreset[inst] = name;
       if (inst === 'bass') currentBassSound = name;
       else if (inst === 'chords') currentChordSound = name;
       else currentMelodySound = name;
@@ -2821,16 +2898,32 @@
       reseedShape(inst);
       panel.classList.remove('edited');
       repaint();
-      fieldName.textContent = currentSoundFor(inst);
-      syncTableRow();
+      var nm = currentSoundFor(inst);
+      if (nm !== PRODUCER_SOUND) fieldName.textContent = nm;
+      syncSource();
     };
-    function syncTableRow() {
-      var on = currentSoundFor(inst) === PRODUCER_SOUND;
-      tableRow.style.display = on ? 'flex' : 'none';
-      if (on) drawWave(shapeFor(inst).table);
+    function syncSource() {
+      var onTable = currentSoundFor(inst) === PRODUCER_SOUND;
+      tableRow.style.display = onTable ? 'flex' : 'none';
+      pickRow.style.display = onTable ? 'none' : 'flex';
+      srcTable.classList.toggle('on', onTable);
+      srcPreset.classList.toggle('on', !onTable);
+      srcTable.setAttribute('aria-pressed', onTable ? 'true' : 'false');
+      srcPreset.setAttribute('aria-pressed', onTable ? 'false' : 'true');
+      if (onTable) drawWave(shapeFor(inst).table);
+      else closeList();
     }
-    fieldName.textContent = currentSoundFor(inst);
-    syncTableRow();
+    srcTable.onclick = function () {
+      if (currentSoundFor(inst) !== PRODUCER_SOUND) pickSound(PRODUCER_SOUND);
+    };
+    srcPreset.onclick = function () {
+      if (currentSoundFor(inst) === PRODUCER_SOUND) {
+        pickSound(layerLastPreset[inst] || soundList()[0]);
+      }
+    };
+    fieldName.textContent = currentSoundFor(inst) === PRODUCER_SOUND
+      ? (layerLastPreset[inst] || soundList()[0]) : currentSoundFor(inst);
+    syncSource();
 
     return panel;
   }
