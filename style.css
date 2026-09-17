@@ -744,41 +744,6 @@ body {
   opacity: 0.8;
 }
 
-/* Sound selector */
-.sound-selector {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 2px 0;
-}
-
-.sound-btn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  color: var(--text-muted);
-  padding: 6px 14px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.12s;
-  font-family: inherit;
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sound-btn:active { transform: scale(0.94); }
-.sound-btn.active {
-  background: var(--accent);
-  color: #1a1528;
-  border-color: var(--accent);
-}
-
 /* Chord selector dropdowns */
 .chord-selector-row {
   display: flex;
@@ -1303,10 +1268,6 @@ body {
   }
   .btn-primary:hover:not(:disabled) { opacity: 0.9; }
   .btn-secondary:hover { background: var(--surface-3); }
-  .sound-btn:hover:not(.active) {
-    background: var(--surface-2);
-    border-color: var(--accent-soft);
-  }
   .theme-dot:hover { transform: scale(1.15); }
   .pr-cell:hover { background: var(--surface-2) !important; }
   .ct-cell:hover { background: var(--surface-2) !important; }
@@ -1370,25 +1331,6 @@ body {
        pinned gutter are hidden without drawing a visible band. */
     background: var(--surface);
     padding-right: 4px;
-  }
-
-  /* Sounds: one swipeable row. Four stacked rows of chips ate a third
-     of the screen before you could place a note. */
-  .sound-selector {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 6px;
-    padding: 2px 0 4px;
-    scrollbar-width: none;
-    overscroll-behavior-x: contain;
-  }
-  .sound-selector::-webkit-scrollbar { display: none; }
-  .sound-btn {
-    flex: 0 0 auto;
-    min-height: 40px;
-    padding: 8px 16px;
-    font-size: 0.75rem;
   }
 
   .piano-roll { padding: 0; }
@@ -1780,12 +1722,6 @@ body {
 .pr-note-block::after,
 .ct-note-block::after { right: 3px; }
 
-/* Oscillator panel */
-.sound-btn-producer {
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-
 /* ── Shaper ──
    The knob panel under the sound picker on chords, bass and melody. Amber on
    black, with a ring of lit segments round each knob: it reads as a piece of
@@ -1797,7 +1733,8 @@ body {
   border: 1px solid var(--peach);
   border-radius: 2px;
   flex-shrink: 0;
-  overflow: hidden;
+  /* No overflow clipping here: the preset list drops out of the panel and
+     would be cut off at the bottom edge. */
 }
 
 .shaper-head {
@@ -1836,7 +1773,8 @@ body {
 }
 .shaper-caret { transition: transform 0.15s ease; font-size: 0.9em; }
 .shaper.collapsed .shaper-caret { transform: rotate(-90deg); }
-.shaper.collapsed .shaper-waves,
+.shaper.collapsed .shaper-preset,
+.shaper.collapsed .shaper-table,
 .shaper.collapsed .shaper-knobs { display: none; }
 .shaper-btn {
   background: transparent;
@@ -1853,10 +1791,115 @@ body {
 .shaper-btn:hover { background: rgba(6, 16, 9, 0.12); }
 .shaper-btn:active { background: rgba(6, 16, 9, 0.22); }
 
-.shaper-waves {
+/* Preset picker: a lit window with a step arrow either side, and a drop-down
+   list of every sound for the layer. */
+.shaper-preset {
+  position: relative;
   display: flex;
+  align-items: stretch;
   gap: 8px;
   padding: 10px 12px 0;
+}
+
+.preset-step {
+  flex: none;
+  width: 34px;
+  background: transparent;
+  border: 1px solid rgba(255, 207, 92, 0.35);
+  color: var(--peach);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.preset-step:hover { background: rgba(255, 207, 92, 0.1); }
+
+.preset-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  min-height: 36px;
+  background: rgba(255, 207, 92, 0.07);
+  border: 1px solid var(--peach);
+  color: var(--peach);
+  font: inherit;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.preset-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preset-caret { flex: none; opacity: 0.7; font-size: 0.8em; }
+
+.preset-list {
+  position: absolute;
+  z-index: 30;
+  left: 54px;
+  right: 54px;
+  margin: 0 auto;
+  max-width: 340px;
+  top: calc(100% + 2px);
+  max-height: 232px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: #081409;
+  border: 1px solid var(--peach);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+.preset-option {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 207, 92, 0.16);
+  color: var(--peach);
+  font: inherit;
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 9px 12px;
+  min-height: 40px;
+  cursor: pointer;
+}
+/* A class that sets display beats the UA rule for [hidden], so the list needs
+   to be told to stay shut. */
+.preset-list[hidden] { display: none; }
+.preset-option:last-child { border-bottom: 0; }
+.preset-option:hover { background: rgba(255, 207, 92, 0.12); }
+.preset-option.on { background: var(--peach); color: #061009; text-shadow: none; }
+
+/* Wavetable row: the scan knob beside a screen showing the wave it is on. */
+.shaper-table {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 0;
+}
+.shaper-table .knob-cell { flex: none; width: 74px; }
+.wave-scope {
+  flex: 1;
+  min-width: 0;
+  height: 62px;
+  border: 1px solid rgba(255, 207, 92, 0.3);
+  background: rgba(255, 207, 92, 0.04);
+}
+.wave-scope svg { display: block; width: 100%; height: 100%; }
+.wave-scope .wave-mid {
+  stroke: rgba(255, 207, 92, 0.22);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.wave-scope .wave-line {
+  fill: none;
+  stroke: var(--peach);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px rgba(255, 207, 92, 0.6));
 }
 
 .shaper-knobs {
@@ -2319,12 +2362,10 @@ body {
   color: var(--ph-mid);
 }
 
-:root[data-skin="phosphor"] .sound-btn,
 :root[data-skin="phosphor"] .chord-pick,
 :root[data-skin="phosphor"] .chord-select,
 :root[data-skin="phosphor"] .mode-btn,
-:root[data-skin="phosphor"] .fill-btn,
-:root[data-skin="phosphor"] .wave-btn {
+:root[data-skin="phosphor"] .fill-btn {
   font-family: 'VT323', monospace;
   font-weight: 400;
   font-size: 1rem;
@@ -2335,11 +2376,9 @@ body {
   background: transparent;
   color: var(--ph-mid);
 }
-:root[data-skin="phosphor"] .sound-btn.active,
 :root[data-skin="phosphor"] .chord-pick.active,
 :root[data-skin="phosphor"] .mode-btn.active,
-:root[data-skin="phosphor"] .fill-btn.active,
-:root[data-skin="phosphor"] .wave-btn.active {
+:root[data-skin="phosphor"] .fill-btn.active {
   background: rgba(108, 240, 138, 0.16);
   border-color: var(--ph-green);
   color: var(--ph-bright);
@@ -2480,17 +2519,18 @@ body {
   text-shadow: var(--ph-glow-amber);
 }
 :root[data-skin="phosphor"] .knob { border-radius: 50%; }
-:root[data-skin="phosphor"] .shaper .wave-btn {
-  border-color: var(--ph-dim);
+:root[data-skin="phosphor"] .preset-field,
+:root[data-skin="phosphor"] .preset-step,
+:root[data-skin="phosphor"] .preset-option {
+  font-family: 'VT323', monospace;
+  font-weight: 400;
+  font-size: 1.15rem;
+  text-transform: uppercase;
   color: var(--ph-amber);
   border-radius: 0;
 }
-:root[data-skin="phosphor"] .shaper .wave-btn.active {
-  background: var(--ph-amber);
-  border-color: var(--ph-amber);
-  color: var(--ph-black);
-  box-shadow: 0 0 12px rgba(255, 207, 92, 0.35);
-}
+:root[data-skin="phosphor"] .preset-option.on { color: var(--ph-black); }
+:root[data-skin="phosphor"] .preset-list { border-radius: 0; }
 
 /* ============================================================
    MOBILE, PART TWO
@@ -2532,8 +2572,6 @@ body {
   .build-container .btn-primary { padding: 9px 24px; }
   .seq-controls { gap: 8px; }
   .btn-seq-play { width: 34px; height: 34px; }
-  .sound-selector { padding: 0; }
-  .sound-btn { min-height: 32px; padding: 5px 12px; }
   .drum-ruler { display: none; }
   .home-container, .lobby-container { gap: 16px; padding: 16px 24px; }
 }
@@ -2545,11 +2583,9 @@ body {
    the same gesture at half strength, and a press pulls it back in.
    ============================================================ */
 
-:root[data-skin="phosphor"] .sound-btn,
 :root[data-skin="phosphor"] .chord-pick,
 :root[data-skin="phosphor"] .mode-btn,
 :root[data-skin="phosphor"] .fill-btn,
-:root[data-skin="phosphor"] .wave-btn,
 :root[data-skin="phosphor"] .btn-primary,
 :root[data-skin="phosphor"] .btn-secondary,
 :root[data-skin="phosphor"] .btn-seq-play,
@@ -2560,10 +2596,8 @@ body {
 }
 
 /* The selected one */
-:root[data-skin="phosphor"] .sound-btn.active,
 :root[data-skin="phosphor"] .chord-pick.active,
-:root[data-skin="phosphor"] .mode-btn.active,
-:root[data-skin="phosphor"] .wave-btn.active {
+:root[data-skin="phosphor"] .mode-btn.active {
   background: rgba(108, 240, 138, 0.18);
   border-color: var(--ph-green);
   color: var(--ph-bright);
@@ -2576,11 +2610,9 @@ body {
 }
 
 /* Press */
-:root[data-skin="phosphor"] .sound-btn:active,
 :root[data-skin="phosphor"] .chord-pick:active,
 :root[data-skin="phosphor"] .mode-btn:active,
 :root[data-skin="phosphor"] .fill-btn:active,
-:root[data-skin="phosphor"] .wave-btn:active,
 :root[data-skin="phosphor"] .btn-primary:active,
 :root[data-skin="phosphor"] .btn-secondary:active,
 :root[data-skin="phosphor"] .btn-seq-play:active {
@@ -2589,11 +2621,9 @@ body {
 
 /* Hover, on pointing devices only — a phone would latch this after a tap */
 @media (hover: hover) and (pointer: fine) {
-  :root[data-skin="phosphor"] .sound-btn:hover:not(.active),
   :root[data-skin="phosphor"] .chord-pick:hover:not(.active),
   :root[data-skin="phosphor"] .mode-btn:hover:not(.active),
-  :root[data-skin="phosphor"] .fill-btn:hover:not(.active):not(:disabled),
-  :root[data-skin="phosphor"] .wave-btn:hover:not(.active) {
+  :root[data-skin="phosphor"] .fill-btn:hover:not(.active):not(:disabled) {
     transform: scale(1.04);
     background: rgba(108, 240, 138, 0.08);
     border-color: var(--ph-mid);
@@ -2627,10 +2657,6 @@ body {
     background: rgba(108, 240, 138, 0.14) !important;
   }
 }
-
-/* The chip row scrolls on phones, so leave room for a grown chip to
-   sit inside it rather than forcing the scroller to scroll vertically. */
-:root[data-skin="phosphor"] .sound-selector { padding: 4px 0 6px; }
 
 /* ============================================================
    PHOSPHOR — CRT MOTION

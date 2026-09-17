@@ -495,9 +495,9 @@
         if (inst === 'vocal' && typeof data.dataUrl === 'string' &&
             (data.dataUrl.length > MAX_VOCAL_BYTES || data.dataUrl.indexOf('data:audio/') !== 0)) return;
         game.submissions[inst] = { data: data, bpm: gameBpm, playerIndex: from };
-        var soundOk = typeof msg.sound === 'string' && soundNamesFor(inst).indexOf(msg.sound) !== -1;
+        var soundOk = typeof msg.sound === 'string' &&
+          (msg.sound === PRODUCER_SOUND || soundNamesFor(inst).indexOf(msg.sound) !== -1);
         if (soundOk) game.submissions[inst].sound = msg.sound;
-        if (msg.patch && typeof msg.patch === 'object') game.submissions[inst].patch = normalisePatch(msg.patch);
         if (msg.shape && typeof msg.shape === 'object') {
           game.submissions[inst].shape = normaliseShape(inst, game.submissions[inst].sound, msg.shape);
         }
@@ -885,9 +885,8 @@
       synths.bass = createInstrument('bass', currentBassSound, false, null, shape);
     } else {
       currentMelodySound = sound || 'Piano';
-      if (sub && sub.patch) melodyPatch = normalisePatch(sub.patch);
       if (synths.melody) synths.melody.dispose();
-      synths.melody = createInstrument('melody', currentMelodySound, true, melodyPatch, shape);
+      synths.melody = createInstrument('melody', currentMelodySound, true, shape);
     }
     layerShapes[inst] = shape;
     layerShapeEdited[inst] = !!(sub && sub.shape);
@@ -901,7 +900,6 @@
   function stampSound(sub, inst) {
     if (!SHAPED_LAYERS[inst]) return sub;
     sub.sound = currentSoundFor(inst);
-    if (inst === 'melody' && currentMelodySound === PRODUCER_SOUND) sub.patch = normalisePatch(melodyPatch);
     var shape = shapeToSend(inst);
     if (shape) sub.shape = shape;
     return sub;
@@ -1106,6 +1104,7 @@
   function createChordSynth(presetName, shape) {
     var name = presetName || currentChordSound;
     var sh = shape || shapeFor('chords');
+    if (name === PRODUCER_SOUND) return createOscSynth('chords', sh);
     var sampled = packEntry('chords', name);
     if (sampled) return createSampledInstrument(sampled, 'chords', sh);
     var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS['Piano Chords'];
@@ -1235,39 +1234,84 @@
     };
   }
 
-  // ── Oscillator ──
-  // A plain oscillator + ADSR the player can dial in, rather than a fixed
-  // preset. The patch travels with the layer so everyone hears the same sound.
-  const PRODUCER_SOUND = 'Oscillator';
-  const PRODUCER_WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
-  // Measured, not guessed: each waveform played against the twelve stock melody
-  // presets, at the cutoff where it is loudest. A flat -10 left the oscillator
-  // 4 to 10 dB hotter than everything else, square worst. These bring each
-  // waveform to the stock presets' peak-RMS average, so the oscillator sits in
-  // the mix instead of on top of it and switching waveform no longer jumps.
-  const WAVE_TRIM = { sine: -19, triangle: -17.5, sawtooth: -15, square: -20 };
-  // The oscillator's envelope and cutoff live in its shape (see below) like
-  // every other sound's, so the patch carries only what is unique to it.
-  const PRODUCER_DEFAULT = { wave: 'sawtooth', attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4, cutoff: 6000 };
-  const CUTOFF_MIN = 80;
-  const CUTOFF_MAX = 14000;
-  let melodyPatch = { wave: PRODUCER_DEFAULT.wave };
-
-  function normalisePatch(patch) {
-    var w = (patch || {}).wave;
-    return { wave: PRODUCER_WAVES.indexOf(w) < 0 ? PRODUCER_DEFAULT.wave : w };
+  // ── Wavetable ──
+  // A scanning oscillator, available on every melodic layer. Each table is a
+  // set of harmonic amplitudes; the WAVE knob sweeps across them and the
+  // partials are mixed between neighbours, so the timbre morphs rather than
+  // switching. The four basic waveforms are the first four stops, so nothing
+  // the old oscillator could do is lost — there is just more in between.
+  const PRODUCER_SOUND = 'Wavetable';
+  const TABLE_PARTIALS = 16;
+  function phase(k) { return k % 4 < 2 ? 1 : -1; }
+  const WAVETABLES = [
+    { name: 'SINE',  f: function (k) { return k === 1 ? 1 : 0; } },
+    { name: 'TRI',   f: function (k) { return k % 2 ? (k % 4 === 1 ? 1 : -1) / (k * k) : 0; } },
+    { name: 'HOLLOW',f: function (k) { return k % 2 ? 1 / Math.pow(k, 1.5) : 0; } },
+    { name: 'SQUARE',f: function (k) { return k % 2 ? 1 / k : 0; } },
+    { name: 'SAW',   f: function (k) { return (k % 2 ? 1 : -1) / k; } },
+    // The last three put their partials out of phase with each other. It does
+    // not change the spectrum, so the timbre is the same, but it spreads the
+    // energy across the cycle instead of stacking it into one spike — which
+    // costs less headroom and draws a wave you can actually read.
+    { name: 'BUZZ',  f: function (k) { return phase(k) / Math.sqrt(k); } },
+    { name: 'VOX',   f: function (k) { return phase(k) * (Math.exp(-Math.pow(k - 4, 2) / 5) + 0.6 * Math.exp(-Math.pow(k - 9, 2) / 6)); } },
+    { name: 'GLASS', f: function (k) { return k === 1 ? 1 : (k % 3 === 1 ? phase(k) * 0.7 / Math.sqrt(k) : 0); } }
+  ];
+  const TABLE_MAX = WAVETABLES.length - 1;
+  const TABLE_DEFAULT = 4;   // SAW, what the old oscillator opened on
+  // Levelling the partials to equal RMS is not the same as equal loudness:
+  // a bright table loses more to the filter and to the ear than a dark one.
+  // Measured per table against the stock melody presets and applied on top,
+  // so scanning changes the timbre and not the volume. Filled in below.
+  const TABLE_BASE_TRIM = -15.5;
+  //            SINE   TRI HOLLOW SQUARE  SAW  BUZZ   VOX GLASS
+  var TABLE_TRIM = [-1.2, 0.3, -2.8, -3.0, 1.3, 5.8, 3.4, 2.2];
+  function trimAt(pos) {
+    var p = Math.max(0, Math.min(TABLE_MAX, +pos || 0));
+    var i = Math.floor(p), f = p - i;
+    return TABLE_BASE_TRIM + TABLE_TRIM[i] * (1 - f) + TABLE_TRIM[Math.min(TABLE_MAX, i + 1)] * f;
   }
 
-  function createOscSynth(patch, inst, shape) {
-    var p = normalisePatch(patch);
+  // Each table is built once and levelled to the same RMS, so scanning across
+  // them changes the timbre without also changing the volume.
+  var tableCache = WAVETABLES.map(function (t) {
+    var a = [], rms = 0;
+    for (var k = 1; k <= TABLE_PARTIALS; k++) { var v = t.f(k); a.push(v); rms += v * v; }
+    rms = Math.sqrt(rms / 2) || 1;
+    return a.map(function (v) { return v / rms; });
+  });
+
+  // Mix between the two tables the knob sits between.
+  function tableAt(pos) {
+    var p = Math.max(0, Math.min(TABLE_MAX, +pos || 0));
+    var i = Math.floor(p), f = p - i;
+    var lo = tableCache[i], hi = tableCache[Math.min(TABLE_MAX, i + 1)];
+    var out = [];
+    for (var k = 0; k < TABLE_PARTIALS; k++) out.push(lo[k] * (1 - f) + hi[k] * f);
+    return out;
+  }
+  function tableName(pos) {
+    var p = Math.max(0, Math.min(TABLE_MAX, +pos || 0));
+    var i = Math.round(p);
+    var exact = Math.abs(p - i) < 0.08;
+    if (exact) return WAVETABLES[i].name;
+    var a = Math.floor(p);
+    return WAVETABLES[a].name + '\u203a' + WAVETABLES[a + 1].name;
+  }
+
+  const CUTOFF_MIN = 80;
+  const CUTOFF_MAX = 14000;
+  const PRODUCER_DEFAULT = { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4, cutoff: 6000 };
+
+  function createOscSynth(inst, shape) {
     var sh = shape || presetShape(inst || 'melody', PRODUCER_SOUND);
     var key = inst || 'melody';
     var reverb = makeReverb(key + ':prod', 1.2, 0.14, makeBus(key));
     var syn = capVoices(new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: p.wave },
+      oscillator: { type: 'custom', partials: tableAt(sh.table) },
       envelope: { attack: sh.attack, decay: sh.decay, sustain: sh.sustain, release: sh.release },
       detune: sh.fine,
-      volume: WAVE_TRIM[p.wave] != null ? WAVE_TRIM[p.wave] : -17
+      volume: trimAt(sh.table)
     }).connect(shapeFilter(key, sh, reverb)), 16);
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
@@ -1284,7 +1328,7 @@
   // Drums, SFX and vocals are left out on purpose: the first two are one-shot
   // samples with no envelope worth dialling, and the third is a recording.
   const SHAPED_LAYERS = { chords: 1, bass: 1, melody: 1 };
-  const SHAPE_KEYS = ['attack', 'decay', 'sustain', 'release', 'cutoff', 'fine'];
+  const SHAPE_KEYS = ['attack', 'decay', 'sustain', 'release', 'cutoff', 'fine', 'table'];
   const FINE_RANGE = 50;      // cents either way — detune, not transpose
   function fmtTime(v) {
     return v >= 1 ? v.toFixed(2) + 's' : Math.round(v * 1000) + 'ms';
@@ -1300,7 +1344,9 @@
         return v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + 'Hz';
       } },
     fine:    { label: 'FINE', min: -FINE_RANGE, max: FINE_RANGE,
-      fmt: function (v) { return (v > 0 ? '+' : '') + Math.round(v) + 'c'; } }
+      fmt: function (v) { return (v > 0 ? '+' : '') + Math.round(v) + 'c'; } },
+    // Only the wavetable reads this one; the other sounds carry it harmlessly.
+    table:   { label: 'WAVE', min: 0, max: TABLE_MAX, detent: 1, fmt: tableName }
   };
 
   // A knob's travel is linear, but time and pitch are not heard that way: a
@@ -1335,7 +1381,8 @@
     return {
       attack: env.attack, decay: env.decay, sustain: env.sustain, release: env.release,
       cutoff: soundName === PRODUCER_SOUND ? PRODUCER_DEFAULT.cutoff : CUTOFF_MAX,
-      fine: 0
+      fine: 0,
+      table: TABLE_DEFAULT
     };
   }
 
@@ -1436,9 +1483,9 @@
     return names;
   }
 
-  function createInstrument(group, soundName, poly, patch, shape) {
+  function createInstrument(group, soundName, poly, shape) {
     var sh = shape === undefined ? shapeFor(group) : shape;
-    if (soundName === PRODUCER_SOUND) return createOscSynth(patch, group, sh);
+    if (soundName === PRODUCER_SOUND) return createOscSynth(group, sh);
     var def = packEntry(group, soundName);
     if (def) return createSampledInstrument(def, group, sh);
     var bank = bankFor(group);
@@ -1448,13 +1495,13 @@
 
   function getOrCreateBassSynth() {
     if (synths.bass) synths.bass.dispose();
-    synths.bass = createInstrument('bass', currentBassSound, false, null, shapeFor('bass'));
+    synths.bass = createInstrument('bass', currentBassSound, false, shapeFor('bass'));
     return synths.bass;
   }
 
   function getOrCreateMelodySynth() {
     if (synths.melody) synths.melody.dispose();
-    synths.melody = createInstrument('melody', currentMelodySound, true, melodyPatch, shapeFor('melody'));
+    synths.melody = createInstrument('melody', currentMelodySound, true, shapeFor('melody'));
     return synths.melody;
   }
 
@@ -2535,7 +2582,16 @@
       paint();
       onChange(key);
     }
-    function nudge(by) { setFromKnob(shapeToKnob(key, shapeFor(inst)[key]) + by); }
+    function nudge(by) {
+      // A knob with a detent steps in its own units — the wavetable's arrow
+      // keys walk table to table, while dragging it still morphs between them.
+      if (def.detent) {
+        var v = Math.round(shapeFor(inst)[key] / def.detent + (by > 0 ? 1 : -1)) * def.detent;
+        setFromKnob(shapeToKnob(key, Math.max(def.min, Math.min(def.max, v))));
+        return;
+      }
+      setFromKnob(shapeToKnob(key, shapeFor(inst)[key]) + by);
+    }
 
     var dragging = false, startY = 0, startX = 0, startT = 0;
     knob.addEventListener('pointerdown', function (e) {
@@ -2601,26 +2657,115 @@
     head.appendChild(tools);
     panel.appendChild(head);
 
-    // The oscillator is the one sound whose waveform is part of the patch
-    // rather than the preset, so its picker lives inside the panel.
-    var waveRow = null;
-    if (inst === 'melody') {
-      waveRow = document.createElement('div');
-      waveRow.className = 'shaper-waves';
-      PRODUCER_WAVES.forEach(function (w) {
-        var b = document.createElement('button');
-        b.className = 'wave-btn' + (melodyPatch.wave === w ? ' active' : '');
-        b.title = w;
-        b.appendChild(waveIcon(w));
-        b.onclick = function () {
-          waveRow.querySelectorAll('.wave-btn').forEach(function (x) { x.classList.remove('active'); });
-          b.classList.add('active');
-          melodyPatch.wave = w;
-          repatch(inst);
-        };
-        waveRow.appendChild(b);
+    // The preset picker. A row of buttons used to sit above the panel; as a
+    // field with a drop-down it costs one line instead of three, which is
+    // most of a phone's roll back, and it keeps every preset one tap away
+    // rather than off the side of a scrolling row.
+    var pickRow = document.createElement('div');
+    pickRow.className = 'shaper-preset';
+    var prev = document.createElement('button');
+    prev.className = 'preset-step';
+    prev.textContent = '\u2039';
+    prev.setAttribute('aria-label', 'Previous sound');
+    var next = document.createElement('button');
+    next.className = 'preset-step';
+    next.textContent = '\u203a';
+    next.setAttribute('aria-label', 'Next sound');
+    var field = document.createElement('button');
+    field.className = 'preset-field';
+    field.setAttribute('aria-haspopup', 'listbox');
+    field.setAttribute('aria-expanded', 'false');
+    var fieldName = document.createElement('span');
+    fieldName.className = 'preset-name';
+    field.appendChild(fieldName);
+    var caret = document.createElement('span');
+    caret.className = 'preset-caret';
+    caret.textContent = '\u25be';
+    field.appendChild(caret);
+    var list = document.createElement('div');
+    list.className = 'preset-list';
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+
+    function soundList() {
+      // The wavetable is offered on every shaped layer, not just melody: a
+      // scanned bass or a scanned pad is as much use as a scanned lead.
+      return [PRODUCER_SOUND].concat(soundNamesFor(inst));
+    }
+    function pickSound(name) {
+      if (inst === 'bass') currentBassSound = name;
+      else if (inst === 'chords') currentChordSound = name;
+      else currentMelodySound = name;
+      // The knobs start again from the new preset's own envelope, so a preset
+      // is always heard as itself first and shaped from there.
+      panel.reseed();
+      rebuildLayerSynth(inst);
+    }
+    function stepSound(by) {
+      var names = soundList();
+      var i = names.indexOf(currentSoundFor(inst));
+      pickSound(names[(i + by + names.length) % names.length]);
+    }
+    function closeList() {
+      list.hidden = true;
+      field.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('pointerdown', onOutside, true);
+    }
+    function onOutside(e) { if (!pickRow.contains(e.target)) closeList(); }
+    function openList() {
+      list.innerHTML = '';
+      soundList().forEach(function (name) {
+        var opt = document.createElement('button');
+        opt.className = 'preset-option' + (name === currentSoundFor(inst) ? ' on' : '');
+        opt.setAttribute('role', 'option');
+        opt.textContent = name;
+        opt.onclick = function () { pickSound(name); closeList(); field.focus(); };
+        list.appendChild(opt);
       });
-      panel.appendChild(waveRow);
+      list.hidden = false;
+      field.setAttribute('aria-expanded', 'true');
+      var on = list.querySelector('.preset-option.on');
+      if (on) on.scrollIntoView({ block: 'nearest' });
+      document.addEventListener('pointerdown', onOutside, true);
+    }
+    field.onclick = function () { if (list.hidden) openList(); else closeList(); };
+    field.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { stepSound(1); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { stepSound(-1); e.preventDefault(); }
+      else if (e.key === 'Escape') closeList();
+    });
+    prev.onclick = function () { stepSound(-1); };
+    next.onclick = function () { stepSound(1); };
+    pickRow.appendChild(prev);
+    pickRow.appendChild(field);
+    pickRow.appendChild(next);
+    pickRow.appendChild(list);
+    panel.appendChild(pickRow);
+
+    // The wavetable gets its own row: the scan knob and a screen drawing the
+    // wave it is currently on. It only means anything for that one sound, so
+    // the row appears and disappears with it.
+    var tableRow = document.createElement('div');
+    tableRow.className = 'shaper-table';
+    var scope = document.createElement('div');
+    scope.className = 'wave-scope';
+    var scopePath = null;
+    scope.innerHTML = '<svg viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path class="wave-mid" d="M0 32H240"/><path class="wave-line" d=""/></svg>';
+    scopePath = scope.querySelector('.wave-line');
+    function drawWave(pos) {
+      var partials = tableAt(pos);
+      var pts = [], max = 0, N = 120, y = [];
+      for (var i = 0; i <= N; i++) {
+        var t = i / N, v = 0;
+        for (var k = 0; k < partials.length; k++) v += partials[k] * Math.sin(2 * Math.PI * (k + 1) * t);
+        y.push(v);
+        if (Math.abs(v) > max) max = Math.abs(v);
+      }
+      for (var j = 0; j <= N; j++) {
+        pts.push((j / N * 240).toFixed(1) + ' ' + (32 - y[j] / (max || 1) * 27).toFixed(1));
+      }
+      scopePath.setAttribute('d', 'M' + pts.join('L'));
     }
 
     var row = document.createElement('div');
@@ -2629,15 +2774,18 @@
       var k = buildKnob(inst, key, function (changed) {
         layerShapeEdited[inst] = true;
         panel.classList.add('edited');
+        if (changed === 'table') drawWave(shapeFor(inst).table);
         // A cutoff sweep rides the filter that is already in the chain;
         // everything else needs the voices rebuilt, which is debounced so a
         // drag does not dispose and recreate the synth on every frame.
         if (SHAPE_DEFS[changed].live) liveCutoff(inst);
         else repatch(inst);
       });
-      row.appendChild(k.el);
+      (key === 'table' ? tableRow : row).appendChild(k.el);
       return k;
     });
+    tableRow.appendChild(scope);
+    panel.appendChild(tableRow);
     panel.appendChild(row);
 
     function repaint() { knobs.forEach(function (k) { k.paint(); }); }
@@ -2673,9 +2821,16 @@
       reseedShape(inst);
       panel.classList.remove('edited');
       repaint();
-      if (waveRow) waveRow.style.display = currentMelodySound === PRODUCER_SOUND ? 'flex' : 'none';
+      fieldName.textContent = currentSoundFor(inst);
+      syncTableRow();
     };
-    if (waveRow) waveRow.style.display = currentMelodySound === PRODUCER_SOUND ? 'flex' : 'none';
+    function syncTableRow() {
+      var on = currentSoundFor(inst) === PRODUCER_SOUND;
+      tableRow.style.display = on ? 'flex' : 'none';
+      if (on) drawWave(shapeFor(inst).table);
+    }
+    fieldName.textContent = currentSoundFor(inst);
+    syncTableRow();
 
     return panel;
   }
@@ -2695,27 +2850,6 @@
     }, 120);
   }
 
-  function waveIcon(type) {
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 32 16');
-    svg.setAttribute('width', '30');
-    svg.setAttribute('height', '15');
-    var d = {
-      sine: 'M1 8 Q5 0 9 8 T17 8 T25 8 T31 8',
-      triangle: 'M1 13 L7 3 L13 13 L19 3 L25 13 L31 5',
-      sawtooth: 'M1 13 L8 3 L8 13 L15 3 L15 13 L22 3 L22 13 L29 3',
-      square: 'M1 13 L1 3 L8 3 L8 13 L15 13 L15 3 L22 3 L22 13 L29 13 L29 3'
-    }[type];
-    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '2');
-    path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(path);
-    return svg;
-  }
 
   // ── Piano Roll (bass/melody with edge-drag) ──
   function initPianoRoll(inst, noteNames, polyphonic, chordMode) {
@@ -2728,45 +2862,8 @@
     var wrapper = document.createElement('div');
     wrapper.className = 'piano-roll-wrapper';
 
-    // Sound selector
-    var soundBar = document.createElement('div');
-    soundBar.className = 'sound-selector';
-    var curSound = currentSoundFor(inst);
-    var shaper = null;
-    function pickSound(name) {
-      soundBar.querySelectorAll('.sound-btn').forEach(function (b) { b.classList.remove('active'); });
-      if (inst === 'bass') currentBassSound = name;
-      else if (inst === 'chords') currentChordSound = name;
-      else currentMelodySound = name;
-      // The knobs start again from the new preset's own envelope, so a preset
-      // is always heard as itself first and shaped from there.
-      if (shaper) shaper.reseed();
-      rebuildLayerSynth(inst);
-    }
-    soundNamesFor(inst).forEach(function (name) {
-      var btn = document.createElement('button');
-      btn.className = 'sound-btn' + (name === curSound ? ' active' : '');
-      btn.textContent = name;
-      btn.onclick = function () { pickSound(name); btn.classList.add('active'); };
-      soundBar.appendChild(btn);
-    });
-
-    if (inst === 'melody') {
-      var pBtn = document.createElement('button');
-      pBtn.className = 'sound-btn sound-btn-producer' + (curSound === PRODUCER_SOUND ? ' active' : '');
-      pBtn.textContent = PRODUCER_SOUND;
-      pBtn.onclick = function () { pickSound(PRODUCER_SOUND); pBtn.classList.add('active'); };
-      // First, not last: the bar scrolls horizontally and nobody finds the
-      // far right of it on a phone.
-      soundBar.insertBefore(pBtn, soundBar.firstChild);
-    }
-
-    wrapper.appendChild(soundBar);
+    if (SHAPED_LAYERS[inst]) wrapper.appendChild(buildShaper(inst));
     if (chordMode) wrapper.appendChild(buildChordBar());
-    if (SHAPED_LAYERS[inst]) {
-      shaper = buildShaper(inst);
-      wrapper.appendChild(shaper);
-    }
 
     var rollContainer = document.createElement('div');
     rollContainer.className = 'piano-roll';
@@ -3066,8 +3163,7 @@
       if (!sub) return;
 
       if (gameSettings.remix) {
-        var remixed = { data: remixLayerData(inst, sub.data), sound: sub.sound,
-          patch: sub.patch, shape: sub.shape };
+        var remixed = { data: remixLayerData(inst, sub.data), sound: sub.sound, shape: sub.shape };
         addLayerSeq(inst, remixed, seqs);
       } else {
         addLayerSeq(inst, sub, seqs);
@@ -3097,13 +3193,13 @@
         });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
-      if (!synths.bgBass) synths.bgBass = createInstrument('bass', sub.sound || 'Analog Bass', false, null, subShape('bass', sub));
+      if (!synths.bgBass) synths.bgBass = createInstrument('bass', sub.sound || 'Analog Bass', false, subShape('bass', sub));
       var bnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
-      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true, sub.patch, subShape('melody', sub));
+      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true, subShape('melody', sub));
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
