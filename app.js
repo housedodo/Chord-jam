@@ -1551,6 +1551,11 @@
   const MUSIC_FADE = 0.45;        // seconds, fading out
   const MUSIC_ATTACK = 2.6;       // seconds, fading in
   const MUSIC_SILENCE = 0.0032;   // about -50 dBFS
+  // Measured across 0 to 120ms of overlap: without one the wrap still steps by
+  // 0.0124 between neighbouring samples, which is the click. 30ms brings that
+  // to 0.0011 and costs the cycle 30ms, or 0.17% of its length. Longer fades
+  // drag unrelated music across the seam and get worse again.
+  const MUSIC_XFADE = 0.03;       // seconds of overlap at the loop seam
 
   var musicCtx = null;
   var musicGain = null;
@@ -1562,22 +1567,57 @@
   var musicWanted = false;
   var musicArmed = false;
 
-  // Silence at either end pushes the seam out of time. Find the real first
-  // and last audible samples and loop between those instead.
-  function findLoopPoints(buf) {
-    var n = buf.length, ch = buf.numberOfChannels, data = [], c;
+  // Trimming to the first and last audible samples was not enough. Two things
+  // still left a hole at the wrap, measured at 41dB deep and about 25ms long:
+  // the few ms of encoder padding kept as a tail, and the fade-in an encoder
+  // puts at the top of the file, which replayed on every repeat.
+  //
+  // So the loop is baked into its own buffer instead: start where the track
+  // reaches its own level rather than at the first faint sample, end on the
+  // last audible one, and blend the tail over the head so the two ends meet
+  // in the middle of a crossfade rather than at a step.
+  function buildLoopBuffer(buf) {
+    var sr = buf.sampleRate, n = buf.length, ch = buf.numberOfChannels;
+    var data = [], c;
     for (c = 0; c < ch; c++) data.push(buf.getChannelData(c));
-    function loud(i) {
-      for (var k = 0; k < ch; k++) if (Math.abs(data[k][i]) > MUSIC_SILENCE) return true;
-      return false;
+    function peak(i) {
+      var m = 0;
+      for (var k = 0; k < ch; k++) { var v = Math.abs(data[k][i] || 0); if (v > m) m = v; }
+      return m;
     }
+    var frame = Math.max(1, Math.round(sr * 0.005));
+    function level(i) {
+      var s = 0;
+      for (var k = 0; k < frame; k++) { var v = peak(i + k); s += v * v; }
+      return Math.sqrt(s / frame);
+    }
+
     var first = 0;
-    while (first < n - 1 && !loud(first)) first++;
+    while (first < n - 1 && peak(first) <= MUSIC_SILENCE) first++;
     var last = n - 1;
-    while (last > first && !loud(last)) last--;
-    // A few ms of tail so a decaying note is not clipped mid-sample.
-    last = Math.min(n - 1, last + Math.round(buf.sampleRate * 0.005));
-    return { start: first / buf.sampleRate, end: (last + 1) / buf.sampleRate };
+    while (last > first && peak(last) <= MUSIC_SILENCE) last--;
+
+    // Half a second in is past any fade and into the track proper.
+    var ref = level(Math.min(last - frame, first + Math.round(sr * 0.5)));
+    var start = first;
+    while (start + frame < last && level(start) < ref * 0.5) start += frame;
+
+    var len = last + 1 - start;
+    var fade = Math.min(Math.round(MUSIC_XFADE * sr), Math.floor(len / 4));
+    if (len - fade < sr * 0.5) return null;   // too short to loop sensibly
+
+    var out = musicCtx.createBuffer(ch, len - fade, sr);
+    for (c = 0; c < ch; c++) {
+      var src = data[c], dst = out.getChannelData(c);
+      for (var i = 0; i < len - fade; i++) dst[i] = src[start + i];
+      // Equal power, so the crossfade holds its level rather than dipping
+      // through the middle the way a linear one does.
+      for (var j = 0; j < fade; j++) {
+        var w = j / fade;
+        dst[j] = src[start + j] * Math.sqrt(w) + src[start + len - fade + j] * Math.sqrt(1 - w);
+      }
+    }
+    return out;
   }
 
   // ── Title-screen spectrum ──
@@ -1833,8 +1873,8 @@
         });
       })
       .then(function (buf) {
-        musicBuffer = buf;
-        musicLoop = findLoopPoints(buf);
+        musicBuffer = buildLoopBuffer(buf) || buf;
+        musicLoop = { start: 0, end: musicBuffer.duration };
         var active = document.querySelector('.screen.active');
         updateMenuMusic(active ? active.id.replace('screen-', '') : 'home');
       })
