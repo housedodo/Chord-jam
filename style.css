@@ -2738,6 +2738,30 @@ body {
 :root[data-skin="phosphor"] .src-btn.on { color: var(--ph-black); }
 :root[data-skin="phosphor"] .preset-list { border-radius: 0; }
 
+/* On a phone the vertical budget is the whole problem: the tabs and the chord
+   bar were wrapping to two and three lines each and leaving the roll a
+   quarter of the screen. Both become one line that scrolls sideways, and the
+   hint goes, since the modes say the same thing. */
+@media (max-width: 600px) {
+  .sandbox-tabs,
+  .chord-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .sandbox-tabs::-webkit-scrollbar,
+  .chord-bar::-webkit-scrollbar { display: none; }
+  .sandbox-tabs > *,
+  .chord-bar > * { flex: none; }
+  .sandbox-done { margin-left: 4px; }
+  .chord-bar-hint { display: none; }
+  .chord-bar-label { display: none; }
+  .picker-label { font-size: 0.66rem; letter-spacing: 0.1em; }
+  .picker .preset-field { flex: 0 0 150px; }
+  .chord-select { min-width: 96px; }
+}
+
 /* ============================================================
    MOBILE, PART TWO
    These components are defined further down the file than the main

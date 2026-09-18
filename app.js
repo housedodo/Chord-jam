@@ -907,12 +907,29 @@
     }
   }
 
+  // Voices are expensive to build — a drum kit is eleven of them, a reverb
+  // renders an impulse response — and they were torn down and rebuilt on every
+  // press of play. Under load that showed as the transport stalling. They are
+  // kept now, and rebuilt only when what they play actually changes.
+  var voiceSig = {};
+  function cachedVoice(key, sig, make) {
+    if (synths[key] && voiceSig[key] === sig) return synths[key];
+    if (synths[key]) synths[key].dispose();
+    synths[key] = make();
+    voiceSig[key] = sig;
+    return synths[key];
+  }
+  function subSignature(inst, sub) {
+    if (!sub) return inst + ':empty';
+    if (inst === 'drums') return 'kit:' + (sub.kit || DEFAULT_DRUM_KIT);
+    return (sub.sound || '') + '|' + (sub.shape ? JSON.stringify(sub.shape) : '');
+  }
+
   // Drums the way their author left them, not the way this player has the kit
   // set. Rebuilt rather than reused, since the kit decides the sound.
   function drumsForSub(sub) {
     var kit = (sub && DRUM_KITS[sub.kit]) ? sub.kit : DEFAULT_DRUM_KIT;
-    if (synths.drums) synths.drums.dispose();
-    return createDrumSynth(kit);
+    return cachedVoice('drums', 'kit:' + kit, function () { return createDrumSynth(kit); });
   }
 
   // The shape a finished layer was submitted with, for the background parts of
@@ -929,18 +946,19 @@
   function voiceForSub(inst, sub) {
     var sound = sub && sub.sound;
     var shape = sub && sub.shape ? normaliseShape(inst, sound, sub.shape) : presetShape(inst, sound);
+    // createInstrument takes the shape fourth; this was still passing the old
+    // argument list with a null in the way, so a bass layer played back
+    // without whatever its author had dialled in.
+    var sig = subSignature(inst, sub);
     if (inst === 'chords') {
       currentChordSound = sound || DEFAULT_CHORD_SOUND;
-      if (synths.chords) synths.chords.dispose();
-      synths.chords = createChordSynth(currentChordSound, shape);
+      cachedVoice('chords', sig, function () { return createChordSynth(currentChordSound, shape); });
     } else if (inst === 'bass') {
       currentBassSound = sound || 'Analog Bass';
-      if (synths.bass) synths.bass.dispose();
-      synths.bass = createInstrument('bass', currentBassSound, false, null, shape);
+      cachedVoice('bass', sig, function () { return createInstrument('bass', currentBassSound, false, shape); });
     } else {
       currentMelodySound = sound || 'Piano';
-      if (synths.melody) synths.melody.dispose();
-      synths.melody = createInstrument('melody', currentMelodySound, true, shape);
+      cachedVoice('melody', sig, function () { return createInstrument('melody', currentMelodySound, true, shape); });
     }
     layerShapes[inst] = shape;
     layerShapeEdited[inst] = !!(sub && sub.shape);
@@ -1259,6 +1277,7 @@
   }
 
   function getOrCreateChordSynth() {
+    voiceSig['chords'] = null;   // picked by hand, so the cache must not win
     if (synths.chords) { synths.chords.dispose(); synths.chords = null; }
     synths.chords = createChordSynth(currentChordSound, shapeFor('chords'));
     return synths.chords;
@@ -1645,12 +1664,14 @@
   }
 
   function getOrCreateBassSynth() {
+    voiceSig['bass'] = null;   // picked by hand, so the cache must not win
     if (synths.bass) synths.bass.dispose();
     synths.bass = createInstrument('bass', currentBassSound, false, shapeFor('bass'));
     return synths.bass;
   }
 
   function getOrCreateMelodySynth() {
+    voiceSig['melody'] = null;   // picked by hand, so the cache must not win
     if (synths.melody) synths.melody.dispose();
     synths.melody = createInstrument('melody', currentMelodySound, true, shapeFor('melody'));
     return synths.melody;
@@ -2205,7 +2226,6 @@
     var sub = games[currentGameIdx] && games[currentGameIdx].submissions[inst];
     if (!sub) return;
     if (inst === 'drums' || inst === 'sfx') {
-      var gridId = inst === 'drums' ? '#drum-grid' : '#sfx-grid';
       if (inst === 'drums') {
         if (DRUM_KITS[sub.kit]) currentDrumKit = sub.kit;
         // Any lane with something on it has to be showing, whatever the kit.
@@ -2218,9 +2238,7 @@
       }
       Object.keys(sub.data).forEach(function (lane) {
         (sub.data[lane] || []).forEach(function (on, step) {
-          if (!on) return;
-          var cell = document.querySelector(gridId + ' .drum-cell[data-name="' + lane + '"][data-step="' + step + '"]');
-          if (cell) cell.classList.add('on');
+          if (on) setPad(inst, lane, step, true);
         });
       });
       return;
@@ -2587,27 +2605,13 @@
   }
 
   function collectData(instrument) {
-    if (instrument === 'drums') {
-      var grid = {};
-      DRUM_NAMES.forEach(function (name) {
-        grid[name] = [];
-        for (var s = 0; s < STEPS; s++) {
-          var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          grid[name].push(cell && cell.classList.contains('on'));
-        }
+    if (instrument === 'drums' || instrument === 'sfx') {
+      var kind = instrument;
+      var out = {};
+      (kind === 'drums' ? DRUM_NAMES : SFX_NAMES).forEach(function (name) {
+        out[name] = padLane(kind, name).slice();
       });
-      return grid;
-    }
-    if (instrument === 'sfx') {
-      var sfxGrid = {};
-      SFX_NAMES.forEach(function (name) {
-        sfxGrid[name] = [];
-        for (var s = 0; s < STEPS; s++) {
-          var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          sfxGrid[name].push(cell && cell.classList.contains('on'));
-        }
-      });
-      return sfxGrid;
+      return out;
     }
     if (instrument === 'vocal') {
       return vocalClip
@@ -2707,10 +2711,7 @@
     if (!fillAnchor) return;
     var start = fillAnchor.step;
     for (var s = 0; s < STEPS; s++) {
-      var cell = document.querySelector(
-        '#drum-grid .drum-cell[data-name="' + fillAnchor.name + '"][data-step="' + s + '"]');
-      if (!cell) continue;
-      cell.classList.toggle('on', s >= start && (s - start) % every === 0);
+      setPad('drums', fillAnchor.name, s, s >= start && (s - start) % every === 0);
     }
   }
 
@@ -2842,14 +2843,59 @@
     return out;
   }
 
+  // ── Pad state ──
+  // The grids are the visible thing, but the sequencer must not read them: a
+  // querySelector per lane per sixteenth, against a document that also holds a
+  // 1568-cell piano roll, is enough main-thread work to make notes late on a
+  // slower machine — and Tone schedules on the main thread, so late notes are
+  // the crackle. The truth lives here, the DOM follows it, and a step callback
+  // touches nothing but an array.
+  var padState = { drums: {}, sfx: {} };
+  var padCells = { drums: null, sfx: null };
+
+  function padsFor(kind) { return padState[kind] || (padState[kind] = {}); }
+
+  function padLane(kind, name) {
+    var pads = padsFor(kind);
+    if (!pads[name]) {
+      pads[name] = [];
+      for (var i = 0; i < STEPS; i++) pads[name].push(false);
+    }
+    return pads[name];
+  }
+
+  function padOn(kind, name, step) {
+    var pads = padState[kind];
+    return !!(pads && pads[name] && pads[name][step]);
+  }
+
+  function setPad(kind, name, step, on, cell) {
+    padLane(kind, name)[step] = !!on;
+    if (!cell) {
+      cell = document.querySelector('#' + (kind === 'drums' ? 'drum' : 'sfx') +
+        '-grid .drum-cell[data-name="' + name + '"][data-step="' + step + '"]');
+    }
+    if (cell) cell.classList.toggle('on', !!on);
+  }
+
+  function clearPads(kind) { padState[kind] = {}; }
+
+  // The cells of a grid, indexed by step, so the playhead highlight is a walk
+  // over two small arrays rather than two document-wide queries per step.
+  function indexPadCells(kind, gridId) {
+    var byStep = [];
+    for (var i = 0; i < STEPS; i++) byStep.push([]);
+    document.querySelectorAll(gridId + ' .drum-cell').forEach(function (cell) {
+      var s = +cell.dataset.step;
+      if (byStep[s]) byStep[s].push(cell);
+    });
+    padCells[kind] = byStep;
+  }
+
   // A lane's steps, so one can be taken off the grid and put back without
   // losing the part written on it.
   function rememberLane(name) {
-    var steps = [];
-    for (var s = 0; s < STEPS; s++) {
-      var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-      steps.push(!!(cell && cell.classList.contains('on')));
-    }
+    var steps = padLane('drums', name).slice();
     if (steps.indexOf(true) !== -1) drumLaneMemory[name] = steps;
   }
 
@@ -2954,6 +3000,7 @@
   function initDrumGrid() {
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
+    clearPads('drums');
     grid.appendChild(buildKitBar());
     grid.appendChild(buildStepRuler());
     fillAnchor = null;
@@ -2978,7 +3025,7 @@
         cell.dataset.step = s;
         cell.addEventListener('pointerdown', (function (c) {
           return function () {
-            c.classList.toggle('on');
+            setPad('drums', c.dataset.name, +c.dataset.step, !c.classList.contains('on'), c);
             // The anchor is the last step you touched, on or off. Only moving
             // it on an on-tap left the hint naming a lane you had since left.
             // A hand-placed step also means the lane no longer matches
@@ -2996,19 +3043,17 @@
     drumLanes.forEach(function (name) {
       var steps = drumLaneMemory[name];
       if (!steps) return;
-      for (var s = 0; s < STEPS; s++) {
-        if (!steps[s]) continue;
-        var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-        if (cell) cell.classList.add('on');
-      }
+      for (var s = 0; s < STEPS; s++) if (steps[s]) setPad('drums', name, s, true);
     });
     grid.appendChild(buildAddLaneRow());
+    indexPadCells('drums', '#drum-grid');
     initFillBar();
   }
 
   function initSfxGrid() {
     var grid = document.getElementById('sfx-grid');
     grid.innerHTML = '';
+    clearPads('sfx');
     grid.appendChild(buildStepRuler());
     SFX_NAMES.forEach(function (name) {
       var row = document.createElement('div');
@@ -3019,11 +3064,14 @@
         cell.className = 'drum-cell' + (s % 4 === 0 ? ' beat' : '');
         cell.dataset.name = name;
         cell.dataset.step = s;
-        cell.addEventListener('pointerdown', (function (c) { return function () { c.classList.toggle('on'); }; })(cell));
+        cell.addEventListener('pointerdown', (function (c) {
+          return function () { setPad('sfx', c.dataset.name, +c.dataset.step, !c.classList.contains('on'), c); };
+        })(cell));
         row.appendChild(cell);
       }
       grid.appendChild(row);
     });
+    indexPadCells('sfx', '#sfx-grid');
   }
 
   // Furthest left a block can be dragged before it would run into the block
@@ -3456,6 +3504,7 @@
       shaperOpen = open;
       panel.classList.toggle('collapsed', !open);
       title.setAttribute('aria-expanded', open ? 'true' : 'false');
+      syncRows();
     }
     title.onclick = function () { setOpen(panel.classList.contains('collapsed')); };
     // Short screens too, not just phones: on a small laptop the panel and the
@@ -3481,10 +3530,20 @@
         k.el.classList.toggle('inert', sampled && !!SAMPLER_DEAD_KNOBS[k.key]);
       });
     }
+    function syncRows() {
+      // Inline display beats the stylesheet, so folding the panel has to be
+      // decided here too — otherwise the preset row stayed on screen with the
+      // panel collapsed, which is most of what it costs on a phone.
+      var folded = panel.classList.contains('collapsed');
+      var onTable = currentSoundFor(inst) === PRODUCER_SOUND;
+      srcRow.style.display = folded ? 'none' : 'flex';
+      pickRow.style.display = (folded || onTable) ? 'none' : 'flex';
+      tableRow.style.display = (folded || !onTable) ? 'none' : 'flex';
+      row.style.display = folded ? 'none' : '';
+    }
     function syncSource() {
       var onTable = currentSoundFor(inst) === PRODUCER_SOUND;
-      tableRow.style.display = onTable ? 'flex' : 'none';
-      pickRow.style.display = onTable ? 'none' : 'flex';
+      syncRows();
       srcTable.classList.toggle('on', onTable);
       srcPreset.classList.toggle('on', !onTable);
       srcTable.setAttribute('aria-pressed', onTable ? 'true' : 'false');
@@ -3855,9 +3914,22 @@
   // ── Chord Timeline (Klimper-style single line) ──
 
   // ── Preview ──
+  // Tone schedules notes from the main thread, a tenth of a second ahead by
+  // default. On a slower machine that is not enough: measured under a 6x CPU
+  // throttle, every step ran late, by 46ms at the median and 120ms at worst —
+  // late notes are what crackle and stutter. Playback gets a wider lookahead
+  // so the scheduler can fall behind and still be early; tapping a pad gets
+  // the narrow one back, because there the delay would be felt.
+  const LOOKAHEAD_PLAYING = 0.35;
+  const LOOKAHEAD_TAPPING = 0.1;
+  function setLookAhead(playing) {
+    try { Tone.context.lookAhead = playing ? LOOKAHEAD_PLAYING : LOOKAHEAD_TAPPING; } catch (e) {}
+  }
+
   function startPreview(instrument, includePrevious) {
     // Never drop sequence references on the floor: a second start used to leak
     // the previous run's sequences, which kept stacking voices.
+    setLookAhead(true);
     disposePreviewSeqs();
     Tone.Transport.bpm.value = gameBpm;
     Tone.Transport.stop();
@@ -3876,8 +3948,7 @@
       var seq = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { highlightDrumStep(s); }, time);
         DRUM_NAMES.forEach(function (name) {
-          var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          if (cell && cell.classList.contains('on')) synths.drums.trigger(name, time);
+          if (padOn('drums', name, s)) synths.drums.trigger(name, time);
         });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(seq);
@@ -3886,8 +3957,7 @@
       var sfxSeq = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { highlightSfxStep(s); }, time);
         SFX_NAMES.forEach(function (name) {
-          var cell = document.querySelector('#sfx-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
-          if (cell && cell.classList.contains('on')) synths.sfx.trigger(name, time);
+          if (padOn('sfx', name, s)) synths.sfx.trigger(name, time);
         });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0);
       previewSeqs.push(sfxSeq);
@@ -3938,19 +4008,19 @@
 
   function addLayerSeq(inst, sub, seqs) {
     if (inst === 'drums') {
-      if (!synths.bgDrums) synths.bgDrums = createDrumSynth(sub.kit);
+      cachedVoice('bgDrums', subSignature('drums', sub), function () { return createDrumSynth(sub.kit); });
       var data = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name, time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
-      if (!synths.bgSfx) synths.bgSfx = createSfxSynth();
+      cachedVoice('bgSfx', 'sfx', function () { return createSfxSynth(); });
       var sfxData = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name, time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
-      if (!synths.bgChords) synths.bgChords = createChordSynth(sub.sound, subShape('chords', sub));
+      cachedVoice('bgChords', subSignature('chords', sub), function () { return createChordSynth(sub.sound, subShape('chords', sub)); });
       var notes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         notes.forEach(function (n) {
@@ -3958,13 +4028,13 @@
         });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
-      if (!synths.bgBass) synths.bgBass = createInstrument('bass', sub.sound || 'Analog Bass', false, subShape('bass', sub));
+      cachedVoice('bgBass', subSignature('bass', sub), function () { return createInstrument('bass', sub.sound || 'Analog Bass', false, subShape('bass', sub)); });
       var bnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
-      if (!synths.bgMelody) synths.bgMelody = createInstrument('melody', sub.sound || 'Piano', true, subShape('melody', sub));
+      cachedVoice('bgMelody', subSignature('melody', sub), function () { return createInstrument('melody', sub.sound || 'Piano', true, subShape('melody', sub)); });
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
@@ -3992,29 +4062,31 @@
   }
 
   function stopPreview() {
+    setLookAhead(false);
     previewPlaying = false;
     previewSource = null;
     cancelPendingPlayback();
     disposePreviewSeqs();
     Tone.Transport.stop();
     Tone.Transport.cancel();
-    ['bgDrums', 'bgChords', 'bgBass', 'bgMelody', 'bgSfx'].forEach(function (k) {
-      if (synths[k]) { synths[k].dispose(); synths[k] = null; }
-    });
+    // The background voices stay put: rebuilding them on every stop is what
+    // made pressing play cost the best part of a second on a slower machine.
     document.querySelectorAll('.drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
     document.querySelectorAll('.pr-playhead').forEach(function (el) { el.style.display = 'none'; });
     refreshTransportButtons();
   }
 
-  function highlightDrumStep(step) {
-    document.querySelectorAll('#drum-grid .drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
-    document.querySelectorAll('#drum-grid .drum-cell[data-step="' + step + '"]').forEach(function (el) { el.classList.add('playing'); });
+  var padLit = { drums: -1, sfx: -1 };
+  function highlightPadStep(kind, step) {
+    var cells = padCells[kind];
+    if (!cells) return;
+    var prev = padLit[kind];
+    if (prev >= 0 && cells[prev]) cells[prev].forEach(function (el) { el.classList.remove('playing'); });
+    if (cells[step]) cells[step].forEach(function (el) { el.classList.add('playing'); });
+    padLit[kind] = step;
   }
-
-  function highlightSfxStep(step) {
-    document.querySelectorAll('#sfx-grid .drum-cell.playing').forEach(function (el) { el.classList.remove('playing'); });
-    document.querySelectorAll('#sfx-grid .drum-cell[data-step="' + step + '"]').forEach(function (el) { el.classList.add('playing'); });
-  }
+  function highlightDrumStep(step) { highlightPadStep('drums', step); }
+  function highlightSfxStep(step) { highlightPadStep('sfx', step); }
 
   function showPlayhead(inst, step) {
     var ph = document.getElementById(inst + '-playhead');
@@ -4535,6 +4607,9 @@
     Tone.Transport.loopStart = 0;
     Tone.Transport.loopEnd = loopSeconds();
 
+    // Every path that starts the transport goes through here, so the wider
+    // lookahead is set here too rather than at each caller.
+    setLookAhead(true);
     var waiting = pendingAudioLoads;
     pendingAudioLoads = [];
     if (!waiting.length) { Tone.Transport.start(); return; }
