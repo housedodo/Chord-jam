@@ -10,7 +10,7 @@
   <!-- ?v= is a cache buster. Bump it on every deploy: without it a phone
        keeps serving the CSS and JS it cached last visit, and the site looks
        like it never changed. -->
-  <link rel="stylesheet" href="style.css?v=20250918f">
+  <link rel="stylesheet" href="style.css?v=20250919a">
   <script>
     // Apply the skin before first paint, so the page never renders unskinned
     // while app.js loads. applyColorScheme() sets the variables afterwards.
@@ -184,13 +184,19 @@
   <!-- BUILD screen (instrument sequencer) -->
   <div id="screen-build" class="screen">
     <div class="build-container">
+      <!-- The controls live here on a wide screen: a column of their own, so
+           the roll gets the whole height beside it. layoutBuild() moves them
+           in and out of it; on a narrow screen the rail is empty and the same
+           elements sit in a toolbar above the roll. -->
+      <aside id="build-rail" class="build-rail"></aside>
+      <div class="build-main">
       <div id="sandbox-tabs" class="sandbox-tabs" style="display:none"></div>
       <div class="build-header">
         <div class="build-info">
           <span id="build-song" class="build-song"></span>
           <span id="build-instrument" class="build-badge"></span>
         </div>
-        <div class="build-timer">
+        <div class="build-timer" id="build-timer">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span id="build-time"></span>
         </div>
@@ -291,6 +297,7 @@
         <input id="guess-input" type="text" class="song-input" placeholder="Your title..." maxlength="80" autocomplete="off" spellcheck="false">
       </div>
       <button id="btn-submit" class="btn-primary btn-submit">Submit Layer</button>
+      </div>
     </div>
   </div>
 
@@ -336,6 +343,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
-  <script src="app.js?v=20250918f"></script>
+  <script src="app.js?v=20250919a"></script>
 </body>
 </html>

@@ -3151,3 +3151,226 @@ body {
   .wait-head { display: none; }
   .home-bars { display: none; }
 }
+
+/* ── Build layout: rail or toolbar ───────────────────────────────────────────
+   Wide screens put the layer's controls in a column down the left so the roll
+   keeps the whole height; narrower ones fold the same controls into one
+   toolbar above the roll. layoutBuild() in app.js moves the elements between
+   the two, and everything here is about how they sit once they arrive. */
+
+.build-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The song, the badge, the clock and the listen button moved into the
+   transport row, so the header they used to sit in has nothing left to show. */
+.build-header:empty { display: none; }
+.seq-controls .build-info { margin-left: 6px; }
+.seq-controls .build-timer { margin-left: auto; }
+.seq-controls .btn-listen-existing {
+  width: auto;
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  gap: 6px;
+}
+
+.build-rail { display: none; }
+
+.build-container.layout-rail {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 18px;
+  max-width: 1600px;
+  height: 100%;
+  min-height: 0;
+}
+.build-container.layout-rail .build-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  width: 232px;
+  min-height: 0;
+}
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail-scroll::-webkit-scrollbar { display: none; }
+.build-container.layout-rail .build-rail .btn-submit {
+  margin-top: 0;
+  flex-shrink: 0;
+  padding-bottom: 14px;
+}
+
+.rail-sec {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.rail-label {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The controls stack in the rail: a row of chips is what the old bars were,
+   and it is the width they wasted that put the roll in a corner. */
+.build-rail .chord-bar,
+.build-rail .kit-bar,
+.build-rail .fill-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.build-rail .chord-bar-label,
+.build-rail .chord-bar-hint,
+.build-rail .kit-label,
+.build-rail .fill-bar-label,
+.build-rail .fill-bar-hint,
+.build-rail .rowsize-label { display: none; }
+.build-rail .chord-select,
+.build-rail .preset-field { width: 100%; }
+/* In a column, `flex: 1` on the field means a field as tall as the section. */
+.build-rail .preset-field,
+.build-rail .picker .preset-field { flex: none; }
+/* Except in the sound row, where it shares a line with the step arrows. */
+.build-rail .shaper-preset .preset-field { flex: 1; width: auto; }
+/* The mode button above it already says PROGRESSION. */
+.build-rail .chord-bar .picker-label { display: none; }
+.build-rail .picker { flex-direction: column; align-items: stretch; gap: 6px; }
+.build-rail .picker-label { font-size: 0.6rem; }
+.build-rail .preset-list { left: 0; right: auto; width: 100%; }
+.build-rail .chord-mode-toggle,
+.build-rail .fill-buttons,
+.build-rail .rowsize-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 0;
+}
+.build-rail .chord-mode-toggle .mode-btn,
+.build-rail .fill-buttons .fill-btn { flex: 1 1 auto; }
+.build-rail .rowsize-bar .mode-btn { flex: 1; }
+.build-rail .picker { width: 100%; }
+.build-rail .chord-clear { width: 100%; }
+
+/* In the rail the shaper is not a panel inside a panel: the section already
+   says SOUND, so the panel drops its own frame and title bar. */
+.build-rail .shaper,
+:root[data-skin="phosphor"] .build-rail .shaper {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.build-rail .shaper-head {
+  background: none;
+  color: var(--peach);
+  padding: 0;
+  justify-content: flex-end;
+}
+:root[data-skin="phosphor"] .build-rail .shaper-head {
+  background: none;
+  color: var(--ph-amber);
+}
+.build-rail .shaper-toggle { display: none; }
+.build-rail .shaper-btn {
+  color: var(--peach);
+  border-color: rgba(255, 207, 92, 0.45);
+}
+:root[data-skin="phosphor"] .build-rail .shaper-btn { color: var(--ph-amber); }
+.build-rail .shaper-btn:hover { background: rgba(255, 207, 92, 0.12); }
+.build-rail .shaper-source,
+.build-rail .shaper-preset,
+.build-rail .shaper-table,
+.build-rail .shaper-knobs { padding-left: 0; padding-right: 0; }
+.build-rail .shaper-knobs { flex-wrap: wrap; justify-content: flex-start; }
+.build-rail .shaper-knobs .knob-cell { flex: 0 0 calc(33.333% - 4px); }
+.build-rail .shaper-table { flex-direction: column; align-items: stretch; }
+.build-rail .shaper-table .knob-cell { width: auto; align-self: flex-start; }
+.build-rail .wave-scope { width: 100%; }
+
+/* With the rail carrying the controls there is height to spare, and a grid
+   centred in it reads as adrift rather than roomy. */
+.layout-rail .drum-grid { justify-content: flex-start; padding-top: 4px; }
+
+/* Toolbar mode: one row above the roll instead of four. */
+.build-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.build-tools > * { flex-shrink: 0; }
+.build-tools .chord-bar { flex: 0 1 auto; }
+/* The field says MAJOR and the picker says the progression's name, so the
+   words in front of them are a line's worth of width for nothing. */
+.build-tools .chord-bar-label,
+.build-tools .picker-label { display: none; }
+/* The hint is the one thing on the row that can lose characters without
+   losing a control, so it is what gives way when the line runs out. */
+.build-tools .chord-bar-hint {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The shaper as a drop-down: folded it is a title bar in the toolbar, and
+   opening it lays the panel over the top of the roll rather than pushing the
+   notes down. */
+.build-tools .shaper.shaper-pop { position: relative; }
+.build-tools .shaper.shaper-pop:not(.collapsed) {
+  position: relative;
+  border-color: transparent;
+  background: none;
+}
+.build-tools .shaper.shaper-pop .shaper-head { position: relative; z-index: 2; }
+.build-tools .shaper.shaper-pop > :not(.shaper-head) { position: relative; }
+.build-tools .shaper.shaper-pop .shaper-body {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  width: 420px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  background: #081409;
+  border: 1px solid var(--peach);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+.shaper-body { display: flex; flex-direction: column; }
+.build-rail .shaper-body { display: contents; }
+.shaper.collapsed .shaper-body,
+.build-tools .shaper.shaper-pop.collapsed .shaper-body { display: none; }
+
+.seq-controls .bpm-display,
+.seq-controls .build-timer { white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .build-tools { gap: 8px; }
+  .build-tools > * { flex: 1 1 100%; }
+  .seq-controls { flex-wrap: wrap; gap: 8px 10px; }
+  .seq-controls .build-info { display: none; }
+}

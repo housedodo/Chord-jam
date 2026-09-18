@@ -163,8 +163,18 @@
 
   function updateGridMetrics() {
     var phone = isPhoneLayout();
-    CELL_W = phone ? 26 : 34;
     LABEL_W = phone ? 40 : 54;
+    // A roll narrower than the space it has been given leaves a band of empty
+    // canvas down one side, which is the same wasted room the rail was built
+    // to reclaim. Widen the steps to fill what is actually there instead —
+    // capped, because a 32-step bar of very wide cells is harder to read, not
+    // easier. The phone keeps its dense cells: there it is never the surplus.
+    CELL_W = 26;
+    if (!phone) {
+      var rail = window.innerWidth >= RAIL_MIN_WIDTH ? 250 : 0;
+      var free = window.innerWidth - rail - 48 - 34 - LABEL_W;
+      CELL_W = Math.max(34, Math.min(52, Math.floor(free / STEPS)));
+    }
     var h = ROLL_ROW_HEIGHTS[rollRowSize] || ROLL_ROW_HEIGHTS.roomy;
     CELL_H = phone ? h[1] : h[0];
   }
@@ -2622,9 +2632,125 @@
     return pianoRollNotes.slice();
   }
 
+  // ── Build screen layout ──
+  // The same controls in two shapes. Wide screen: a rail down the left holds
+  // them in a column, and the roll takes the whole height beside it. Narrower:
+  // they fold into one toolbar above the roll, with the shaper opening as a
+  // drop-down over the notes. Nothing is rebuilt between the two — the live
+  // elements are moved, which is why they are held here rather than looked up.
+  const RAIL_MIN_WIDTH = 1040;
+  const RAIL_LAYERS = { drums: 1, chords: 1, bass: 1, melody: 1 };
+  var buildParts = { shaper: null, writing: null, view: null, extra: null };
+  var railWasOn = null;
+  var buildLayoutInst = null;
+
+  function railActive(inst) {
+    return !!RAIL_LAYERS[inst] && !isPhoneLayout() && window.innerWidth >= RAIL_MIN_WIDTH;
+  }
+
+  function railSection(label, el) {
+    if (!el) return null;
+    var sec = document.createElement('section');
+    sec.className = 'rail-sec';
+    var h = document.createElement('h3');
+    h.className = 'rail-label';
+    h.textContent = label;
+    sec.appendChild(h);
+    sec.appendChild(el);
+    return sec;
+  }
+
+  // One line for who, what and how long: the song, the layer badge, the clock
+  // and the listen button ride the transport row rather than a header of their
+  // own. Four stacked bars above the roll were most of what the roll was
+  // missing.
+  function fillTransportRow(controls) {
+    var info = document.querySelector('#screen-build .build-info');
+    var timer = document.getElementById('build-timer');
+    var listen = document.getElementById('btn-listen-existing');
+    if (info) controls.appendChild(info);
+    if (timer) controls.appendChild(timer);
+    if (listen) controls.appendChild(listen);
+    // Emptied of its children the header is still a flex item, and an empty
+    // row between two others is a gap nobody asked for. :empty does not cover
+    // it: the whitespace in the markup counts as content.
+    var header = document.querySelector('#screen-build .build-header');
+    if (header) header.style.display = header.querySelector('*') ? '' : 'none';
+  }
+
+  function layoutBuild(inst) {
+    buildLayoutInst = inst;
+    var container = document.querySelector('#screen-build .build-container');
+    var main = document.querySelector('#screen-build .build-main');
+    var rail = document.getElementById('build-rail');
+    var seq = document.getElementById('seq-' + inst);
+    if (!container || !main || !rail || !seq) return;
+
+    var controls = seq.querySelector('.seq-controls');
+    if (controls) fillTransportRow(controls);
+    var rowsInRow = buildParts.view && !railActive(inst);
+    if (rowsInRow && controls) controls.appendChild(buildParts.view);
+
+    var rails = railActive(inst);
+    railWasOn = rails;
+    container.classList.toggle('layout-rail', rails);
+    if (buildParts.shaper) {
+      buildParts.shaper.setFixedOpen(rails);
+      // Phones get the drop-down too: in the flow the open panel took the
+      // roll down to a few rows, which is the whole complaint it was meant
+      // to answer.
+      buildParts.shaper.setPop(!rails);
+    }
+
+    var submit = document.getElementById('btn-submit');
+    var tabs = document.getElementById('sandbox-tabs');
+    // Emptying the rail detaches its sections, not the controls: every one of
+    // them is held in buildParts and put back below.
+    rail.replaceChildren();
+    var stale = seq.querySelector('.build-tools');
+    if (stale) stale.remove();
+
+    if (rails) {
+      // The sections scroll, the submit button does not: a wavetable open on
+      // a short screen is taller than the rail, and the one control nobody
+      // can afford to lose is the one that hands the layer in.
+      var scroll = document.createElement('div');
+      scroll.className = 'rail-scroll';
+      [ sandboxMode ? railSection('Layer', tabs) : null,
+        railSection('Sound', buildParts.shaper),
+        railSection(inst === 'drums' ? 'Kit' : 'Writing', buildParts.writing),
+        railSection('Fill', buildParts.extra),
+        railSection('View', buildParts.view)
+      ].forEach(function (sec) { if (sec) scroll.appendChild(sec); });
+      rail.appendChild(scroll);
+      rail.appendChild(submit);
+      return;
+    }
+
+    if (tabs) main.insertBefore(tabs, main.firstChild);
+    if (inst === 'drums') {
+      var grid = document.getElementById('drum-grid');
+      if (buildParts.extra) seq.insertBefore(buildParts.extra, grid);
+      if (buildParts.writing && grid) grid.insertBefore(buildParts.writing, grid.firstChild);
+    } else {
+      var wrapper = seq.querySelector('.piano-roll-wrapper');
+      var roll = wrapper && wrapper.querySelector('.piano-roll');
+      if (wrapper && (buildParts.shaper || buildParts.writing)) {
+        var tools = document.createElement('div');
+        tools.className = 'build-tools';
+        [buildParts.shaper, buildParts.writing].forEach(function (el) {
+          if (el) tools.appendChild(el);
+        });
+        wrapper.insertBefore(tools, roll || wrapper.firstChild);
+      }
+    }
+    main.appendChild(submit);
+  }
+
   // ── Sequencer Init ──
   function initSequencer(instrument) {
     pianoRollNotes = [];
+    buildParts = { shaper: null, writing: null, view: null, extra: null };
     if (instrument === 'drums') initDrumGrid();
     else if (instrument === 'chords') initPianoRoll('chords', NOTE_NAMES_CHORDS, true, true);
     else if (instrument === 'bass') initPianoRoll('bass', NOTE_NAMES_BASS, false);
@@ -2632,8 +2758,10 @@
     else if (instrument === 'sfx') initSfxGrid();
     else if (instrument === 'vocal') {
       initVocalRecorder();
+      layoutBuild(instrument);
       return;
     }
+    if (instrument === 'sfx') layoutBuild(instrument);
 
     var playBtn = document.getElementById(instrument + '-play');
     playBtn.onclick = function () {
@@ -3003,7 +3131,12 @@
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
     clearPads('drums');
-    grid.appendChild(buildKitBar());
+    // Kit and quick-fill are this layer's controls: layoutBuild() puts them in
+    // the rail on a wide screen, or back here when there is no rail.
+    buildParts.shaper = null;
+    buildParts.writing = buildKitBar();
+    buildParts.view = null;
+    buildParts.extra = document.querySelector('#seq-drums .fill-bar');
     grid.appendChild(buildStepRuler());
     fillAnchor = null;
     clearFillActive();
@@ -3048,6 +3181,7 @@
       for (var s = 0; s < STEPS; s++) if (steps[s]) setPad('drums', name, s, true);
     });
     grid.appendChild(buildAddLaneRow());
+    layoutBuild('drums');
     indexPadCells('drums', '#drum-grid');
     initFillBar();
   }
@@ -3342,6 +3476,13 @@
     head.appendChild(tools);
     panel.appendChild(head);
 
+    // Everything below the title bar is one group, so the toolbar can drop it
+    // over the roll in a single move. In the rail the wrapper disappears
+    // (display: contents) and the rows stack as they always did.
+    var body = document.createElement('div');
+    body.className = 'shaper-body';
+    panel.appendChild(body);
+
     // Two sources, one at a time: the presets, or the wavetable. The toggle
     // swaps which one's controls are on show, so the panel stays the size of
     // whichever is actually in use.
@@ -3355,7 +3496,7 @@
     srcTable.textContent = 'WAVETABLE';
     srcRow.appendChild(srcPreset);
     srcRow.appendChild(srcTable);
-    panel.appendChild(srcRow);
+    body.appendChild(srcRow);
 
     // The preset picker. A row of buttons used to sit above the panel; as a
     // field with a drop-down it costs one line instead of three, which is
@@ -3437,7 +3578,7 @@
     pickRow.appendChild(field);
     pickRow.appendChild(next);
     pickRow.appendChild(list);
-    panel.appendChild(pickRow);
+    body.appendChild(pickRow);
 
     // The wavetable gets its own row: the scan knob and a screen drawing the
     // wave it is currently on. It only means anything for that one sound, so
@@ -3485,8 +3626,8 @@
       return k;
     });
     tableRow.appendChild(scope);
-    panel.appendChild(tableRow);
-    panel.appendChild(row);
+    body.appendChild(tableRow);
+    body.appendChild(row);
 
     function repaint() { knobs.forEach(function (k) { k.paint(); }); }
 
@@ -3513,16 +3654,46 @@
     // The roll is what people came for, so on a phone the panel starts folded
     // away to its title bar and opens on a tap. It stays open once opened,
     // for the rest of the session.
-    function setOpen(open) {
-      shaperOpen = open;
+    function setOpen(open, remember) {
+      // A drop-down opening over the roll is not a preference: it says nothing
+      // about how the player wants the panel to sit when it is in the flow.
+      if (remember !== false) shaperOpen = open;
       panel.classList.toggle('collapsed', !open);
       title.setAttribute('aria-expanded', open ? 'true' : 'false');
       syncRows();
     }
-    title.onclick = function () { setOpen(panel.classList.contains('collapsed')); };
-    // Short screens too, not just phones: on a small laptop the panel and the
-    // chord bar left the roll three rows tall. Folded it is one line.
-    setOpen(shaperOpen === null ? (!isPhoneLayout() && window.innerHeight >= 760) : shaperOpen);
+    function defaultOpen() {
+      // Short screens too, not just phones: on a small laptop the panel and
+      // the chord bar left the roll three rows tall. Folded it is one line.
+      return shaperOpen === null ? (!isPhoneLayout() && window.innerHeight >= 760) : shaperOpen;
+    }
+    title.onclick = function () {
+      if (panel.classList.contains('shaper-fixed')) return;
+      setOpen(panel.classList.contains('collapsed'));
+    };
+    setOpen(defaultOpen());
+
+    // In the rail the panel has a column of its own, so it is simply open —
+    // folding it there would only leave a hole. In the toolbar it is a
+    // drop-down, and a drop-down that starts open covers the notes.
+    panel.setFixedOpen = function (fixed) {
+      panel.classList.toggle('shaper-fixed', fixed);
+      if (fixed) setOpen(true, false);
+      else if (panel.classList.contains('shaper-pop')) setOpen(false, false);
+      else setOpen(defaultOpen(), false);
+    };
+    panel.setPop = function (pop) {
+      panel.classList.toggle('shaper-pop', pop);
+      if (pop && !panel.classList.contains('shaper-fixed')) setOpen(false, false);
+    };
+    // A panel lying over the notes has to get out of the way by itself, or
+    // the first thing anyone does with it is hunt for the way to close it.
+    document.addEventListener('pointerdown', function (e) {
+      if (!panel.classList.contains('shaper-pop')) return;
+      if (panel.classList.contains('collapsed')) return;
+      if (panel.contains(e.target)) return;
+      setOpen(false, false);
+    }, true);
 
     // Picking a different preset reseeds the knobs from that preset.
     panel.reseed = function () {
@@ -3608,16 +3779,13 @@
     var wrapper = document.createElement('div');
     wrapper.className = 'piano-roll-wrapper';
 
-    if (SHAPED_LAYERS[inst]) wrapper.appendChild(buildShaper(inst));
-    if (chordMode) wrapper.appendChild(buildChordBar(noteNames));
-    // Into the transport row rather than a line of its own: a control meant to
-    // win back height should not spend any.
-    var controls = document.querySelector('#seq-' + inst + ' .seq-controls');
-    if (controls) {
-      var oldBar = controls.querySelector('.rowsize-bar');
-      if (oldBar) oldBar.remove();
-      controls.appendChild(buildRowSizeBar());
-    }
+    // The controls are built here and placed by layoutBuild(), which decides
+    // between the rail and the toolbar. They are not appended to the wrapper
+    // any more: on a wide screen they do not belong above the roll at all.
+    buildParts.shaper = SHAPED_LAYERS[inst] ? buildShaper(inst) : null;
+    buildParts.writing = chordMode ? buildChordBar(noteNames) : null;
+    buildParts.view = buildRowSizeBar();
+    buildParts.extra = null;
 
     var rollContainer = document.createElement('div');
     rollContainer.className = 'piano-roll';
@@ -3697,6 +3865,7 @@
     requestAnimationFrame(function () { restoreScroll(10); });
     rollContainer.addEventListener('scroll', function () { rollScrollTop = rollContainer.scrollTop; });
     grid.appendChild(wrapper);
+    layoutBuild(inst);
 
     // Interaction: edge-drag resize
     var resizing = null;
@@ -3888,9 +4057,22 @@
   let rollScrollTop = null;
   let lastPhoneLayout = isPhoneLayout();
 
+  // Debounced: a window drag fires this by the frame, and each pass can
+  // rebuild the whole roll.
+  var resizeTimer = null;
   window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(onResize, 150);
+  });
+
+  function onResize() {
     var phone = isPhoneLayout();
-    if (phone === lastPhoneLayout) return;
+    // The rail appears and disappears on its own width, and the controls just
+    // move — the roll only has to be rebuilt when its own metrics change.
+    if (buildLayoutInst && railActive(buildLayoutInst) !== railWasOn) layoutBuild(buildLayoutInst);
+    var wasCellW = CELL_W;
+    updateGridMetrics();
+    if (phone === lastPhoneLayout && CELL_W === wasCellW) return;
     lastPhoneLayout = phone;
     if (rollRebuild) {
       var saved = pianoRollNotes.slice();
@@ -3899,7 +4081,7 @@
       if (rollRedraw) rollRedraw();
     }
     if (document.getElementById('vocal-timeline')) renderVocalTimeline();
-  });
+  }
 
   function renderPR(inst, noteNames, cellH) {
     var layer = document.getElementById(inst + '-notes-layer');
