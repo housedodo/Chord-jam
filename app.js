@@ -509,6 +509,7 @@
         var soundOk = typeof msg.sound === 'string' &&
           (msg.sound === PRODUCER_SOUND || soundNamesFor(inst).indexOf(msg.sound) !== -1);
         if (soundOk) game.submissions[inst].sound = msg.sound;
+        if (typeof msg.kit === 'string' && DRUM_KITS[msg.kit]) game.submissions[inst].kit = msg.kit;
         if (msg.shape && typeof msg.shape === 'object') {
           game.submissions[inst].shape = normaliseShape(inst, game.submissions[inst].sound, msg.shape);
         }
@@ -872,6 +873,14 @@
     }
   }
 
+  // Drums the way their author left them, not the way this player has the kit
+  // set. Rebuilt rather than reused, since the kit decides the sound.
+  function drumsForSub(sub) {
+    var kit = (sub && DRUM_KITS[sub.kit]) ? sub.kit : DEFAULT_DRUM_KIT;
+    if (synths.drums) synths.drums.dispose();
+    return createDrumSynth(kit);
+  }
+
   // The shape a finished layer was submitted with, for the background parts of
   // a preview: those must sound the way their author left them, not the way
   // whoever is building right now has their own knobs set.
@@ -909,6 +918,9 @@
   // three submit paths stamp it here, so no layer can reach the others
   // sounding different from how its author left it.
   function stampSound(sub, inst) {
+    // Drums carry their kit, so a layer sounds to everyone else the way it
+    // sounded to whoever built it.
+    if (inst === 'drums') { sub.kit = currentDrumKit; return sub; }
     if (!SHAPED_LAYERS[inst]) return sub;
     sub.sound = currentSoundFor(inst);
     var shape = shapeToSend(inst);
@@ -1046,23 +1058,97 @@
     return poly;
   }
 
-  function createDrumSynth() {
-    return withSampledPads('drums', DRUM_NAMES, createSynthDrumKit());
+  // ── Drum kits ──
+  // A kit is two things at once: which lanes the grid shows, and how the kit
+  // sounds. The lanes keep the grid to what a part actually needs — eleven
+  // rows is a lot of screen on a phone — and anything left out is still one
+  // tap away on the ADD button, so nothing is locked off.
+  //
+  // The tone is a handful of parameters over the same voices rather than a
+  // separate synth per kit: enough for a boom-bap kick and an 808 kick to be
+  // obviously different instruments without eleven more voices to keep level.
+  const DRUM_KITS = {
+    'Studio': {
+      lanes: ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Crash'],
+      tone: {}
+    },
+    '808': {
+      lanes: ['Kick', 'Snare', 'HiHat', 'OpenHH', 'Clap', 'Cowbell'],
+      // A long pitch sweep on a low tuned membrane is what makes an 808 kick
+      // boom rather than thud, and its hats are shorter and brighter.
+      tone: {
+        kick: { pitchDecay: 0.14, octaves: 9, decay: 0.85, volume: -1 },
+        snare: { noise: 'white', decay: 0.12, volume: -3 },
+        hat: { decay: 0.035, openDecay: 0.22, resonance: 6000, volume: -13 },
+        perc: { decay: 0.9, volume: -6 }
+      }
+    },
+    'Lo-Fi': {
+      lanes: ['Kick', 'Snare', 'HiHat', 'Rim', 'Shaker'],
+      // Dusty: everything short, and the whole kit under a lowpass so the top
+      // end sounds like it came off tape rather than out of a synth.
+      tone: {
+        lowpass: 3200,
+        kick: { pitchDecay: 0.04, octaves: 4, decay: 0.24, volume: 1 },
+        snare: { noise: 'pink', decay: 0.1, volume: -2 },
+        hat: { decay: 0.045, openDecay: 0.18, resonance: 2500, volume: -12 },
+        perc: { decay: 0.7, volume: -4 }
+      }
+    },
+    'Latin': {
+      lanes: ['Kick', 'Conga', 'Shaker', 'Cowbell', 'Rim', 'Clap'],
+      // Hand percussion: shorter, drier, and the kick out of the way of it.
+      tone: {
+        kick: { pitchDecay: 0.03, octaves: 5, decay: 0.2, volume: -1 },
+        snare: { noise: 'pink', decay: 0.09, volume: -2 },
+        hat: { decay: 0.04, openDecay: 0.16, resonance: 4500, volume: -12 },
+        // Hand percussion carries this kit, so it is pushed up rather than
+        // sitting where it does under a full drum kit: measured 4dB quieter
+        // than the others before this.
+        perc: { decay: 1.15, volume: 4 }
+      }
+    }
+  };
+  const DRUM_KIT_NAMES = Object.keys(DRUM_KITS);
+  const DEFAULT_DRUM_KIT = 'Studio';
+  var currentDrumKit = DEFAULT_DRUM_KIT;
+  // Which lanes the grid is showing, and the steps of any lane taken off it,
+  // so switching kit or removing a lane by accident does not lose the part.
+  var drumLanes = DRUM_KITS[DEFAULT_DRUM_KIT].lanes.slice();
+  var drumLaneMemory = {};
+
+  function kitTone(name) {
+    var kit = DRUM_KITS[name] || DRUM_KITS[DEFAULT_DRUM_KIT];
+    return kit.tone || {};
   }
 
-  function createSynthDrumKit() {
+  function createDrumSynth(kitName) {
+    return withSampledPads('drums', DRUM_NAMES, createSynthDrumKit(kitName));
+  }
+
+  function createSynthDrumKit(kitName) {
+    var t = kitTone(kitName || currentDrumKit);
+    var K = t.kick || {}, S = t.snare || {}, H = t.hat || {}, P = t.perc || {};
+    function num(v, dflt) { return v == null ? dflt : v; }
+    // Percussion decays are scaled rather than set, so one number per kit
+    // moves the toms, congas and cymbals together and keeps their relative
+    // lengths.
+    var pd = num(P.decay, 1), pv = num(P.volume, 0);
     var vol = makeBus('drums');
-    var kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }).connect(vol);
-    var snare = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(vol);
-    var hihat = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.06, sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -12 }).connect(vol);
-    var openHH = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.3, sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -14 }).connect(vol);
-    var clap = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 } }).connect(vol);
-    var tom = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }).connect(vol);
-    var rim = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }, volume: -6 }).connect(vol);
-    var crash = new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 }).connect(vol);
-    var cowbell = new Tone.MetalSynth({ frequency: 560, envelope: { attack: 0.001, decay: 0.2, sustain: 0 }, harmonicity: 5.1, modulationIndex: 16, resonance: 5000, octaves: 0.5, volume: -12 }).connect(vol);
-    var shaker = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04, sustain: 0 }, volume: -10 }).connect(vol);
-    var conga = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15, sustain: 0 }, volume: -4 }).connect(vol);
+    if (t.lowpass) {
+      vol = new Tone.Filter({ type: 'lowpass', frequency: t.lowpass, rolloff: -12 }).connect(vol);
+    }
+    var kick = new Tone.MembraneSynth({ pitchDecay: num(K.pitchDecay, 0.05), octaves: num(K.octaves, 6), envelope: { attack: 0.001, decay: num(K.decay, 0.3), sustain: 0 }, volume: num(K.volume, 0) }).connect(vol);
+    var snare = new Tone.NoiseSynth({ noise: { type: S.noise || 'white' }, envelope: { attack: 0.001, decay: num(S.decay, 0.15), sustain: 0 }, volume: num(S.volume, 0) }).connect(vol);
+    var hihat = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.decay, 0.06), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) }).connect(vol);
+    var openHH = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.openDecay, 0.3), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) - 2 }).connect(vol);
+    var clap = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1 * pd, sustain: 0 }, volume: pv }).connect(vol);
+    var tom = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, volume: pv }).connect(vol);
+    var rim = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05 * pd, sustain: 0 }, volume: -6 + pv }).connect(vol);
+    var crash = new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 + pv }).connect(vol);
+    var cowbell = new Tone.MetalSynth({ frequency: 560, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 16, resonance: 5000, octaves: 0.5, volume: -12 + pv }).connect(vol);
+    var shaker = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04 * pd, sustain: 0 }, volume: -10 + pv }).connect(vol);
+    var conga = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15 * pd, sustain: 0 }, volume: -4 + pv }).connect(vol);
     return {
       trigger: function (name, time) {
         switch (name) {
@@ -1079,7 +1165,13 @@
           case 'Conga': conga.triggerAttackRelease('D3', '8n', time); break;
         }
       },
-      dispose: function () { [kick, snare, hihat, openHH, clap, tom, rim, crash, cowbell, shaker, conga, vol].forEach(function (n) { n.dispose(); }); }
+      // Never the bus: it is cached and shared with whatever plays next, so
+      // disposing it here left the layer connected to a dead node. The kit's
+      // own filter, when it has one, does belong to the kit.
+      dispose: function () {
+        [kick, snare, hihat, openHH, clap, tom, rim, crash, cowbell, shaker, conga].forEach(function (n) { n.dispose(); });
+        if (t.lowpass && vol) vol.dispose();
+      }
     };
   }
 
@@ -1110,7 +1202,8 @@
           case 'Drop': drop.triggerAttackRelease('C1', '4n', time); break;
         }
       },
-      dispose: function () { [siren, laser, boom, sweep, zap, whoosh, glitch, drop, vol].forEach(function (n) { n.dispose(); }); }
+      // The bus is cached and shared, so it is not the kit's to dispose.
+      dispose: function () { [siren, laser, boom, sweep, zap, whoosh, glitch, drop].forEach(function (n) { n.dispose(); }); }
     };
   }
 
@@ -2227,6 +2320,11 @@
     // than in initPianoRoll means a resize, which rebuilds the roll, does not
     // wipe out what the player has dialled in.
     if (SHAPED_LAYERS[instrument]) reseedShape(instrument);
+    if (instrument === 'drums') {
+      currentDrumKit = DEFAULT_DRUM_KIT;
+      drumLanes = DRUM_KITS[DEFAULT_DRUM_KIT].lanes.slice();
+      drumLaneMemory = {};
+    }
     rollScrollTop = null;
     var game = games[currentGameIdx];
     var playerIdx = (netMode !== 'local') ? myPlayerIndex : currentTurnPlayer;
@@ -2480,16 +2578,134 @@
     updateFillBar();
   }
 
+  // A lane's steps, so one can be taken off the grid and put back without
+  // losing the part written on it.
+  function rememberLane(name) {
+    var steps = [];
+    for (var s = 0; s < STEPS; s++) {
+      var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+      steps.push(!!(cell && cell.classList.contains('on')));
+    }
+    if (steps.indexOf(true) !== -1) drumLaneMemory[name] = steps;
+  }
+
+  function removeDrumLane(name) {
+    rememberLane(name);
+    drumLanes = drumLanes.filter(function (n) { return n !== name; });
+    initDrumGrid();
+  }
+
+  function addDrumLane(name) {
+    if (drumLanes.indexOf(name) === -1) drumLanes.push(name);
+    initDrumGrid();
+  }
+
+  function pickDrumKit(name) {
+    if (!DRUM_KITS[name]) return;
+    // Hold on to every lane's steps first: a kit swap can take several away
+    // at once, and picking the old kit back should bring the part with it.
+    drumLanes.forEach(rememberLane);
+    currentDrumKit = name;
+    drumLanes = DRUM_KITS[name].lanes.slice();
+    initDrumGrid();
+    if (synths.drums) { synths.drums.dispose(); synths.drums = null; }
+    ensureAudio().then(function () { synths.drums = createDrumSynth(currentDrumKit); });
+  }
+
+  function buildKitBar() {
+    var bar = document.createElement('div');
+    bar.className = 'kit-bar';
+    var label = document.createElement('span');
+    label.className = 'kit-label';
+    label.textContent = 'KIT';
+    var field = document.createElement('button');
+    field.className = 'preset-field';
+    field.setAttribute('aria-haspopup', 'listbox');
+    var nameEl = document.createElement('span');
+    nameEl.className = 'preset-name';
+    nameEl.textContent = currentDrumKit;
+    var caret = document.createElement('span');
+    caret.className = 'preset-caret';
+    caret.textContent = '\u25be';
+    field.appendChild(nameEl);
+    field.appendChild(caret);
+    var list = document.createElement('div');
+    list.className = 'preset-list';
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+    function close() { list.hidden = true; document.removeEventListener('pointerdown', outside, true); }
+    function outside(e) { if (!bar.contains(e.target)) close(); }
+    field.onclick = function () {
+      if (!list.hidden) { close(); return; }
+      list.innerHTML = '';
+      DRUM_KIT_NAMES.forEach(function (n) {
+        var opt = document.createElement('button');
+        opt.className = 'preset-option' + (n === currentDrumKit ? ' on' : '');
+        opt.setAttribute('role', 'option');
+        opt.textContent = n;
+        opt.onclick = function () { close(); pickDrumKit(n); };
+        list.appendChild(opt);
+      });
+      list.hidden = false;
+      document.addEventListener('pointerdown', outside, true);
+    };
+    bar.appendChild(label);
+    bar.appendChild(field);
+    bar.appendChild(list);
+    return bar;
+  }
+
+  function buildAddLaneRow() {
+    var wrap = document.createElement('div');
+    wrap.className = 'lane-add';
+    var spare = DRUM_NAMES.filter(function (n) { return drumLanes.indexOf(n) === -1; });
+    if (!spare.length) return wrap;
+    var btn = document.createElement('button');
+    btn.className = 'lane-add-btn';
+    btn.textContent = '+ ADD';
+    var list = document.createElement('div');
+    list.className = 'preset-list';
+    list.hidden = true;
+    function close() { list.hidden = true; document.removeEventListener('pointerdown', outside, true); }
+    function outside(e) { if (!wrap.contains(e.target)) close(); }
+    btn.onclick = function () {
+      if (!list.hidden) { close(); return; }
+      list.innerHTML = '';
+      spare.forEach(function (n) {
+        var opt = document.createElement('button');
+        opt.className = 'preset-option';
+        opt.textContent = n;
+        opt.onclick = function () { close(); addDrumLane(n); };
+        list.appendChild(opt);
+      });
+      list.hidden = false;
+      document.addEventListener('pointerdown', outside, true);
+    };
+    wrap.appendChild(btn);
+    wrap.appendChild(list);
+    return wrap;
+  }
+
   function initDrumGrid() {
     var grid = document.getElementById('drum-grid');
     grid.innerHTML = '';
+    grid.appendChild(buildKitBar());
     grid.appendChild(buildStepRuler());
     fillAnchor = null;
     clearFillActive();
-    DRUM_NAMES.forEach(function (name) {
+    drumLanes.forEach(function (name) {
       var row = document.createElement('div');
       row.className = 'drum-row';
       row.innerHTML = '<span class="drum-label">' + name + '</span>';
+      // Appended, then ordered back to the left of the cells by CSS: building
+      // it into the innerHTML string would mean escaping the name by hand.
+      var drop = document.createElement('button');
+      drop.className = 'lane-drop';
+      drop.title = 'Remove ' + name;
+      drop.setAttribute('aria-label', 'Remove ' + name);
+      drop.textContent = '\u00d7';
+      drop.onclick = function (e) { e.stopPropagation(); removeDrumLane(name); };
+      row.appendChild(drop);
       for (var s = 0; s < STEPS; s++) {
         var cell = document.createElement('div');
         cell.className = 'drum-cell' + (s % 4 === 0 ? ' beat' : '');
@@ -2510,6 +2726,18 @@
       }
       grid.appendChild(row);
     });
+    // Put back anything written on these lanes before they were last taken
+    // off the grid, or before a kit swap.
+    drumLanes.forEach(function (name) {
+      var steps = drumLaneMemory[name];
+      if (!steps) return;
+      for (var s = 0; s < STEPS; s++) {
+        if (!steps[s]) continue;
+        var cell = document.querySelector('#drum-grid .drum-cell[data-name="' + name + '"][data-step="' + s + '"]');
+        if (cell) cell.classList.add('on');
+      }
+    });
+    grid.appendChild(buildAddLaneRow());
     initFillBar();
   }
 
@@ -3267,7 +3495,7 @@
     }
 
     if (instrument === 'drums') {
-      if (!synths.drums) synths.drums = createDrumSynth();
+      if (!synths.drums) synths.drums = createDrumSynth(currentDrumKit);
       var seq = new Tone.Sequence(safeStep(function (time, s) {
         Tone.Draw.schedule(function () { highlightDrumStep(s); }, time);
         DRUM_NAMES.forEach(function (name) {
@@ -3333,7 +3561,7 @@
 
   function addLayerSeq(inst, sub, seqs) {
     if (inst === 'drums') {
-      if (!synths.bgDrums) synths.bgDrums = createDrumSynth();
+      if (!synths.bgDrums) synths.bgDrums = createDrumSynth(sub.kit);
       var data = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name, time); });
@@ -3531,7 +3759,7 @@
       if (!sub) return;
 
       if (inst === 'drums') {
-        if (!synths.drums) synths.drums = createDrumSynth();
+        synths.drums = drumsForSub(sub);
         var data = sub.data;
         seqs.push(new Tone.Sequence(safeStep(function (time, s) {
           DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.drums.trigger(name, time); });
@@ -3835,7 +4063,7 @@
     var sub = game.submissions[inst];
     if (!sub) return;
     if (inst === 'drums') {
-      if (!synths.drums) synths.drums = createDrumSynth();
+      synths.drums = drumsForSub(sub);
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (sub.data[name] && sub.data[name][s]) synths.drums.trigger(name, time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));

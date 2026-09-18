@@ -2037,6 +2037,67 @@ body {
   .shaper-btn { padding: 2px 12px; }
 }
 
+/* Drum kit bar and lane controls */
+.kit-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.kit-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+.kit-bar .preset-field { flex: 0 1 220px; }
+.kit-bar .preset-list { left: 44px; right: auto; width: 220px; max-width: none; }
+
+/* The remove button sits in the row's own flow, in the order the markup puts
+   it: after the label and before the cells. Absolute positioning put it on
+   top of the lane's name. */
+.drum-row { position: relative; }
+.lane-drop {
+  order: -1;
+  flex: none;
+  width: 22px;
+  min-height: 30px;
+  padding: 0;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  opacity: 0;
+}
+.drum-row:hover .lane-drop,
+.lane-drop:focus-visible { opacity: 1; }
+.lane-drop:hover { color: var(--danger, #c22e2e); }
+
+.lane-add { position: relative; padding-top: 6px; }
+.lane-add-btn {
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  padding: 5px 14px;
+  min-height: 34px;
+  cursor: pointer;
+}
+.lane-add-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.lane-add .preset-list { left: 0; right: auto; width: 200px; max-width: none; top: calc(100% + 2px); }
+
+/* A finger has no hover, so the lane's remove button stays visible there, and
+   it gets a thumb-sized target. */
+@media (max-width: 600px), (pointer: coarse) {
+  .lane-drop { opacity: 0.55; width: 26px; min-height: 32px; }
+}
+
 /* Quick fill (drums only) */
 .fill-bar {
   display: flex;
@@ -2572,6 +2633,14 @@ body {
   font-size: 1.15rem;
   text-transform: uppercase;
   color: var(--ph-amber);
+  border-radius: 0;
+}
+:root[data-skin="phosphor"] .lane-add-btn,
+:root[data-skin="phosphor"] .kit-label {
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  color: var(--ph-mid);
   border-radius: 0;
 }
 :root[data-skin="phosphor"] .preset-option.on,
