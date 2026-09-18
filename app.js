@@ -34,9 +34,12 @@
   const NOTE_NAMES_BASS = ROLL_RANGE;
   const NOTE_NAMES_MELODY = ROLL_RANGE;
   const NOTE_NAMES_CHORDS = ROLL_RANGE;
-  // Where each layer opens: the note parked near the bottom of the view, so
-  // the room to draw is above it.
-  const ROLL_HOME = { bass: 'C2', chords: 'C3', melody: 'C4' };
+  // Every layer opens on the same octave, C3 to C4, because that is where a
+  // part is usually written and it saves everyone scrolling to find it. The
+  // view is centred on the two, so both are on screen when the roll is tall
+  // enough to hold them.
+  const ROLL_HOME_LOW = 'C3';
+  const ROLL_HOME_HIGH = 'C4';
   function isSharp(noteName) { return noteName.indexOf('#') !== -1; }
   const CHORD_ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const CHORD_QUALITIES = [
@@ -145,11 +148,39 @@
 
   function isPhoneLayout() { return window.innerWidth <= 600; }
 
+  // Row height is the player's call: 49 rows at full height means scrolling
+  // for anything with range, and packed rows fit an octave and a half on a
+  // laptop. Remembered, because it is a preference and not a per-round choice.
+  const ROLL_ROW_HEIGHTS = { roomy: [32, 28], packed: [17, 16] };
+  // Packed by default where the screen is short, because that is the only way
+  // C3 and C4 both fit; once the player picks, their choice is what sticks.
+  var rollRowSize = (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('st-rows'); } catch (e) {}
+    if (saved === 'packed' || saved === 'roomy') return saved;
+    return window.innerHeight < 820 ? 'packed' : 'roomy';
+  })();
+
   function updateGridMetrics() {
     var phone = isPhoneLayout();
     CELL_W = phone ? 26 : 34;
     LABEL_W = phone ? 40 : 54;
-    CELL_H = phone ? 28 : 32;
+    var h = ROLL_ROW_HEIGHTS[rollRowSize] || ROLL_ROW_HEIGHTS.roomy;
+    CELL_H = phone ? h[1] : h[0];
+  }
+
+  function setRollRowSize(size) {
+    rollRowSize = size;
+    try { localStorage.setItem('st-rows', size); } catch (e) {}
+    // The scroll position is in pixels, so it has to be dropped: the same
+    // pixel is a different note once the rows change height.
+    rollScrollTop = null;
+    if (rollRebuild) {
+      var saved = pianoRollNotes.slice();
+      rollRebuild();
+      pianoRollNotes = saved;
+      if (rollRedraw) rollRedraw();
+    }
   }
 
   // ── State ──
@@ -2787,22 +2818,28 @@
     initDrumGrid();
   }
 
-  function applyProgression(name, noteNames) {
+  // The progression voiced from wherever it was placed: the note clicked is
+  // the first chord's root, and the rest follow it in that key. Chords that
+  // would run off the end of the grid are left off rather than squeezed in.
+  function progressionFrom(name, rootName, startStep, noteNames) {
     var prog = CHORD_PROGRESSIONS[name];
-    if (!prog) return;
-    var root = noteToMidi(PROGRESSION_ROOT);
+    if (!prog) return [];
+    var root = noteToMidi(rootName);
+    if (root === null) return [];
     var ceiling = noteToMidi(noteNames[noteNames.length - 1]);
     var bar = Math.max(1, Math.floor(STEPS / prog.length));
-    pianoRollNotes = [];
+    var out = [];
     prog.forEach(function (chord, i) {
+      var at = startStep + i * bar;
+      if (at + bar > STEPS) return;
       var quality = CHORD_QUALITIES.filter(function (q) { return q.label === chord[1]; })[0] || CHORD_QUALITIES[0];
       var gid = 'g' + (++chordGroupSeq);
       chordFromPitch(midiToNote(root + chord[0]), quality, ceiling).forEach(function (n) {
         if (noteNames.indexOf(n) === -1) return;
-        pianoRollNotes.push({ note: n, start: i * bar, length: bar, chord: gid });
+        out.push({ note: n, start: at, length: bar, chord: gid });
       });
     });
-    if (rollRedraw) rollRedraw();
+    return out;
   }
 
   // A lane's steps, so one can be taken off the grid and put back without
@@ -3010,6 +3047,8 @@
   // grouped so they behave like one pad rather than loose notes.
   let selectedQuality = CHORD_QUALITIES[0];
   let chordPlaceMode = 'chord';
+  // The progression waiting to be placed, if the player has picked one.
+  let pendingProgression = null;
   let chordGroupSeq = 0;
 
   function buildChordBar(noteNames) {
@@ -3035,29 +3074,63 @@
 
     var modes = document.createElement('div');
     modes.className = 'chord-mode-toggle';
-    [['chord', 'Chord'], ['note', 'Single note']].forEach(function (m) {
+    function lightMode() {
+      modes.querySelectorAll('.mode-btn').forEach(function (x) {
+        x.classList.toggle('active', x.dataset.mode === chordPlaceMode);
+      });
+      bar.classList.toggle('armed', chordPlaceMode === 'progression');
+    }
+    [['chord', 'Chord'], ['note', 'Single note'], ['progression', 'Progression']].forEach(function (m) {
       var b = document.createElement('button');
-      b.className = 'mode-btn' + (chordPlaceMode === m[0] ? ' active' : '');
+      b.className = 'mode-btn';
+      b.dataset.mode = m[0];
       b.textContent = m[1];
       b.onclick = function () {
-        modes.querySelectorAll('.mode-btn').forEach(function (x) { x.classList.remove('active'); });
-        b.classList.add('active');
+        // Progression only means anything with one picked, so that button
+        // opens the list rather than arming an empty mode.
+        if (m[0] === 'progression' && !pendingProgression) { progField.click(); return; }
         chordPlaceMode = m[0];
+        lightMode();
       };
       modes.appendChild(b);
     });
     bar.appendChild(modes);
 
-    // Four chords, filled in, as somewhere to start rather than a blank grid.
-    bar.appendChild(buildPicker('PROGRESSION', PROGRESSION_NAMES, 'Pick one', function (n) {
-      applyProgression(n, noteNames);
-    }));
+    // Pick a progression and the next note you place becomes its first chord:
+    // it is written from that row and that step, so it lands in the key and
+    // the place you chose rather than always in C at the start of the bar.
+    var picker = buildPicker('PROGRESSION', PROGRESSION_NAMES,
+      pendingProgression || 'Pick one', function (n) {
+        pendingProgression = n;
+        chordPlaceMode = 'progression';
+        lightMode();
+      });
+    var progField = picker.querySelector('.preset-field');
+    bar.appendChild(picker);
+    lightMode();
 
     var hint = document.createElement('span');
     hint.className = 'chord-bar-hint';
     hint.textContent = 'click a row to place it there';
     bar.appendChild(hint);
 
+    return bar;
+  }
+
+  function buildRowSizeBar() {
+    var bar = document.createElement('div');
+    bar.className = 'rowsize-bar';
+    var label = document.createElement('span');
+    label.className = 'rowsize-label';
+    label.textContent = 'ROWS';
+    bar.appendChild(label);
+    [['roomy', 'Roomy'], ['packed', 'Packed']].forEach(function (o) {
+      var b = document.createElement('button');
+      b.className = 'mode-btn' + (rollRowSize === o[0] ? ' active' : '');
+      b.textContent = o[1];
+      b.onclick = function () { if (rollRowSize !== o[0]) setRollRowSize(o[0]); };
+      bar.appendChild(b);
+    });
     return bar;
   }
 
@@ -3465,6 +3538,14 @@
 
     if (SHAPED_LAYERS[inst]) wrapper.appendChild(buildShaper(inst));
     if (chordMode) wrapper.appendChild(buildChordBar(noteNames));
+    // Into the transport row rather than a line of its own: a control meant to
+    // win back height should not spend any.
+    var controls = document.querySelector('#seq-' + inst + ' .seq-controls');
+    if (controls) {
+      var oldBar = controls.querySelector('.rowsize-bar');
+      if (oldBar) oldBar.remove();
+      controls.appendChild(buildRowSizeBar());
+    }
 
     var rollContainer = document.createElement('div');
     rollContainer.className = 'piano-roll';
@@ -3529,9 +3610,17 @@
         return;
       }
       if (rollScrollTop != null) { rollContainer.scrollTop = rollScrollTop; return; }
-      var homeRow = reversed.indexOf(ROLL_HOME[inst] || 'C3');
-      if (homeRow < 0) return;
-      rollContainer.scrollTop = Math.max(0, (homeRow + 1) * cellH - rollContainer.clientHeight * 0.82);
+      var lowRow = reversed.indexOf(ROLL_HOME_LOW);
+      var highRow = reversed.indexOf(ROLL_HOME_HIGH);
+      if (lowRow < 0 || highRow < 0) return;
+      // Centre the octave in the view. Too short to hold it, and C3 stays at
+      // the bottom with as much above it as fits.
+      var span = (lowRow - highRow + 1) * cellH;
+      var view = rollContainer.clientHeight;
+      var top = view >= span
+        ? highRow * cellH - (view - span) / 2
+        : (lowRow + 1) * cellH - view;
+      rollContainer.scrollTop = Math.max(0, top);
     }
     requestAnimationFrame(function () { restoreScroll(10); });
     rollContainer.addEventListener('scroll', function () { rollScrollTop = rollContainer.scrollTop; });
@@ -3603,7 +3692,10 @@
       }
 
       var placed;
-      if (chordMode && chordPlaceMode === 'chord') {
+      if (chordMode && chordPlaceMode === 'progression' && pendingProgression) {
+        placed = progressionFrom(pendingProgression, noteName, step, noteNames);
+        if (!placed.length) return;
+      } else if (chordMode && chordPlaceMode === 'chord') {
         var gid = 'g' + (++chordGroupSeq);
         placed = chordFromPitch(noteName, selectedQuality, noteToMidi(noteNames[noteNames.length - 1]))
           .map(function (n) { return { note: n, start: step, length: 1, chord: gid }; });

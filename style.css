@@ -2037,6 +2037,32 @@ body {
   .shaper-btn { padding: 2px 12px; }
 }
 
+/* Row height picker, on its own thin line above the roll. */
+.rowsize-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.rowsize-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
+.rowsize-bar .mode-btn { padding: 2px 10px; min-height: 26px; font-size: 0.7rem; }
+/* A finger needs a real target even on a control this small. */
+@media (max-width: 600px), (pointer: coarse) {
+  .rowsize-bar .mode-btn { min-height: 32px; padding: 2px 12px; }
+}
+
+/* The chord bar while a progression is armed: the next note placed writes the
+   whole thing, so the bar says so rather than leaving it a surprise. */
+.chord-bar.armed { box-shadow: inset 0 0 0 1px var(--accent); border-radius: var(--radius-xs); }
+.chord-bar.armed .chord-bar-hint::after {
+  content: ' — the note you place starts the progression';
+  color: var(--accent);
+}
+
 /* Sandbox: one tab per layer, always reachable. */
 .sandbox-tabs {
   display: flex;
@@ -2696,6 +2722,7 @@ body {
   color: var(--ph-amber);
   border-radius: 0;
 }
+:root[data-skin="phosphor"] .rowsize-label,
 :root[data-skin="phosphor"] .sandbox-tab,
 :root[data-skin="phosphor"] .lane-add-btn,
 :root[data-skin="phosphor"] .picker-label,
