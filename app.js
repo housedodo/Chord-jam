@@ -2554,6 +2554,7 @@
     }
 
     initSequencer(instrument);
+    warmVoices(instrument);
 
     document.getElementById('btn-submit').onclick = function () {
       clearInterval(buildTimer);
@@ -2919,7 +2920,8 @@
     drumLanes = DRUM_KITS[name].lanes.slice();
     initDrumGrid();
     if (synths.drums) { synths.drums.dispose(); synths.drums = null; }
-    ensureAudio().then(function () { synths.drums = createDrumSynth(currentDrumKit); });
+    voiceSig.drums = null;
+    ensureAudio().then(function () { drumsForSub({ kit: currentDrumKit }); });
   }
 
   function buildKitBar() {
@@ -3156,6 +3158,17 @@
     var progField = picker.querySelector('.preset-field');
     bar.appendChild(picker);
     lightMode();
+
+    var clear = document.createElement('button');
+    clear.className = 'mode-btn chord-clear';
+    clear.textContent = 'Clear all';
+    clear.onclick = function () {
+      if (!pianoRollNotes.length) return;
+      pianoRollNotes = [];
+      if (rollRedraw) rollRedraw();
+      toast('Chords cleared');
+    };
+    bar.appendChild(clear);
 
     var hint = document.createElement('span');
     hint.className = 'chord-bar-hint';
@@ -3710,12 +3723,15 @@
           e.preventDefault();
         } else if (grabbed) {
           // The middle of a note is a handle: drag it anywhere on the grid,
-          // in time and in pitch, with a chord moving as one block.
+          // in time and in pitch, with a chord moving as one block. A finger
+          // has no second button, so on touch a tap that does not turn into a
+          // drag deletes instead — which is what a tap used to do.
           var rect0 = canvas.getBoundingClientRect();
           var grabStep = Math.floor((e.clientX - rect0.left - LABEL_W) / CELL_W);
           var grabRow = Math.floor((e.clientY - rect0.top) / cellH);
           moving = {
             idxs: groupIdxs(idx),
+            tapDeletes: e.pointerType === 'touch' || e.pointerType === 'pen',
             grabStep: grabStep,
             grabRow: grabRow,
             from: groupIdxs(idx).map(function (i) {
@@ -3851,7 +3867,14 @@
       }
     });
 
-    canvas.addEventListener('pointerup', function () { resizing = null; moving = null; });
+    canvas.addEventListener('pointerup', function () {
+      if (moving && moving.tapDeletes && !moving.moved && moving.idxs.length) {
+        removeNoteAt(moving.idxs[0]);
+        renderPR(inst, reversed, cellH);
+      }
+      resizing = null;
+      moving = null;
+    });
     canvas.addEventListener('pointercancel', function () { resizing = null; moving = null; });
   }
 
@@ -4006,21 +4029,67 @@
     });
   }
 
+  // Both the warm-up and playback go through this, so what the warm-up builds
+  // is exactly what playback then finds in the cache.
+  function bgVoiceFor(inst, sub) {
+    if (!sub) return null;
+    if (inst === 'drums') {
+      return cachedVoice('bgDrums', subSignature('drums', sub), function () { return createDrumSynth(sub.kit); });
+    }
+    if (inst === 'sfx') return cachedVoice('bgSfx', 'sfx', function () { return createSfxSynth(); });
+    if (inst === 'chords') {
+      return cachedVoice('bgChords', subSignature('chords', sub), function () {
+        return createChordSynth(sub.sound, subShape('chords', sub)); });
+    }
+    if (inst === 'bass') {
+      return cachedVoice('bgBass', subSignature('bass', sub), function () {
+        return createInstrument('bass', sub.sound || 'Analog Bass', false, subShape('bass', sub)); });
+    }
+    if (inst === 'melody') {
+      return cachedVoice('bgMelody', subSignature('melody', sub), function () {
+        return createInstrument('melody', sub.sound || 'Piano', true, subShape('melody', sub)); });
+    }
+    return null;
+  }
+
+  // Voices are built when a layer opens rather than when play is pressed, so
+  // the cost lands while nobody is listening. Node graphs can be built on a
+  // suspended context, so this does not need audio to have started.
+  function warmVoices(inst) {
+    var run = function () {
+      try {
+        var game = games[currentGameIdx];
+        if (game) {
+          INSTRUMENTS.concat(['sfx', 'vocal']).forEach(function (other) {
+            if (other !== inst && game.submissions[other]) bgVoiceFor(other, game.submissions[other]);
+          });
+        }
+        if (inst === 'drums') drumsForSub({ kit: currentDrumKit });
+        else if (inst === 'sfx') cachedVoice('sfx', 'sfx', function () { return createSfxSynth(); });
+        else if (inst === 'chords') getOrCreateChordSynth();
+        else if (inst === 'bass') getOrCreateBassSynth();
+        else if (inst === 'melody') getOrCreateMelodySynth();
+      } catch (e) { console.warn('warm-up', e); }
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 1500 });
+    else setTimeout(run, 250);
+  }
+
   function addLayerSeq(inst, sub, seqs) {
     if (inst === 'drums') {
-      cachedVoice('bgDrums', subSignature('drums', sub), function () { return createDrumSynth(sub.kit); });
+      bgVoiceFor('drums', sub);
       var data = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         DRUM_NAMES.forEach(function (name) { if (data[name] && data[name][s]) synths.bgDrums.trigger(name, time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'sfx') {
-      cachedVoice('bgSfx', 'sfx', function () { return createSfxSynth(); });
+      bgVoiceFor('sfx', sub);
       var sfxData = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         SFX_NAMES.forEach(function (name) { if (sfxData[name] && sfxData[name][s]) synths.bgSfx.trigger(name, time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'chords') {
-      cachedVoice('bgChords', subSignature('chords', sub), function () { return createChordSynth(sub.sound, subShape('chords', sub)); });
+      bgVoiceFor('chords', sub);
       var notes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         notes.forEach(function (n) {
@@ -4028,13 +4097,13 @@
         });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'bass') {
-      cachedVoice('bgBass', subSignature('bass', sub), function () { return createInstrument('bass', sub.sound || 'Analog Bass', false, subShape('bass', sub)); });
+      bgVoiceFor('bass', sub);
       var bnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         bnotes.forEach(function (n) { if (n.start === s) synths.bgBass.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });
       }), Array.from({ length: STEPS }, function (_, i) { return i; }), '16n').start(0));
     } else if (inst === 'melody') {
-      cachedVoice('bgMelody', subSignature('melody', sub), function () { return createInstrument('melody', sub.sound || 'Piano', true, subShape('melody', sub)); });
+      bgVoiceFor('melody', sub);
       var mnotes = sub.data;
       seqs.push(new Tone.Sequence(safeStep(function (time, s) {
         mnotes.forEach(function (n) { if (n.start === s) synths.bgMelody.play(n.note, n.length * Tone.Time('16n').toSeconds(), time); });

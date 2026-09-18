@@ -2756,6 +2756,7 @@ body {
   .chord-bar > * { flex: none; }
   .sandbox-done { margin-left: 4px; }
   .chord-bar-hint { display: none; }
+  .chord-clear { order: 9; }
   .chord-bar-label { display: none; }
   .picker-label { font-size: 0.66rem; letter-spacing: 0.1em; }
   .picker .preset-field { flex: 0 0 150px; }
