@@ -2037,11 +2037,54 @@ body {
   .shaper-btn { padding: 2px 12px; }
 }
 
+/* Sandbox: one tab per layer, always reachable. */
+.sandbox-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+.sandbox-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.sandbox-tab:hover { color: var(--text); }
+/* A dot marks a layer that has something on it, so an empty session reads at
+   a glance. */
+.sandbox-tab.filled::before { content: '\2022 '; color: var(--accent); }
+.sandbox-tab.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.sandbox-done { margin-left: auto; border-style: dashed; }
+
+/* A labelled picker: kit, drum pattern, chord progression. */
+.picker { position: relative; display: flex; align-items: center; gap: 8px; }
+.picker-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.picker .preset-field { flex: 0 1 210px; }
+.picker .preset-list { left: auto; right: 0; width: 230px; max-width: none; margin: 0; }
+
 /* Drum kit bar and lane controls */
 .kit-bar {
   position: relative;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding-bottom: 8px;
 }
@@ -2595,6 +2638,24 @@ body {
   :root[data-skin="phosphor"] .logo { font-size: 2.5rem; padding: 8px 14px; }
 }
 
+/* Not much height to go round: a laptop at 768 leaves about 640px of viewport,
+   and the panel was taking 228 of it. Everything here shrinks the panel rather
+   than the roll, which is what people are actually working in. */
+@media (max-height: 820px) and (min-width: 601px) {
+  .shaper-source { padding-top: 8px; }
+  .shaper-preset { padding-top: 8px; }
+  .shaper-knobs { padding: 8px 12px 8px; }
+  .knob { width: 34px; height: 34px; }
+  .knob::after { height: 10px; transform-origin: 50% 14px; top: 3px; }
+  .knob-seg { inset: -6px; }
+  .knob-seg i { height: 4px; transform-origin: 50% 23px; }
+  .shaper-table { padding-top: 8px; }
+  .wave-scope { height: 44px; }
+  .preset-field { min-height: 30px; padding: 3px 10px; }
+  .src-btn { min-height: 28px; }
+  .chord-bar { padding: 4px 0; }
+}
+
 /* The shaper is the one amber panel in a green room, so it keeps its own
    colour against the skin's blanket green rules. It comes after them on
    purpose: they select on the same specificity and would otherwise win. */
@@ -2635,7 +2696,9 @@ body {
   color: var(--ph-amber);
   border-radius: 0;
 }
+:root[data-skin="phosphor"] .sandbox-tab,
 :root[data-skin="phosphor"] .lane-add-btn,
+:root[data-skin="phosphor"] .picker-label,
 :root[data-skin="phosphor"] .kit-label {
   font-family: 'VT323', monospace;
   font-size: 1.05rem;
@@ -2644,6 +2707,7 @@ body {
   border-radius: 0;
 }
 :root[data-skin="phosphor"] .preset-option.on,
+:root[data-skin="phosphor"] .sandbox-tab.on,
 :root[data-skin="phosphor"] .src-btn.on { color: var(--ph-black); }
 :root[data-skin="phosphor"] .preset-list { border-radius: 0; }
 

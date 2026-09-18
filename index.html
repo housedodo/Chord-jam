@@ -10,7 +10,7 @@
   <!-- ?v= is a cache buster. Bump it on every deploy: without it a phone
        keeps serving the CSS and JS it cached last visit, and the site looks
        like it never changed. -->
-  <link rel="stylesheet" href="style.css?v=20250918b">
+  <link rel="stylesheet" href="style.css?v=20250918c">
   <script>
     // Apply the skin before first paint, so the page never renders unskinned
     // while app.js loads. applyColorScheme() sets the variables afterwards.
@@ -50,6 +50,7 @@
         </div>
         <button id="btn-local" class="btn-secondary" style="width:100%">Local Multiplayer</button>
         <button id="btn-solo" class="btn-secondary" style="width:100%">Solo Mode</button>
+        <button id="btn-sandbox" class="btn-secondary" style="width:100%">Sandbox</button>
       </div>
       <p class="home-hint">Create a room and share the code, or join a friend's room!</p>
     </div>
@@ -183,6 +184,7 @@
   <!-- BUILD screen (instrument sequencer) -->
   <div id="screen-build" class="screen">
     <div class="build-container">
+      <div id="sandbox-tabs" class="sandbox-tabs" style="display:none"></div>
       <div class="build-header">
         <div class="build-info">
           <span id="build-song" class="build-song"></span>
@@ -334,6 +336,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
-  <script src="app.js?v=20250918b"></script>
+  <script src="app.js?v=20250918c"></script>
 </body>
 </html>

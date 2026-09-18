@@ -155,6 +155,9 @@
   // ── State ──
   let players = [];
   let soloMode = false;
+  // Sandbox: the same one-player session, but every layer stays open and you
+  // move between them instead of handing one in and moving on.
+  let sandboxMode = false;
   let gameBpm = 120;
   let games = []; // [{ songName, enteredBy, submissions:{}, guesses:[] }]
   let currentRound = 0;
@@ -2075,6 +2078,7 @@
       var name = getName();
       if (!name) { toast('Enter your name first'); return; }
       soloMode = false;
+      sandboxMode = false;
       var code = generateCode();
       toast('Creating room ' + code + '...');
       createHost(code, name);
@@ -2088,6 +2092,7 @@
       var code = document.getElementById('input-room-code').value.trim().toUpperCase();
       if (!code) { toast('Enter a room code'); return; }
       soloMode = false;
+      sandboxMode = false;
       joinRoom(code, name);
     });
 
@@ -2098,20 +2103,25 @@
       if (!name) { toast('Enter your name first'); return; }
       players = [{ name: name, color: PLAYER_COLORS[0] }];
       soloMode = false;
+      sandboxMode = false;
       netMode = 'local';
       showLobby();
     });
 
-    // Solo
-    document.getElementById('btn-solo').addEventListener('click', function () {
+    // Solo, and sandbox: the same setup screen, told apart by a flag.
+    function startOnePlayer(sandbox) {
       ensureAudio();
       var name = getName();
       if (!name) { toast('Enter your name first'); return; }
       players = [{ name: name, color: PLAYER_COLORS[0] }];
       soloMode = true;
+      sandboxMode = sandbox;
       netMode = 'local';
       showSoloSetup();
-    });
+    }
+    document.getElementById('btn-solo').addEventListener('click', function () { startOnePlayer(false); });
+    var sandboxBtn = document.getElementById('btn-sandbox');
+    if (sandboxBtn) sandboxBtn.addEventListener('click', function () { startOnePlayer(true); });
   }
 
   function getName() {
@@ -2133,10 +2143,109 @@
       soloInstIdx = 0;
       games = [{ songName: sn, enteredBy: 0, submissions: {}, guesses: [] }];
       currentGameIdx = 0;
+      currentTurnPlayer = 0;
+      if (sandboxMode) {
+        // No clock and no running order: every layer is open from the start.
+        gameSettings.timer = 'none';
+        currentSandboxLayer = null;
+        openSandboxLayer(INSTRUMENTS[0]);
+        return;
+      }
       startSoloBuild();
     };
     document.getElementById('btn-solo-back').onclick = function () { showScreen('home'); };
   }
+
+  // ── Sandbox ──
+  // Layers are kept in the same submissions map a game uses, so a sandbox
+  // session plays back, reveals and exports like any other.
+  function sandboxLayers() {
+    return INSTRUMENTS.slice();
+  }
+
+  function saveSandboxLayer(inst) {
+    if (!inst || !games[currentGameIdx]) return;
+    if (inst === 'vocal' && !vocalClip) return;
+    games[currentGameIdx].submissions[inst] = stampSound(
+      { data: collectData(inst), bpm: gameBpm, playerIndex: 0 }, inst);
+  }
+
+  function restoreSandboxLayer(inst) {
+    var sub = games[currentGameIdx] && games[currentGameIdx].submissions[inst];
+    if (!sub) return;
+    if (inst === 'drums' || inst === 'sfx') {
+      var gridId = inst === 'drums' ? '#drum-grid' : '#sfx-grid';
+      if (inst === 'drums') {
+        if (DRUM_KITS[sub.kit]) currentDrumKit = sub.kit;
+        // Any lane with something on it has to be showing, whatever the kit.
+        Object.keys(sub.data).forEach(function (lane) {
+          if (sub.data[lane] && sub.data[lane].indexOf(true) !== -1 && drumLanes.indexOf(lane) === -1) {
+            drumLanes.push(lane);
+          }
+        });
+        initDrumGrid();
+      }
+      Object.keys(sub.data).forEach(function (lane) {
+        (sub.data[lane] || []).forEach(function (on, step) {
+          if (!on) return;
+          var cell = document.querySelector(gridId + ' .drum-cell[data-name="' + lane + '"][data-step="' + step + '"]');
+          if (cell) cell.classList.add('on');
+        });
+      });
+      return;
+    }
+    if (inst === 'vocal') return;
+    if (sub.sound) {
+      if (inst === 'bass') currentBassSound = sub.sound;
+      else if (inst === 'chords') currentChordSound = sub.sound;
+      else currentMelodySound = sub.sound;
+    }
+    if (sub.shape) {
+      layerShapes[inst] = normaliseShape(inst, sub.sound, sub.shape);
+      layerShapeEdited[inst] = true;
+    }
+    pianoRollNotes = (sub.data || []).map(function (n) { return Object.assign({}, n); });
+    if (rollRedraw) rollRedraw();
+  }
+
+  function openSandboxLayer(inst) {
+    stopPreview();
+    saveSandboxLayer(currentSandboxLayer);
+    currentSandboxLayer = inst;
+    showBuild(inst);
+    restoreSandboxLayer(inst);
+    renderSandboxTabs();
+  }
+
+  function renderSandboxTabs() {
+    var bar = document.getElementById('sandbox-tabs');
+    if (!bar) return;
+    if (!sandboxMode) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = '';
+    sandboxLayers().forEach(function (inst) {
+      var b = document.createElement('button');
+      var sub = games[currentGameIdx] && games[currentGameIdx].submissions[inst];
+      var written = sub && (inst === 'drums' || inst === 'sfx'
+        ? Object.keys(sub.data || {}).some(function (k) { return (sub.data[k] || []).indexOf(true) !== -1; })
+        : (inst === 'vocal' ? !!(sub.data && sub.data.dataUrl) : (sub.data || []).length > 0));
+      b.className = 'sandbox-tab' + (inst === currentSandboxLayer ? ' on' : '') + (written ? ' filled' : '');
+      b.textContent = inst;
+      b.onclick = function () { if (inst !== currentSandboxLayer) openSandboxLayer(inst); };
+      bar.appendChild(b);
+    });
+    var done = document.createElement('button');
+    done.className = 'sandbox-tab sandbox-done';
+    done.textContent = 'listen';
+    done.onclick = function () {
+      saveSandboxLayer(currentSandboxLayer);
+      stopPreview();
+      showReveal();
+    };
+    bar.appendChild(done);
+  }
+
+  var currentSandboxLayer = null;
 
   function startSoloBuild() {
     if (soloInstIdx >= INSTRUMENTS.length) {
@@ -2314,6 +2423,7 @@
   // ── Build ──
   function showBuild(instrument) {
     showScreen('build');
+    renderSandboxTabs();
     // Start this round's layer from its preset. Playing a finished song loads
     // its author's shape into the globals, so without this the next round's
     // knobs would open on somebody else's settings. Reseeding here rather
@@ -2418,6 +2528,13 @@
     if (currentRound > 0 && game.enteredBy !== currentTurnPlayer && !soloMode) {
       var guess = document.getElementById('guess-input').value.trim();
       if (guess) game.guesses.push({ playerIndex: currentTurnPlayer, guess: guess, round: currentRound, instrument: instrument });
+    }
+
+    if (sandboxMode) {
+      saveSandboxLayer(instrument);
+      renderSandboxTabs();
+      toast(instrument + ' kept — switch layers any time');
+      return;
     }
 
     if (soloMode) {
@@ -2578,6 +2695,116 @@
     updateFillBar();
   }
 
+  // ── Starting points ──
+  // A pattern is written as one bar of sixteenths and tiled across the grid,
+  // which is how these grooves are actually thought of. Lanes a pattern needs
+  // are added to the grid if the kit does not already show them.
+  const DRUM_PATTERNS = {
+    'Four on the Floor': { Kick: [0,4,8,12], Clap: [4,12], HiHat: [2,6,10,14], OpenHH: [14] },
+    'Boom Bap':          { Kick: [0,6,10], Snare: [4,12], HiHat: [0,2,4,6,8,10,12,14] },
+    'Drum & Bass':       { Kick: [0,10], Snare: [4,12], HiHat: [2,6,10,14], Rim: [7] },
+    'Reggaeton':         { Kick: [0,8], Snare: [3,6,10,14], HiHat: [0,4,8,12] },
+    'Trap':              { Kick: [0,10], Snare: [8], HiHat: [0,2,4,6,8,10,12,13,14,15] },
+    'Rock':              { Kick: [0,8], Snare: [4,12], HiHat: [0,2,4,6,8,10,12,14], Crash: [0] }
+  };
+  const DRUM_PATTERN_NAMES = Object.keys(DRUM_PATTERNS);
+
+  // Four chords, as scale degrees from the key rather than fixed notes, so the
+  // same progression can start anywhere later without rewriting it.
+  const CHORD_PROGRESSIONS = {
+    'I - V - vi - IV': [[0,'Major'],[7,'Major'],[9,'Minor'],[5,'Major']],
+    'vi - IV - I - V': [[9,'Minor'],[5,'Major'],[0,'Major'],[7,'Major']],
+    'I - vi - IV - V': [[0,'Major'],[9,'Minor'],[5,'Major'],[7,'Major']],
+    'ii - V - I - I':  [[2,'Minor 7th'],[7,'7th'],[0,'Major 7th'],[0,'Major 7th']],
+    'i - VII - VI - V':[[0,'Minor'],[10,'Major'],[8,'Major'],[7,'Major']],
+    'i - VI - III - VII': [[0,'Minor'],[8,'Major'],[3,'Major'],[10,'Major']]
+  };
+  const PROGRESSION_NAMES = Object.keys(CHORD_PROGRESSIONS);
+  const PROGRESSION_ROOT = 'C4';
+
+  // The picker these all use: a lit field that drops a list. Same shape as the
+  // sound picker in the shaper, so there is one control to learn.
+  function buildPicker(label, names, current, onPick) {
+    var wrap = document.createElement('div');
+    wrap.className = 'picker';
+    if (label) {
+      var lab = document.createElement('span');
+      lab.className = 'picker-label';
+      lab.textContent = label;
+      wrap.appendChild(lab);
+    }
+    var field = document.createElement('button');
+    field.className = 'preset-field';
+    field.setAttribute('aria-haspopup', 'listbox');
+    var nameEl = document.createElement('span');
+    nameEl.className = 'preset-name';
+    nameEl.textContent = current;
+    var caret = document.createElement('span');
+    caret.className = 'preset-caret';
+    caret.textContent = '\u25be';
+    field.appendChild(nameEl);
+    field.appendChild(caret);
+    var list = document.createElement('div');
+    list.className = 'preset-list';
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+    function close() { list.hidden = true; document.removeEventListener('pointerdown', outside, true); }
+    function outside(e) { if (!wrap.contains(e.target)) close(); }
+    field.onclick = function () {
+      if (!list.hidden) { close(); return; }
+      list.innerHTML = '';
+      names.forEach(function (n) {
+        var opt = document.createElement('button');
+        opt.className = 'preset-option' + (n === nameEl.textContent ? ' on' : '');
+        opt.setAttribute('role', 'option');
+        opt.textContent = n;
+        opt.onclick = function () { close(); nameEl.textContent = n; onPick(n); };
+        list.appendChild(opt);
+      });
+      list.hidden = false;
+      document.addEventListener('pointerdown', outside, true);
+    };
+    wrap.appendChild(field);
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  function applyDrumPattern(name) {
+    var pat = DRUM_PATTERNS[name];
+    if (!pat) return;
+    Object.keys(pat).forEach(function (lane) {
+      if (drumLanes.indexOf(lane) === -1) drumLanes.push(lane);
+    });
+    // Written into the memory the grid restores from, so the rebuild that
+    // brings the new lanes in also brings the pattern.
+    drumLanes.forEach(function (lane) { rememberLane(lane); });
+    DRUM_NAMES.forEach(function (lane) {
+      if (!pat[lane]) { delete drumLaneMemory[lane]; return; }
+      var steps = [];
+      for (var s = 0; s < STEPS; s++) steps.push(pat[lane].indexOf(s % 16) !== -1);
+      drumLaneMemory[lane] = steps;
+    });
+    initDrumGrid();
+  }
+
+  function applyProgression(name, noteNames) {
+    var prog = CHORD_PROGRESSIONS[name];
+    if (!prog) return;
+    var root = noteToMidi(PROGRESSION_ROOT);
+    var ceiling = noteToMidi(noteNames[noteNames.length - 1]);
+    var bar = Math.max(1, Math.floor(STEPS / prog.length));
+    pianoRollNotes = [];
+    prog.forEach(function (chord, i) {
+      var quality = CHORD_QUALITIES.filter(function (q) { return q.label === chord[1]; })[0] || CHORD_QUALITIES[0];
+      var gid = 'g' + (++chordGroupSeq);
+      chordFromPitch(midiToNote(root + chord[0]), quality, ceiling).forEach(function (n) {
+        if (noteNames.indexOf(n) === -1) return;
+        pianoRollNotes.push({ note: n, start: i * bar, length: bar, chord: gid });
+      });
+    });
+    if (rollRedraw) rollRedraw();
+  }
+
   // A lane's steps, so one can be taken off the grid and put back without
   // losing the part written on it.
   function rememberLane(name) {
@@ -2652,6 +2879,7 @@
     bar.appendChild(label);
     bar.appendChild(field);
     bar.appendChild(list);
+    bar.appendChild(buildPicker('PATTERN', DRUM_PATTERN_NAMES, 'Pick one', applyDrumPattern));
     return bar;
   }
 
@@ -2784,7 +3012,7 @@
   let chordPlaceMode = 'chord';
   let chordGroupSeq = 0;
 
-  function buildChordBar() {
+  function buildChordBar(noteNames) {
     var bar = document.createElement('div');
     bar.className = 'chord-bar';
 
@@ -2819,6 +3047,11 @@
       modes.appendChild(b);
     });
     bar.appendChild(modes);
+
+    // Four chords, filled in, as somewhere to start rather than a blank grid.
+    bar.appendChild(buildPicker('PROGRESSION', PROGRESSION_NAMES, 'Pick one', function (n) {
+      applyProgression(n, noteNames);
+    }));
 
     var hint = document.createElement('span');
     hint.className = 'chord-bar-hint';
@@ -3152,7 +3385,9 @@
       title.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     title.onclick = function () { setOpen(panel.classList.contains('collapsed')); };
-    setOpen(shaperOpen === null ? !isPhoneLayout() : shaperOpen);
+    // Short screens too, not just phones: on a small laptop the panel and the
+    // chord bar left the roll three rows tall. Folded it is one line.
+    setOpen(shaperOpen === null ? (!isPhoneLayout() && window.innerHeight >= 760) : shaperOpen);
 
     // Picking a different preset reseeds the knobs from that preset.
     panel.reseed = function () {
@@ -3229,7 +3464,7 @@
     wrapper.className = 'piano-roll-wrapper';
 
     if (SHAPED_LAYERS[inst]) wrapper.appendChild(buildShaper(inst));
-    if (chordMode) wrapper.appendChild(buildChordBar());
+    if (chordMode) wrapper.appendChild(buildChordBar(noteNames));
 
     var rollContainer = document.createElement('div');
     rollContainer.className = 'piano-roll';
@@ -3304,24 +3539,49 @@
 
     // Interaction: edge-drag resize
     var resizing = null;
+    var moving = null;
+
+    // Right button deletes, so the browser menu must not open over the roll.
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
     canvas.addEventListener('pointerdown', function (e) {
+      var right = e.button === 2 || e.buttons === 2;
       var block = e.target.closest('.pr-note-block');
       if (block) {
         var idx = +block.dataset.index;
-        var edge = grabbedEdge(block.getBoundingClientRect(), e.clientX);
         var grabbed = pianoRollNotes[idx];
+        if (right) {
+          removeNoteAt(idx);
+          renderPR(inst, reversed, cellH);
+          return;
+        }
+        var edge = grabbedEdge(block.getBoundingClientRect(), e.clientX);
         if (edge && grabbed) {
           resizing = { noteIdx: idx, edge: edge, anchorEnd: grabbed.start + grabbed.length };
           canvas.setPointerCapture(e.pointerId);
           e.preventDefault();
-        } else {
-          removeNoteAt(idx);
-          renderPR(inst, reversed, cellH);
+        } else if (grabbed) {
+          // The middle of a note is a handle: drag it anywhere on the grid,
+          // in time and in pitch, with a chord moving as one block.
+          var rect0 = canvas.getBoundingClientRect();
+          var grabStep = Math.floor((e.clientX - rect0.left - LABEL_W) / CELL_W);
+          var grabRow = Math.floor((e.clientY - rect0.top) / cellH);
+          moving = {
+            idxs: groupIdxs(idx),
+            grabStep: grabStep,
+            grabRow: grabRow,
+            from: groupIdxs(idx).map(function (i) {
+              return { start: pianoRollNotes[i].start, row: reversed.indexOf(pianoRollNotes[i].note) };
+            }),
+            moved: false
+          };
+          canvas.setPointerCapture(e.pointerId);
+          e.preventDefault();
         }
         return;
       }
 
+      if (right) return;
       var cell = e.target.closest('.pr-cell');
       if (!cell) return;
       var step = +cell.dataset.step;
@@ -3380,6 +3640,30 @@
     }
 
     canvas.addEventListener('pointermove', function (e) {
+      if (moving) {
+        var mRect = canvas.getBoundingClientRect();
+        var step = Math.floor((e.clientX - mRect.left - LABEL_W) / CELL_W);
+        var row = Math.floor((e.clientY - mRect.top) / cellH);
+        var dStep = step - moving.grabStep;
+        var dRow = row - moving.grabRow;
+        // Clamp the whole group by its own edges, so a chord keeps its shape
+        // instead of collapsing against the end of the grid.
+        moving.from.forEach(function (f, k) {
+          var len = pianoRollNotes[moving.idxs[k]].length;
+          dStep = Math.max(-f.start, Math.min(STEPS - len - f.start, dStep));
+          dRow = Math.max(-f.row, Math.min(reversed.length - 1 - f.row, dRow));
+        });
+        if (dStep === 0 && dRow === 0 && !moving.moved) return;
+        moving.moved = true;
+        moving.idxs.forEach(function (i, k) {
+          var n = pianoRollNotes[i];
+          if (!n) return;
+          n.start = moving.from[k].start + dStep;
+          n.note = reversed[moving.from[k].row + dRow];
+        });
+        renderPR(inst, reversed, cellH);
+        return;
+      }
       if (!resizing) return;
       var rect = canvas.getBoundingClientRect();
       var x = e.clientX - rect.left;
@@ -3416,7 +3700,8 @@
       }
     });
 
-    canvas.addEventListener('pointerup', function () { resizing = null; });
+    canvas.addEventListener('pointerup', function () { resizing = null; moving = null; });
+    canvas.addEventListener('pointercancel', function () { resizing = null; moving = null; });
   }
 
   // Crossing the phone/desktop breakpoint (usually a rotation) needs the roll
