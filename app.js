@@ -1200,38 +1200,54 @@
     if (t.lowpass) {
       vol = new Tone.Filter({ type: 'lowpass', frequency: t.lowpass, rolloff: -12 }).connect(vol);
     }
-    var kick = new Tone.MembraneSynth({ pitchDecay: num(K.pitchDecay, 0.05), octaves: num(K.octaves, 6), envelope: { attack: 0.001, decay: num(K.decay, 0.3), sustain: 0 }, volume: num(K.volume, 0) }).connect(vol);
-    var snare = new Tone.NoiseSynth({ noise: { type: S.noise || 'white' }, envelope: { attack: 0.001, decay: num(S.decay, 0.15), sustain: 0 }, volume: num(S.volume, 0) }).connect(vol);
-    var hihat = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.decay, 0.06), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) }).connect(vol);
-    var openHH = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.openDecay, 0.3), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) - 2 }).connect(vol);
-    var clap = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1 * pd, sustain: 0 }, volume: pv }).connect(vol);
-    var tom = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, volume: pv }).connect(vol);
-    var rim = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05 * pd, sustain: 0 }, volume: -6 + pv }).connect(vol);
-    var crash = new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 + pv }).connect(vol);
-    var cowbell = new Tone.MetalSynth({ frequency: 560, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 16, resonance: 5000, octaves: 0.5, volume: -12 + pv }).connect(vol);
-    var shaker = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04 * pd, sustain: 0 }, volume: -10 + pv }).connect(vol);
-    var conga = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15 * pd, sustain: 0 }, volume: -4 + pv }).connect(vol);
+    // Built on first hit, not up front. A kit shows five or six lanes and a
+    // part often uses fewer, but every voice that exists is processed on
+    // every block — and the cymbals are the expensive ones: Tone's MetalSynth
+    // is six FM oscillators that keep running once triggered. An unplayed
+    // lane now costs nothing, and a background kit only pays for the lanes
+    // that actually have steps in them.
+    var makers = {
+      Kick: function () { return new Tone.MembraneSynth({ pitchDecay: num(K.pitchDecay, 0.05), octaves: num(K.octaves, 6), envelope: { attack: 0.001, decay: num(K.decay, 0.3), sustain: 0 }, volume: num(K.volume, 0) }); },
+      Snare: function () { return new Tone.NoiseSynth({ noise: { type: S.noise || 'white' }, envelope: { attack: 0.001, decay: num(S.decay, 0.15), sustain: 0 }, volume: num(S.volume, 0) }); },
+      HiHat: function () { return new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.decay, 0.06), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) }); },
+      OpenHH: function () { return new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: num(H.openDecay, 0.3), sustain: 0 }, harmonicity: 5.1, modulationIndex: 32, resonance: num(H.resonance, 4000), octaves: 1.5, volume: num(H.volume, -12) - 2 }); },
+      Clap: function () { return new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1 * pd, sustain: 0 }, volume: pv }); },
+      Tom: function () { return new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, volume: pv }); },
+      Rim: function () { return new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05 * pd, sustain: 0 }, volume: -6 + pv }); },
+      Crash: function () { return new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 0.8 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 40, resonance: 3500, octaves: 1.5, volume: -16 + pv }); },
+      Cowbell: function () { return new Tone.MetalSynth({ frequency: 560, envelope: { attack: 0.001, decay: 0.2 * pd, sustain: 0 }, harmonicity: 5.1, modulationIndex: 16, resonance: 5000, octaves: 0.5, volume: -12 + pv }); },
+      Shaker: function () { return new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.04 * pd, sustain: 0 }, volume: -10 + pv }); },
+      Conga: function () { return new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.001, decay: 0.15 * pd, sustain: 0 }, volume: -4 + pv }); }
+    };
+    // Which note each voice is struck at, and how long it rings. Nothing here
+    // is a pitch the player chooses — it is the kit's own voicing.
+    var hits = {
+      Kick: ['C1', '8n'], Snare: [null, '8n'], HiHat: [null, '32n'], OpenHH: [null, '16n'],
+      Clap: [null, '16n'], Tom: ['E2', '8n'], Rim: ['G4', '32n'], Crash: [null, '16n'],
+      Cowbell: [null, '16n'], Shaker: [null, '32n'], Conga: ['D3', '8n']
+    };
+    var voices = {};
+    function voice(name) {
+      if (!voices[name] && makers[name]) voices[name] = makers[name]().connect(vol);
+      return voices[name];
+    }
     return {
+      // Lazy must not mean built mid-bar: the warm-up primes the lanes a part
+      // actually uses, so the first play is as smooth as it was when every
+      // lane was built whether or not it was ever struck.
+      prime: function (names) { (names || Object.keys(makers)).forEach(voice); },
       trigger: function (name, time) {
-        switch (name) {
-          case 'Kick': kick.triggerAttackRelease('C1', '8n', time); break;
-          case 'Snare': snare.triggerAttackRelease('8n', time); break;
-          case 'HiHat': hihat.triggerAttackRelease('32n', time); break;
-          case 'OpenHH': openHH.triggerAttackRelease('16n', time); break;
-          case 'Clap': clap.triggerAttackRelease('16n', time); break;
-          case 'Tom': tom.triggerAttackRelease('E2', '8n', time); break;
-          case 'Rim': rim.triggerAttackRelease('G4', '32n', time); break;
-          case 'Crash': crash.triggerAttackRelease('16n', time); break;
-          case 'Cowbell': cowbell.triggerAttackRelease('16n', time); break;
-          case 'Shaker': shaker.triggerAttackRelease('32n', time); break;
-          case 'Conga': conga.triggerAttackRelease('D3', '8n', time); break;
-        }
+        var v = voice(name), hit = hits[name];
+        if (!v || !hit) return;
+        if (hit[0]) v.triggerAttackRelease(hit[0], hit[1], time);
+        else v.triggerAttackRelease(hit[1], time);
       },
       // Never the bus: it is cached and shared with whatever plays next, so
       // disposing it here left the layer connected to a dead node. The kit's
       // own filter, when it has one, does belong to the kit.
       dispose: function () {
-        [kick, snare, hihat, openHH, clap, tom, rim, crash, cowbell, shaker, conga].forEach(function (n) { n.dispose(); });
+        Object.keys(voices).forEach(function (k) { voices[k].dispose(); });
+        voices = {};
         if (t.lowpass && vol) vol.dispose();
       }
     };
@@ -1243,29 +1259,41 @@
 
   function createSynthSfxKit() {
     var vol = makeBus('sfx');
-    var siren = new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.2 } }).connect(vol);
-    var laser = new Tone.FMSynth({ harmonicity: 5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }).connect(vol);
-    var boom = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 8, envelope: { attack: 0.001, decay: 0.6, sustain: 0 } }).connect(vol);
-    var sweep = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.3, decay: 0.5, sustain: 0.2, release: 0.3 }, volume: -8 }).connect(vol);
-    var zap = new Tone.FMSynth({ harmonicity: 8, modulationIndex: 30, envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.05 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 } }).connect(vol);
-    var whoosh = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.1, decay: 0.3, sustain: 0, release: 0.2 }, volume: -6 }).connect(vol);
-    var glitch = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }, volume: -8 }).connect(vol);
-    var drop = new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, volume: 2 }).connect(vol);
+    // Lazy for the same reason as the drum kit: a part that uses two effects
+    // should not leave the other six running.
+    var makers = {
+      Siren: function () { return new Tone.FMSynth({ harmonicity: 3, modulationIndex: 10, envelope: { attack: 0.01, decay: 0.3, sustain: 0.3, release: 0.3 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.2 } }); },
+      Laser: function () { return new Tone.FMSynth({ harmonicity: 5, modulationIndex: 20, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 } }); },
+      Boom: function () { return new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 8, envelope: { attack: 0.001, decay: 0.6, sustain: 0 } }); },
+      Sweep: function () { return new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.3, decay: 0.5, sustain: 0.2, release: 0.3 }, volume: -8 }); },
+      Zap: function () { return new Tone.FMSynth({ harmonicity: 8, modulationIndex: 30, envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.05 }, modulation: { type: 'sawtooth' }, modulationEnvelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 } }); },
+      Whoosh: function () { return new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.1, decay: 0.3, sustain: 0, release: 0.2 }, volume: -6 }); },
+      Glitch: function () { return new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }, volume: -8 }); },
+      Drop: function () { return new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.8, sustain: 0 }, volume: 2 }); }
+    };
+    var hits = {
+      Siren: ['C5', '8n'], Laser: ['G6', '16n'], Boom: ['C1', '4n'], Sweep: [null, '8n'],
+      Zap: ['A5', '32n'], Whoosh: [null, '8n'], Glitch: [null, '32n'], Drop: ['C1', '4n']
+    };
+    var voices = {};
+    function voice(name) {
+      if (!voices[name] && makers[name]) voices[name] = makers[name]().connect(vol);
+      return voices[name];
+    }
     return {
+      prime: function (names) { (names || Object.keys(makers)).forEach(voice); },
       trigger: function (name, time) {
-        switch (name) {
-          case 'Siren': siren.triggerAttackRelease('C5', '8n', time); break;
-          case 'Laser': laser.triggerAttackRelease('G6', '16n', time); break;
-          case 'Boom': boom.triggerAttackRelease('C1', '4n', time); break;
-          case 'Sweep': sweep.triggerAttackRelease('8n', time); break;
-          case 'Zap': zap.triggerAttackRelease('A5', '32n', time); break;
-          case 'Whoosh': whoosh.triggerAttackRelease('8n', time); break;
-          case 'Glitch': glitch.triggerAttackRelease('32n', time); break;
-          case 'Drop': drop.triggerAttackRelease('C1', '4n', time); break;
-        }
+        var hit = hits[name];
+        if (!hit) return;
+        voice(name);
+        if (hit[0]) voices[name].triggerAttackRelease(hit[0], hit[1], time);
+        else voices[name].triggerAttackRelease(hit[1], time);
       },
       // The bus is cached and shared, so it is not the kit's to dispose.
-      dispose: function () { [siren, laser, boom, sweep, zap, whoosh, glitch, drop].forEach(function (n) { n.dispose(); }); }
+      dispose: function () {
+        Object.keys(voices).forEach(function (k) { voices[k].dispose(); });
+        voices = {};
+      }
     };
   }
 
@@ -1278,8 +1306,11 @@
     var preset = CHORD_SOUNDS[name] || CHORD_SOUNDS[Object.keys(CHORD_SOUNDS)[0]];
     var bus = makeBus('chords');
     var reverb = makeReverb('chords', 2, 0.25, bus);
+    // A chord is four notes and they do not overlap the next one by much;
+    // sixteen voices was a ceiling nothing reached and every spare voice, once
+    // triggered, keeps its oscillators running.
     var poly = capVoices(new Tone.PolySynth(Tone.FMSynth, withShape(preset, sh))
-      .connect(shapeFilter('chords', sh, reverb)), 16);
+      .connect(shapeFilter('chords', sh, reverb)), 8);
     return {
       play: function (notes, dur, time) { poly.triggerAttackRelease(notes, dur, time); },
       dispose: function () { poly.dispose(); }
@@ -1301,7 +1332,7 @@
     var opts = withShape(preset, shape);
     var syn;
     if (poly) {
-      syn = capVoices(new Tone.PolySynth(Tone.FMSynth, opts).connect(dest), 16);
+      syn = capVoices(new Tone.PolySynth(Tone.FMSynth, opts).connect(dest), 8);
     } else {
       syn = new Tone.FMSynth(opts).connect(dest);
     }
@@ -1396,6 +1427,9 @@
     if (!pending.length) return fallback;
     pendingAudioLoads.push(Promise.all(pending));
     return {
+      // A pad the pack does not replace still falls back to the synth voice,
+      // so the warm-up has to reach it.
+      prime: function (names) { if (fallback.prime) fallback.prime(names); },
       trigger: function (name, time) {
         var pl = players[name];
         if (pl && pl.loaded) { pl.start(time); return; }
@@ -1486,7 +1520,7 @@
       envelope: { attack: sh.attack, decay: sh.decay, sustain: sh.sustain, release: sh.release },
       detune: sh.fine,
       volume: trimAt(sh.table)
-    }).connect(shapeFilter(key, sh, reverb)), 16);
+    }).connect(shapeFilter(key, sh, reverb)), 8);
     return {
       play: function (note, dur, time) { syn.triggerAttackRelease(note, dur, time); },
       dispose: function () { syn.dispose(); }
@@ -1724,6 +1758,9 @@
   var musicOn = true;
   var musicWanted = false;
   var musicArmed = false;
+  // Set while the theme's context is deliberately suspended, so the state
+  // change that follows is not mistaken for the browser pulling audio away.
+  var musicParked = false;
 
   // Trimming to the first and last audible samples was not enough. Two things
   // still left a hole at the wrap, measured at 41dB deep and about 25ms long:
@@ -1959,12 +1996,13 @@
         fadeMusicTo(0);
         // Tear the source down once silent, not before, or the fade is cut off.
         setTimeout(function () {
-          if (!musicWanted || !musicOn) stopMusicSource();
+          if (!musicWanted || !musicOn) { stopMusicSource(); parkMusic(); }
         }, MUSIC_FADE * 1000 + 60);
-      }
+      } else parkMusic();
       return;
     }
     if (musicCtx.state === 'running') {
+      musicParked = false;
       startMusicSource();
       fadeMusicTo(MUSIC_VOLUME, MUSIC_ATTACK);
       return;
@@ -1977,6 +2015,16 @@
     musicCtx.resume().then(function () {
       if (musicCtx.state === 'running') ensureMusicPlaying();
     }).catch(function () {});
+  }
+
+  // The theme has an audio context of its own, separate from the one the game
+  // plays through, and a running context costs its render thread whether or
+  // not anything is sounding. Two of them on a weak laptop is what audio has
+  // left over for crackling. Silent means suspended, not merely faded out.
+  function parkMusic() {
+    if (!musicCtx || musicCtx.state !== 'running' || musicParked) return;
+    musicParked = true;
+    musicCtx.suspend().catch(function () { musicParked = false; });
   }
 
   function updateMenuMusic(screenId) {
@@ -2014,7 +2062,8 @@
     // backgrounding a tab on a phone does it, and it does not come back on its
     // own when the page is looked at again.
     musicCtx.onstatechange = function () {
-      if (musicCtx.state === 'running') ensureMusicPlaying();
+      if (musicCtx.state === 'running') { musicParked = false; ensureMusicPlaying(); }
+      else if (musicParked) return;   // we suspended it on purpose
       else if (musicWanted && musicOn) { stopMusicSource(); armMusicGesture(); }
     };
     document.addEventListener('visibilitychange', function () {
@@ -2564,6 +2613,7 @@
     }
 
     initSequencer(instrument);
+    releaseOtherVoices(instrument);
     warmVoices(instrument);
 
     document.getElementById('btn-submit').onclick = function () {
@@ -2883,6 +2933,24 @@
   const PROGRESSION_NAMES = Object.keys(CHORD_PROGRESSIONS);
   const PROGRESSION_ROOT = 'C4';
 
+  // An arpeggio is a chord played one note at a time. Melody gets these the
+  // way chords get progressions: pick one, and the next note you place is the
+  // root it climbs from. `order` is the path through the chord, `rate` is how
+  // many steps each note lasts (2 = eighths, 1 = sixteenths) and `reach` is
+  // how many octaves the ladder spans.
+  const ARP_PATTERNS = {
+    'Up':        { order: 'up',     rate: 2, reach: 2 },
+    'Down':      { order: 'down',   rate: 2, reach: 2 },
+    'Up & Down': { order: 'updown', rate: 2, reach: 2 },
+    'Runner':    { order: 'up',     rate: 1, reach: 2 },
+    'Octaves':   { order: 'octave', rate: 2, reach: 1 },
+    'Thumb':     { order: 'thumb',  rate: 2, reach: 1 }
+  };
+  const ARP_PATTERN_NAMES = Object.keys(ARP_PATTERNS);
+  // One bar, like a progression's chord. Long enough to be a figure, short
+  // enough to leave room to answer it.
+  const ARP_BAR = 16;
+
   // The picker these all use: a lit field that drops a list. Same shape as the
   // sound picker in the shaper, so there is one control to learn.
   function buildPicker(label, names, current, onPick) {
@@ -3049,7 +3117,10 @@
     initDrumGrid();
     if (synths.drums) { synths.drums.dispose(); synths.drums = null; }
     voiceSig.drums = null;
-    ensureAudio().then(function () { drumsForSub({ kit: currentDrumKit }); });
+    ensureAudio().then(function () {
+      var kit = drumsForSub({ kit: currentDrumKit });
+      if (kit.prime) kit.prime(drumLanes);
+    });
   }
 
   function buildKitBar() {
@@ -3225,6 +3296,64 @@
     return limit;
   }
 
+  // The chord tones an arpeggio walks, as semitones above the root, laid out
+  // over as many octaves as the pattern reaches.
+  function arpLadder(intervals, reach) {
+    var out = [];
+    for (var o = 0; o < (reach || 1); o++) {
+      intervals.forEach(function (i) { out.push(i + 12 * o); });
+    }
+    return out;
+  }
+
+  function arpOrder(order, intervals, reach) {
+    var ladder = arpLadder(intervals, reach);
+    if (order === 'down') return ladder.slice().reverse();
+    if (order === 'updown') {
+      // Turn around on the top and bottom notes rather than striking them
+      // twice, or the figure limps at both ends.
+      return ladder.concat(ladder.slice(1, -1).reverse());
+    }
+    if (order === 'octave') {
+      var oct = [];
+      intervals.forEach(function (i) { oct.push(i); oct.push(i + 12); });
+      return oct;
+    }
+    if (order === 'thumb') {
+      // The root between every other tone, the way a picked guitar figure
+      // keeps coming back to the bass note.
+      var th = [];
+      intervals.slice(1).forEach(function (i) { th.push(intervals[0]); th.push(i); });
+      return th.length ? th : intervals.slice();
+    }
+    return ladder;
+  }
+
+  // The arpeggio written from wherever it was placed: the row clicked is the
+  // root, and the figure repeats for a bar from that step. Notes that would
+  // run off the end of the grid are left off rather than squeezed in, and
+  // anything above the top of the roll folds back an octave.
+  function arpeggioFrom(name, rootName, startStep, noteNames, quality) {
+    var pat = ARP_PATTERNS[name];
+    if (!pat) return [];
+    var root = noteToMidi(rootName);
+    if (root === null) return [];
+    var ceiling = noteToMidi(noteNames[noteNames.length - 1]);
+    var order = arpOrder(pat.order, (quality || CHORD_QUALITIES[0]).intervals, pat.reach);
+    if (!order.length) return [];
+    var out = [];
+    for (var n = 0; n * pat.rate < ARP_BAR; n++) {
+      var at = startStep + n * pat.rate;
+      if (at + pat.rate > STEPS) break;
+      var m = root + order[n % order.length];
+      while (ceiling != null && m > ceiling) m -= 12;
+      var note = midiToNote(m);
+      if (noteNames.indexOf(note) === -1) continue;
+      out.push({ note: note, start: at, length: pat.rate });
+    }
+    return out;
+  }
+
   // ── Chord roll ──
   // Chords live on a piano roll like every other pitched part. The row you
   // click is the root; the selector only chooses the quality. Stacks stay
@@ -3301,6 +3430,87 @@
       pianoRollNotes = [];
       if (rollRedraw) rollRedraw();
       toast('Chords cleared');
+    };
+    bar.appendChild(clear);
+
+    var hint = document.createElement('span');
+    hint.className = 'chord-bar-hint';
+    hint.textContent = 'click a row to place it there';
+    bar.appendChild(hint);
+
+    return bar;
+  }
+
+  // Melody's writing bar. Same shape as the chord bar, because it is the same
+  // bargain: arm a figure, place one note, get the whole thing — and every
+  // note of it is an ordinary note afterwards, to drag, stretch or delete.
+  let melodyPlaceMode = 'note';
+  let pendingArp = null;
+  let selectedArpQuality = CHORD_QUALITIES[0];
+
+  function buildArpBar(noteNames) {
+    var bar = document.createElement('div');
+    bar.className = 'chord-bar arp-bar';
+
+    var label = document.createElement('span');
+    label.className = 'chord-bar-label';
+    label.textContent = 'Arp';
+    bar.appendChild(label);
+
+    var sel = document.createElement('select');
+    sel.className = 'chord-select';
+    CHORD_QUALITIES.forEach(function (q, i) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = q.label;
+      if (q === selectedArpQuality) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function () { selectedArpQuality = CHORD_QUALITIES[+sel.value]; };
+    bar.appendChild(sel);
+
+    var modes = document.createElement('div');
+    modes.className = 'chord-mode-toggle';
+    function lightMode() {
+      modes.querySelectorAll('.mode-btn').forEach(function (x) {
+        x.classList.toggle('active', x.dataset.mode === melodyPlaceMode);
+      });
+      bar.classList.toggle('armed', melodyPlaceMode === 'arp');
+    }
+    [['note', 'Single note'], ['arp', 'Arpeggio']].forEach(function (m) {
+      var b = document.createElement('button');
+      b.className = 'mode-btn';
+      b.dataset.mode = m[0];
+      b.textContent = m[1];
+      b.onclick = function () {
+        // Arpeggio means nothing without a pattern, so that button opens the
+        // list rather than arming an empty mode.
+        if (m[0] === 'arp' && !pendingArp) { arpField.click(); return; }
+        melodyPlaceMode = m[0];
+        lightMode();
+      };
+      modes.appendChild(b);
+    });
+    bar.appendChild(modes);
+
+    var picker = buildPicker('PATTERN', ARP_PATTERN_NAMES,
+      pendingArp || 'Pick one', function (n) {
+        pendingArp = n;
+        melodyPlaceMode = 'arp';
+        lightMode();
+      });
+    var arpField = picker.querySelector('.preset-field');
+    bar.appendChild(picker);
+    lightMode();
+
+    var clear = document.createElement('button');
+    clear.className = 'mode-btn chord-clear';
+    clear.textContent = 'Clear all';
+    clear.onclick = function () {
+      if (!pianoRollNotes.length) return;
+      pianoRollNotes = [];
+      if (rollRedraw) rollRedraw();
+      toast('Melody cleared');
     };
     bar.appendChild(clear);
 
@@ -3782,8 +3992,10 @@
     // The controls are built here and placed by layoutBuild(), which decides
     // between the rail and the toolbar. They are not appended to the wrapper
     // any more: on a wide screen they do not belong above the roll at all.
+    var arpMode = inst === 'melody';
     buildParts.shaper = SHAPED_LAYERS[inst] ? buildShaper(inst) : null;
-    buildParts.writing = chordMode ? buildChordBar(noteNames) : null;
+    buildParts.writing = chordMode ? buildChordBar(noteNames)
+      : (arpMode ? buildArpBar(noteNames) : null);
     buildParts.view = buildRowSizeBar();
     buildParts.extra = null;
 
@@ -3936,9 +4148,18 @@
       }
 
       var placed;
-      if (chordMode && chordPlaceMode === 'progression' && pendingProgression) {
+      // A figure spread across the bar is finished as placed. Grabbing its
+      // last note to stretch, the way a single note is grabbed, would just
+      // smear whichever note happened to be last.
+      var figure = false;
+      if (arpMode && melodyPlaceMode === 'arp' && pendingArp) {
+        placed = arpeggioFrom(pendingArp, noteName, step, noteNames, selectedArpQuality);
+        if (!placed.length) return;
+        figure = true;
+      } else if (chordMode && chordPlaceMode === 'progression' && pendingProgression) {
         placed = progressionFrom(pendingProgression, noteName, step, noteNames);
         if (!placed.length) return;
+        figure = true;
       } else if (chordMode && chordPlaceMode === 'chord') {
         var gid = 'g' + (++chordGroupSeq);
         placed = chordFromPitch(noteName, selectedQuality, noteToMidi(noteNames[noteNames.length - 1]))
@@ -3949,8 +4170,10 @@
       placed.forEach(function (n) { pianoRollNotes.push(n); });
       renderPR(inst, reversed, cellH);
 
-      resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
-      canvas.setPointerCapture(e.pointerId);
+      if (!figure) {
+        resizing = { noteIdx: pianoRollNotes.length - 1, edge: 'right' };
+        canvas.setPointerCapture(e.pointerId);
+      }
 
       ensureAudio().then(function () {
         if (inst === 'bass') { if (!synths.bass) getOrCreateBassSynth(); synths.bass.play(noteName, '16n'); }
@@ -4213,12 +4436,27 @@
 
   // Both the warm-up and playback go through this, so what the warm-up builds
   // is exactly what playback then finds in the cache.
+  // The pads a saved part actually strikes — everything else in its kit can
+  // stay unbuilt.
+  function padsUsed(sub) {
+    var data = (sub && sub.data) || {};
+    return Object.keys(data).filter(function (k) {
+      return (data[k] || []).indexOf(true) !== -1;
+    });
+  }
+
   function bgVoiceFor(inst, sub) {
     if (!sub) return null;
     if (inst === 'drums') {
-      return cachedVoice('bgDrums', subSignature('drums', sub), function () { return createDrumSynth(sub.kit); });
+      var kit = cachedVoice('bgDrums', subSignature('drums', sub), function () { return createDrumSynth(sub.kit); });
+      if (kit.prime) kit.prime(padsUsed(sub));
+      return kit;
     }
-    if (inst === 'sfx') return cachedVoice('bgSfx', 'sfx', function () { return createSfxSynth(); });
+    if (inst === 'sfx') {
+      var fx = cachedVoice('bgSfx', 'sfx', function () { return createSfxSynth(); });
+      if (fx.prime) fx.prime(padsUsed(sub));
+      return fx;
+    }
     if (inst === 'chords') {
       return cachedVoice('bgChords', subSignature('chords', sub), function () {
         return createChordSynth(sub.sound, subShape('chords', sub)); });
@@ -4234,6 +4472,28 @@
     return null;
   }
 
+  // Every voice that exists is processed on every audio block, playing or
+  // silent — Tone leaves a triggered voice's oscillators running until it is
+  // disposed. So the layer you are building keeps its voice and the layers
+  // behind it keep their bg voices, but the foreground voice of a layer you
+  // have moved on from is just a second copy of a kit nobody is listening to.
+  // Four rounds in, that was eight instruments alive to play four.
+  const FG_VOICES = ['drums', 'chords', 'bass', 'melody', 'sfx'];
+  const BG_VOICES = ['bgDrums', 'bgChords', 'bgBass', 'bgMelody', 'bgSfx'];
+  function releaseVoices(keys, keep) {
+    keys.forEach(function (key) {
+      if (key === keep || !synths[key]) return;
+      try { synths[key].dispose(); } catch (e) {}
+      synths[key] = null;
+      voiceSig[key] = null;
+    });
+  }
+  function releaseOtherVoices(keep) {
+    // Never while something is playing: a running sequence is holding these.
+    if (previewPlaying) return;
+    releaseVoices(FG_VOICES, keep);
+  }
+
   // Voices are built when a layer opens rather than when play is pressed, so
   // the cost lands while nobody is listening. Node graphs can be built on a
   // suspended context, so this does not need audio to have started.
@@ -4246,8 +4506,13 @@
             if (other !== inst && game.submissions[other]) bgVoiceFor(other, game.submissions[other]);
           });
         }
-        if (inst === 'drums') drumsForSub({ kit: currentDrumKit });
-        else if (inst === 'sfx') cachedVoice('sfx', 'sfx', function () { return createSfxSynth(); });
+        if (inst === 'drums') {
+          var kit = drumsForSub({ kit: currentDrumKit });
+          if (kit.prime) kit.prime(drumLanes);
+        } else if (inst === 'sfx') {
+          var fx = cachedVoice('sfx', 'sfx', function () { return createSfxSynth(); });
+          if (fx.prime) fx.prime(SFX_NAMES);
+        }
         else if (inst === 'chords') getOrCreateChordSynth();
         else if (inst === 'bass') getOrCreateBassSynth();
         else if (inst === 'melody') getOrCreateMelodySynth();
@@ -4450,6 +4715,10 @@
 
   function playAllLayersForGame(gameIdx, seqs) {
     var game = games[gameIdx];
+    // The reveal builds its own voice for every layer, so the background
+    // copies the build screen was using are now a second full band sitting in
+    // the graph doing nothing. Building is over — let them go.
+    releaseVoices(BG_VOICES);
     Tone.Transport.stop();
     Tone.Transport.cancel();
     Tone.Transport.bpm.value = gameBpm;

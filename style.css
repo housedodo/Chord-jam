@@ -2062,6 +2062,9 @@ body {
   content: ' — the note you place starts the progression';
   color: var(--accent);
 }
+.chord-bar.arp-bar.armed .chord-bar-hint::after {
+  content: ' — the note you place starts the arpeggio';
+}
 
 /* Sandbox: one tab per layer, always reachable. */
 .sandbox-tabs {
